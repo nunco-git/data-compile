@@ -352,6 +352,7 @@
         <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center;">
           <label style="font-size:12px; color:#334155;">회차 선택:</label>
           <select id="roundSelector" onchange="switchViewingRound(this.value)" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;"></select>
+          <button class="btn btn-danger btn-sm" onclick="deleteRound(viewingRoundId)">🗑️ 이 회차 삭제</button>
         </div>
         <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap: wrap; align-items:center;">
           <button class="btn btn-excel btn-sm" onclick="exportToExcel()">📥 취합 응답 엑셀 다운로드 (.xlsx)</button>
@@ -681,16 +682,17 @@
       if (!name) return;
 
       const managerRef = db.collection('managers').doc(currentUser.id);
-      const oldRoundRef = managerRef.collection('rounds').doc(currentRoundId);
 
-      await oldRoundRef.update({ status: 'closed', closedAt: Date.now() });
+      if (currentRoundId) {
+        await managerRef.collection('rounds').doc(currentRoundId).update({ status: 'closed', closedAt: Date.now() });
+      }
 
       const newRoundRef = managerRef.collection('rounds').doc();
       const newRoundData = {
         name,
         questions: currentUser.questions || [],
-        columns: currentUser.columns || cloneDefaultColumns(),
-        useSurvey: !!currentUser.useSurvey,
+        columns: (currentUser.columns && currentUser.columns.length) ? currentUser.columns : cloneDefaultColumns(),
+        useSurvey: currentUser.useSurvey !== false,
         useExcel: !!currentUser.useExcel,
         status: 'open',
         createdAt: Date.now(),
@@ -701,10 +703,15 @@
 
       currentUser.activeRoundId = newRoundRef.id;
       currentRoundId = newRoundRef.id;
+      currentUser.questions = newRoundData.questions;
+      currentUser.columns = newRoundData.columns;
+      currentUser.useSurvey = newRoundData.useSurvey;
+      currentUser.useExcel = newRoundData.useExcel;
 
       alert(`"${name}" 회차를 새로 시작했습니다. 이전 회차의 응답은 "응답 취합" 탭에서 회차를 선택해 계속 조회할 수 있습니다.`);
 
       await loadRoundsList();
+      renderModeSelection();
       renderManagerQuestions();
       renderColumnConfigEditor();
       if (!document.getElementById('managerTabResponses').classList.contains('hidden')) {
@@ -714,11 +721,73 @@
 
     // 응답 취합 탭에서 조회할 회차를 변경 (과거 회차도 조회 가능, 실시간 구독 대상만 바뀜)
     async function switchViewingRound(roundId) {
+      if (!roundId) {
+        viewingRoundId = null;
+        viewingRoundMeta = null;
+        if (responsesUnsub) { responsesUnsub(); responsesUnsub = null; }
+        cachedResponseDocs = [];
+        document.getElementById('responseTableHeader').innerHTML = '';
+        document.getElementById('responseTableBody').innerHTML = '';
+        return;
+      }
       viewingRoundId = roundId;
       const roundSnap = await db.collection('managers').doc(currentUser.id)
         .collection('rounds').doc(roundId).get();
       viewingRoundMeta = roundSnap.exists ? roundSnap.data() : { questions: [], columns: [], useSurvey: false, useExcel: false };
       subscribeResponses();
+    }
+
+    // 회차(설문)와 그 안의 모든 응답을 삭제
+    async function deleteRound(roundId) {
+      if (!roundId) { alert('삭제할 회차를 먼저 선택하세요.'); return; }
+      const round = roundsList.find(r => r.id === roundId);
+      if (!round) return;
+
+      const isActive = roundId === currentRoundId;
+      const warnMsg = isActive
+        ? `"${round.name}"는 현재 진행 중인 회차입니다. 삭제하면 기관은 더 이상 이 회차에 제출할 수 없게 되고, 그동안 제출된 응답도 모두 함께 삭제됩니다.\n정말 삭제하시겠습니까?`
+        : `"${round.name}" 회차와 그동안 제출된 응답이 모두 삭제됩니다. 되돌릴 수 없습니다.\n정말 삭제하시겠습니까?`;
+      if (!confirm(warnMsg)) return;
+      if (!confirm('한 번 더 확인합니다. 정말로 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.')) return;
+
+      const roundRef = db.collection('managers').doc(currentUser.id).collection('rounds').doc(roundId);
+      const responsesSnap = await roundRef.collection('responses').get();
+
+      let batch = db.batch();
+      let opCount = 0;
+      for (const rDoc of responsesSnap.docs) {
+        batch.delete(rDoc.ref);
+        opCount++;
+        if (opCount >= 400) { await batch.commit(); batch = db.batch(); opCount = 0; }
+      }
+      batch.delete(roundRef);
+      await batch.commit();
+
+      if (isActive) {
+        await db.collection('managers').doc(currentUser.id).update({ activeRoundId: firebase.firestore.FieldValue.delete() });
+        currentUser.activeRoundId = null;
+        currentRoundId = null;
+        currentUser.questions = [];
+        currentUser.columns = cloneDefaultColumns();
+        renderModeSelection();
+        renderManagerQuestions();
+        renderColumnConfigEditor();
+      }
+
+      await loadRoundsList();
+
+      if (!currentRoundId) {
+        alert('활성 회차가 삭제되었습니다. "새 회차 시작" 버튼을 눌러 새 회차를 시작해주세요.');
+      } else {
+        alert('회차가 삭제되었습니다.');
+      }
+
+      if (roundsList.length > 0) {
+        await switchViewingRound(roundsList[0].id);
+        renderRoundSelector();
+      } else {
+        await switchViewingRound(null);
+      }
     }
 
     // 회차의 질문/컬럼 구성을 빈 엑셀 서식으로 다운로드 (재사용/공유용)
@@ -777,6 +846,7 @@
     // 취합 방식 토글
     async function toggleUseMode(type) {
       if (!currentUser) return;
+      if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
       const key = type === 'survey' ? 'useSurvey' : 'useExcel';
       const otherKey = type === 'survey' ? 'useExcel' : 'useSurvey';
       const newVal = !currentUser[key];
@@ -1089,6 +1159,7 @@
     }
 
     async function addQuestion() {
+      if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
       const title = document.getElementById('newQTitle').value.trim();
       const type = document.getElementById('newQType').value;
       const optionsRaw = document.getElementById('newQOptions').value.trim();
@@ -1110,6 +1181,7 @@
     }
 
     async function deleteQuestion(qId) {
+      if (!currentRoundId) return;
       if (!confirm('질문을 삭제하시겠습니까?')) return;
       currentUser.questions = currentUser.questions.filter(q => q.id !== qId);
       await db.collection('managers').doc(currentUser.id)
@@ -1189,6 +1261,7 @@
     }
 
     async function saveColumnConfig() {
+      if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
       if (!columnConfigGrid) return;
       const rows = columnConfigGrid.getData();
       const cols = [];
