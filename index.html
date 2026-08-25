@@ -8,6 +8,12 @@
   <!-- SheetJS (엑셀 다운로드) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
+  <!-- jspreadsheet-ce (실제 엑셀처럼 셀 선택/드래그/붙여넣기가 되는 입력 그리드) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsuites@4/dist/jsuites.css" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/jsuites@4/dist/jsuites.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jspreadsheet-ce@4/dist/jspreadsheet.css" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/jspreadsheet-ce@4/dist/index.js"></script>
+
   <!-- Firebase (Auth + Firestore) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -231,13 +237,9 @@
 
         <div id="excelGridSection" class="hidden">
           <div class="section-heading">📊 엑셀 자료 입력</div>
-          <p class="grid-hint">기존 엑셀에서 복사(Ctrl+C) 후 첫 셀을 클릭하고 붙여넣기(Ctrl+V) 하세요. 문항이 많으면 표 위/아래 가로 스크롤바로 좌우 이동할 수 있습니다.</p>
-          <div class="grid-top-scroll" id="gridTopScroll"><div class="grid-top-scroll-inner" id="gridTopScrollInner"></div></div>
-          <div class="grid-container" id="gridContainer">
-            <table class="data-grid">
-              <thead><tr id="surveyGridHeader"></tr></thead>
-              <tbody id="surveyGridBody"></tbody>
-            </table>
+          <p class="grid-hint">실제 엑셀처럼 셀을 클릭/드래그해서 선택하고, 화살표 키로 이동하며, 엑셀에서 복사한 범위를 그대로 붙여넣기(Ctrl+V)할 수 있습니다.</p>
+          <div id="jspreadsheetWrap" style="max-height:480px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
+            <div id="jspreadsheetContainer"></div>
           </div>
           <div style="margin-bottom:16px;">
             <button type="button" class="btn btn-secondary btn-sm" onclick="addSurveyGridRow()">+ 행 추가</button>
@@ -864,6 +866,9 @@
 
     function exitSurvey() {
       activeSurveyInfo = null;
+      gridInstance = null;
+      const gc = document.getElementById('jspreadsheetContainer');
+      if (gc) gc.innerHTML = '';
       document.getElementById('viewSurvey').classList.add('hidden');
       document.getElementById('viewLogin').classList.remove('hidden');
       document.querySelector('.container').classList.remove('container-wide');
@@ -894,156 +899,96 @@
       });
     }
 
-    // --- (B) 엑셀 붙여넣기 로직 ---
-    function renderSurveyGrid() {
-      const cols = activeSurveyInfo.columns || DEFAULT_COLUMNS;
-      const headerRow = document.getElementById('surveyGridHeader');
-      const body = document.getElementById('surveyGridBody');
+    // --- (B) 엑셀 자료 입력: jspreadsheet-ce로 실제 엑셀처럼 셀 선택/드래그/붙여넣기 지원 ---
+    let gridInstance = null; // jspreadsheet worksheet 인스턴스
 
-      headerRow.innerHTML = '<th>#</th>' + cols.map(c => `<th>${c.name}</th>`).join('');
-      body.innerHTML = '';
-      for (let i = 0; i < 3; i++) addSurveyGridRow();
-      syncGridScrollbars();
+    function buildJspreadsheetColumns(cols) {
+      return cols.map(col => {
+        if (col.type === 'select') {
+          const colDef = {
+            type: 'dropdown',
+            title: col.name,
+            width: 160,
+            autocomplete: !!col.allowCustom // 체크되어 있으면 목록 외 값도 직접 입력 가능
+          };
+          colDef.source = (col.mode === 'dependent') ? [] : (col.options || []);
+          return colDef;
+        }
+        return { type: 'text', title: col.name, width: 160 };
+      });
     }
 
-    // 표 위쪽의 보조 가로 스크롤바를 실제 표(아래쪽 grid-container)와 서로 연동시킴
-    // - 문항(컬럼)이 많아 표가 넓을 때, 아래로 스크롤하지 않아도 위쪽에서 바로 좌우 이동 가능
-    function syncGridScrollbars() {
-      const top = document.getElementById('gridTopScroll');
-      const inner = document.getElementById('gridTopScrollInner');
-      const container = document.getElementById('gridContainer');
-      if (!top || !inner || !container) return;
-      const table = container.querySelector('table');
-      if (!table) return;
+    function renderSurveyGrid() {
+      const cols = activeSurveyInfo.columns || DEFAULT_COLUMNS;
+      const container = document.getElementById('jspreadsheetContainer');
+      container.innerHTML = '';
 
-      inner.style.width = table.scrollWidth + 'px';
+      const columnDefs = buildJspreadsheetColumns(cols);
+      const initialData = Array.from({ length: 3 }, () => cols.map(() => ''));
 
-      let syncing = false;
-      top.onscroll = () => {
-        if (syncing) return; syncing = true;
-        container.scrollLeft = top.scrollLeft;
-        syncing = false;
-      };
-      container.onscroll = () => {
-        if (syncing) return; syncing = true;
-        top.scrollLeft = container.scrollLeft;
-        syncing = false;
-      };
+      const created = jspreadsheet(container, {
+        data: initialData,
+        columns: columnDefs,
+        minDimensions: [cols.length, 3],
+        allowInsertRow: false,
+        allowDeleteRow: true,
+        allowInsertColumn: false,
+        allowDeleteColumn: false,
+        allowRenameColumn: false,
+        columnSorting: false,
+        tableOverflow: true,
+        tableWidth: '100%',
+        onchange: function (instance, cell, x, y) {
+          updateDependentGridColumns(cols, parseInt(x, 10), parseInt(y, 10));
+        },
+        oneditionstart: function (instance, cell, x, y) {
+          prepareDependentGridColumn(cols, parseInt(x, 10), parseInt(y, 10));
+        }
+      });
+
+      // jspreadsheet-ce는 버전에 따라 워크시트 배열을 반환하거나 인스턴스를 바로 반환할 수 있어 둘 다 처리
+      gridInstance = Array.isArray(created) ? created[0] : created;
     }
 
     function addSurveyGridRow() {
-      const cols = activeSurveyInfo.columns || DEFAULT_COLUMNS;
-      const body = document.getElementById('surveyGridBody');
-      const rIdx = body.children.length;
-      const tr = document.createElement('tr');
-
-      const isParentOf = cols.map(c => cols.some(c2 => c2.dependsOn === c.name));
-
-      let html = `<td style="text-align:center; color:#94a3b8;">${rIdx + 1}</td>`;
-      cols.forEach((col, cIdx) => {
-        const changeAttr = isParentOf[cIdx]
-          ? `onchange="handleParentColumnChange(${rIdx}, ${cIdx})" oninput="handleParentColumnChange(${rIdx}, ${cIdx})"`
-          : '';
-
-        if (col.type === 'select' && col.mode === 'dependent') {
-          const listId = `dl_${rIdx}_${cIdx}`;
-          if (col.allowCustom) {
-            html += `<td><input type="text" list="${listId}" placeholder="상위 항목 선택 후 입력" onpaste="handleGridPaste(event, ${rIdx}, ${cIdx})" ${changeAttr} /><datalist id="${listId}"></datalist></td>`;
-          } else {
-            html += `<td><select onpaste="handleGridPaste(event, ${rIdx}, ${cIdx})" ${changeAttr}><option value="">(상위 항목 먼저 선택)</option></select></td>`;
-          }
-        } else if (col.type === 'select' && col.allowCustom) {
-          const listId = `dl_${rIdx}_${cIdx}`;
-          const datalistOptions = col.options.map(opt => `<option value="${opt}"></option>`).join('');
-          html += `<td><input type="text" list="${listId}" onpaste="handleGridPaste(event, ${rIdx}, ${cIdx})" ${changeAttr} /><datalist id="${listId}">${datalistOptions}</datalist></td>`;
-        } else if (col.type === 'select') {
-          const optionsHtml = ['<option value=""></option>']
-            .concat(col.options.map(opt => `<option value="${opt}">${opt}</option>`))
-            .join('');
-          html += `<td><select onpaste="handleGridPaste(event, ${rIdx}, ${cIdx})" ${changeAttr}>${optionsHtml}</select></td>`;
-        } else {
-          html += `<td><input type="text" onpaste="handleGridPaste(event, ${rIdx}, ${cIdx})" ${changeAttr} /></td>`;
-        }
-      });
-      tr.innerHTML = html;
-      body.appendChild(tr);
-      syncGridScrollbars();
+      if (gridInstance) gridInstance.insertRow();
     }
 
-    function handleParentColumnChange(rIdx, parentColIdx) {
-      const cols = activeSurveyInfo.columns || DEFAULT_COLUMNS;
-      const parentCol = cols[parentColIdx];
-      if (!parentCol) return;
+    // 상위 컬럼 값이 바뀌면, 그 값에 종속된 동적목록 컬럼의 선택지를 갱신
+    function updateDependentGridColumns(cols, changedColIdx, rowIdx) {
+      if (!gridInstance || isNaN(changedColIdx) || isNaN(rowIdx)) return;
+      const changedCol = cols[changedColIdx];
+      if (!changedCol) return;
 
-      const body = document.getElementById('surveyGridBody');
-      const tr = body.children[rIdx];
-      if (!tr) return;
-
-      const parentCell = tr.children[parentColIdx + 1];
-      const parentEl = parentCell.querySelector('select, input');
-      const parentVal = parentEl ? parentEl.value.trim() : '';
-
-      cols.forEach((col, cIdx) => {
-        if (col.dependsOn !== parentCol.name) return;
-        const childCell = tr.children[cIdx + 1];
-        if (!childCell) return;
-
+      cols.forEach((col, idx) => {
+        if (col.dependsOn !== changedCol.name) return;
+        const parentVal = gridInstance.getValueFromCoords(changedColIdx, rowIdx);
         const childOptions = (col.optionsMap && col.optionsMap[parentVal]) || [];
-        const childSelect = childCell.querySelector('select');
-        const childInput = childCell.querySelector('input');
-        const childDatalist = childCell.querySelector('datalist');
 
-        if (childSelect) {
-          const placeholder = childOptions.length ? '' : '(상위 항목 먼저 선택)';
-          childSelect.innerHTML = [`<option value="">${placeholder}</option>`]
-            .concat(childOptions.map(o => `<option value="${o}">${o}</option>`))
-            .join('');
-          childSelect.value = '';
-        } else if (childInput && childDatalist) {
-          childDatalist.innerHTML = childOptions.map(o => `<option value="${o}"></option>`).join('');
-          childInput.value = '';
+        gridInstance.options.columns[idx].source = childOptions;
+
+        const currentChildVal = gridInstance.getValueFromCoords(idx, rowIdx);
+        if (currentChildVal && childOptions.indexOf(currentChildVal) === -1) {
+          gridInstance.setValueFromCoords(idx, rowIdx, '', true);
         }
 
-        handleParentColumnChange(rIdx, cIdx);
+        // 연쇄 연동(하위 컬럼이 또 다른 컬럼의 상위인 경우)까지 갱신
+        updateDependentGridColumns(cols, idx, rowIdx);
       });
     }
 
-    function handleGridPaste(e, startRow, startCol) {
-      e.preventDefault();
-      const clipboardData = e.clipboardData || window.clipboardData;
-      const pastedData = clipboardData.getData('Text');
-      if (!pastedData) return;
+    // 동적목록 셀 편집을 시작할 때, 그 시점의 상위 컬럼 값 기준으로 선택지를 최신화
+    function prepareDependentGridColumn(cols, colIdx, rowIdx) {
+      if (!gridInstance || isNaN(colIdx) || isNaN(rowIdx)) return;
+      const col = cols[colIdx];
+      if (!col || col.mode !== 'dependent') return;
 
-      const cols = activeSurveyInfo.columns || DEFAULT_COLUMNS;
-      const isParentOf = cols.map(c => cols.some(c2 => c2.dependsOn === c.name));
-      const rows = pastedData.split(/\r\n|\n|\r/);
-      const body = document.getElementById('surveyGridBody');
+      const parentIdx = cols.findIndex(c => c.name === col.dependsOn);
+      if (parentIdx === -1) return;
 
-      rows.forEach((rowText, rIdx) => {
-        if (rowText === '') return;
-        const targetRow = startRow + rIdx;
-        while (body.children.length <= targetRow) addSurveyGridRow();
-
-        const cellValues = rowText.split('\t');
-        cellValues.forEach((val, cIdx) => {
-          const targetCol = startCol + cIdx;
-          if (targetCol < cols.length) {
-            const cellEl = body.children[targetRow].children[targetCol + 1];
-            const trimmedVal = val.trim();
-            const input = cellEl.querySelector('input');
-            const select = cellEl.querySelector('select');
-            if (select) {
-              const match = Array.from(select.options).find(o => o.value === trimmedVal);
-              select.value = match ? trimmedVal : '';
-            } else if (input) {
-              input.value = trimmedVal;
-            }
-            if (isParentOf[targetCol]) {
-              handleParentColumnChange(targetRow, targetCol);
-            }
-          }
-        });
-      });
+      const parentVal = gridInstance.getValueFromCoords(parentIdx, rowIdx);
+      const childOptions = (col.optionsMap && col.optionsMap[parentVal]) || [];
+      gridInstance.options.columns[colIdx].source = childOptions;
     }
 
     // --- 통합 제출 ---
@@ -1070,17 +1015,12 @@
           responseObj.answers = answers;
         }
 
-        if (activeSurveyInfo.useExcel) {
-          const body = document.getElementById('surveyGridBody');
+        if (activeSurveyInfo.useExcel && gridInstance) {
+          const gridData = gridInstance.getData(); // 배열의 배열
           const submittedRows = [];
-          Array.from(body.children).forEach(tr => {
-            const rowVals = [];
-            let hasVal = false;
-            tr.querySelectorAll('input, select').forEach(el => {
-              const v = (el.value || '').trim();
-              rowVals.push(v);
-              if (v !== '') hasVal = true;
-            });
+          gridData.forEach(row => {
+            const rowVals = row.map(v => (v === null || v === undefined ? '' : String(v).trim()));
+            const hasVal = rowVals.some(v => v !== '');
             if (hasVal) submittedRows.push({ cells: rowVals }); // Firestore는 배열 안에 배열을 직접 저장할 수 없어 객체로 감쌈
           });
           responseObj.rows = submittedRows;
