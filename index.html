@@ -822,12 +822,15 @@
         const hasRows = responseObj.rows && responseObj.rows.length > 0;
         if (!hasAnswers && !hasRows) { alert('입력된 내용이 없습니다.'); return; }
 
+        console.log('[진단] 제출 데이터:', JSON.stringify(responseObj, null, 2));
+
         await db.collection('managers').doc(activeSurveyInfo.managerId)
           .collection('responses').add(responseObj);
 
         alert('자료가 성공적으로 제출되었습니다!');
         exitSurvey();
       } catch (err) {
+        console.error('[진단] 제출 오류 상세:', err);
         alert('제출 중 오류가 발생했습니다: ' + err.message);
       } finally {
         btn.disabled = false;
