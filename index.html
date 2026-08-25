@@ -325,14 +325,14 @@
         <div id="panelManageExcel" class="hidden">
           <div class="q-card">
             <h4 style="margin-top:0;">엑셀 컬럼(항목) 설정</h4>
-            <p class="grid-hint">엑셀에 입력하듯 컬럼명을 바로 입력하거나, 기존 엑셀에서 복사해 붙여넣기(Ctrl+V)로 한 번에 채울 수 있습니다. "목록 선택" 등 상세 설정이 필요한 컬럼만 이름 아래 상세 설정에서 지정하세요.</p>
+            <p class="grid-hint">
+              실제 엑셀처럼 셀을 클릭/드래그하며 바로 입력하거나 붙여넣을 수 있습니다.<br/>
+              "유형"을 목록선택으로 하면 "목록유형"(고정목록/동적목록), "선택목록", 목록외값 허용 등을 함께 채워주세요.<br/>
+              동적목록의 "하위목록"은 <code>부모값:하위1,하위2;부모값2:하위3,하위4</code> 형식으로 세미콜론(;)으로 구분해 한 셀에 입력합니다.
+            </p>
 
-            <div class="grid-top-scroll" id="colGridTopScroll"><div class="grid-top-scroll-inner" id="colGridTopScrollInner"></div></div>
-            <div class="grid-container" id="colGridContainer" style="max-height:none;">
-              <table class="data-grid">
-                <thead><tr id="colNameGridHeader"></tr></thead>
-                <tbody><tr id="colNameGridRow"></tr></tbody>
-              </table>
+            <div id="columnConfigSpreadsheetWrap" style="max-height:420px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
+              <div id="columnConfigSpreadsheet"></div>
             </div>
 
             <div style="display:flex; gap:8px; margin: 10px 0; flex-wrap:wrap; align-items:center;">
@@ -343,10 +343,7 @@
                 <input type="file" id="importSchemaInput" accept=".xlsx,.xls" onchange="handleImportSchemaFile(event)" style="display:none;" />
               </label>
             </div>
-            <p style="font-size:11px; color:#94a3b8; margin-bottom:14px;">엑셀 파일의 첫 번째 행(헤더)을 컬럼명으로 자동 등록합니다. 불러온 뒤 "서식 변경 저장"을 눌러야 실제로 반영됩니다.</p>
-
-            <h4 style="margin-bottom:8px;">컬럼별 상세 설정 (자유입력 / 목록선택 등)</h4>
-            <div id="columnDetailPanels"></div>
+            <p style="font-size:11px; color:#94a3b8; margin-bottom:4px;">엑셀 파일의 첫 번째 행(헤더)을 컬럼명으로 자동 등록합니다. 불러온 뒤 "서식 변경 저장"을 눌러야 실제로 반영됩니다.</p>
           </div>
         </div>
       </div>
@@ -757,13 +754,15 @@
           const headers = headerRow.map(h => String(h || '').trim()).filter(h => h);
 
           if (headers.length === 0) { alert('엑셀 파일에서 헤더(첫 행)를 읽지 못했습니다.'); return; }
-          if (!confirm(`엑셀에서 ${headers.length}개의 컬럼명을 찾았습니다:\n${headers.join(', ')}\n\n현재 컬럼 설정 목록에 추가하시겠습니까? (모두 "자유 입력" 형식으로 추가되며, 필요하면 이후에 목록 선택 등으로 직접 바꿀 수 있습니다.)`)) return;
+          if (!confirm(`엑셀에서 ${headers.length}개의 컬럼명을 찾았습니다:\n${headers.join(', ')}\n\n현재 컬럼 설정 목록에 추가하시겠습니까? (모두 "자유입력" 형식으로 추가되며, 필요하면 이후에 목록선택 등으로 직접 바꿀 수 있습니다.)`)) return;
 
           headers.forEach(h => {
-            workingColumns.push({ name: h, type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false });
+            columnConfigGrid.insertRow();
+            const newRowIdx = columnConfigGrid.getData().length - 1;
+            columnConfigGrid.setValueFromCoords(0, newRowIdx, h, true);
+            columnConfigGrid.setValueFromCoords(1, newRowIdx, '자유입력', true);
+            columnConfigGrid.setValueFromCoords(2, newRowIdx, '고정목록', true);
           });
-          renderColumnNameRow();
-          renderColumnDetailPanels();
           alert('컬럼이 추가되었습니다. 내용을 확인하신 뒤 "서식 변경 저장"을 눌러야 실제로 반영됩니다.');
         } catch (err) {
           console.error(err);
@@ -930,7 +929,7 @@
         data: initialData,
         columns: columnDefs,
         minDimensions: [cols.length, 3],
-        allowInsertRow: false,
+        allowInsertRow: true,
         allowDeleteRow: true,
         allowInsertColumn: false,
         allowDeleteColumn: false,
@@ -1139,183 +1138,100 @@
       });
     }
 
-    // --- 엑셀 컬럼(항목) 설정: 이름은 한 줄 표로 빠르게 입력/붙여넣기, 상세설정은 컬럼별로 ---
-    let workingColumns = []; // 편집 중인 컬럼 배열 (저장 전까지 이 배열이 기준)
+    // --- 엑셀 컬럼(항목) 설정: jspreadsheet 한 표에서 관리 ---
+    let columnConfigGrid = null;
 
     function renderColumnConfigEditor() {
       const src = (currentUser.columns && currentUser.columns.length) ? currentUser.columns : cloneDefaultColumns();
-      workingColumns = src.map(c => ({
-        name: c.name || '', type: c.type || 'text', mode: c.mode || 'flat',
-        options: [...(c.options || [])], dependsOn: c.dependsOn || '',
-        optionsMap: JSON.parse(JSON.stringify(c.optionsMap || {})), allowCustom: !!c.allowCustom
-      }));
-      renderColumnNameRow();
-      renderColumnDetailPanels();
-    }
+      const container = document.getElementById('columnConfigSpreadsheet');
+      container.innerHTML = '';
 
-    // 컬럼명을 엑셀처럼 한 행에 나란히 입력/붙여넣기하는 표
-    function renderColumnNameRow() {
-      const headerRow = document.getElementById('colNameGridHeader');
-      const dataRow = document.getElementById('colNameGridRow');
-      if (workingColumns.length === 0) workingColumns.push({ name: '', type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false });
+      const columnDefs = [
+        { type: 'text', title: '컬럼명', width: 150 },
+        { type: 'dropdown', title: '유형', width: 100, source: ['자유입력', '목록선택'] },
+        { type: 'dropdown', title: '목록유형', width: 110, source: ['고정목록', '동적목록'] },
+        { type: 'text', title: '선택목록(쉼표구분)', width: 220 },
+        { type: 'text', title: '상위 컬럼명', width: 140 },
+        { type: 'text', title: '하위목록(부모값:하위1,하위2;부모값2:하위3)', width: 320 },
+        { type: 'checkbox', title: '목록외값 허용', width: 100 }
+      ];
 
-      headerRow.innerHTML = workingColumns.map((c, i) => `<th>컬럼 ${i + 1}</th>`).join('');
-      dataRow.innerHTML = workingColumns.map((c, i) =>
-        `<td><input type="text" value="${c.name || ''}" placeholder="컬럼명" oninput="updateColumnName(${i}, this.value)" onpaste="handleColumnNamePaste(event, ${i})" /></td>`
-      ).join('');
-      syncColGridScrollbars();
-    }
+      const data = src.map(c => [
+        c.name || '',
+        c.type === 'select' ? '목록선택' : '자유입력',
+        (c.type === 'select' && c.mode === 'dependent') ? '동적목록' : '고정목록',
+        (c.options || []).join(', '),
+        c.dependsOn || '',
+        Object.entries(c.optionsMap || {}).map(([k, v]) => `${k}:${(v || []).join(',')}`).join(';'),
+        !!c.allowCustom
+      ]);
+      if (data.length === 0) data.push(['', '자유입력', '고정목록', '', '', '', false]);
 
-    function updateColumnName(idx, val) {
-      if (!workingColumns[idx]) return;
-      workingColumns[idx].name = val;
-      const label = document.getElementById(`colDetailLabel_${idx}`);
-      if (label) label.innerText = val || `(컬럼 ${idx + 1})`;
-    }
-
-    // 엑셀에서 여러 컬럼명을 복사해 붙여넣으면(탭 또는 쉼표 구분) 이어지는 셀에 한 번에 채움
-    function handleColumnNamePaste(e, startIdx) {
-      e.preventDefault();
-      const clipboardData = e.clipboardData || window.clipboardData;
-      const pastedData = clipboardData.getData('Text');
-      if (!pastedData) return;
-
-      const firstLine = pastedData.split(/\r\n|\n|\r/)[0];
-      const values = firstLine.indexOf('\t') !== -1 ? firstLine.split('\t') : firstLine.split(',');
-
-      values.forEach((val, i) => {
-        const targetIdx = startIdx + i;
-        const v = val.trim();
-        if (!v) return;
-        while (workingColumns.length <= targetIdx) {
-          workingColumns.push({ name: '', type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false });
-        }
-        workingColumns[targetIdx].name = v;
+      const created = jspreadsheet(container, {
+        data: data,
+        columns: columnDefs,
+        minDimensions: [7, 1],
+        allowInsertRow: true,
+        allowDeleteRow: true,
+        allowInsertColumn: false,
+        allowDeleteColumn: false,
+        allowRenameColumn: false,
+        columnSorting: false,
+        tableOverflow: true,
+        tableWidth: '100%'
       });
 
-      renderColumnNameRow();
-      renderColumnDetailPanels();
+      columnConfigGrid = Array.isArray(created) ? created[0] : created;
     }
 
     function addColumnCell() {
-      workingColumns.push({ name: '', type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false });
-      renderColumnNameRow();
-      renderColumnDetailPanels();
+      if (columnConfigGrid) columnConfigGrid.insertRow();
     }
-
-    function removeColumnCell(idx) {
-      if (workingColumns.length <= 1) { alert('최소 1개의 컬럼은 있어야 합니다.'); return; }
-      workingColumns.splice(idx, 1);
-      renderColumnNameRow();
-      renderColumnDetailPanels();
-    }
-
-    // 위쪽 컬럼명 표의 보조 가로 스크롤바 동기화
-    function syncColGridScrollbars() {
-      const top = document.getElementById('colGridTopScroll');
-      const inner = document.getElementById('colGridTopScrollInner');
-      const container = document.getElementById('colGridContainer');
-      if (!top || !inner || !container) return;
-      const table = container.querySelector('table');
-      if (!table) return;
-
-      inner.style.width = table.scrollWidth + 'px';
-      let syncing = false;
-      top.onscroll = () => { if (syncing) return; syncing = true; container.scrollLeft = top.scrollLeft; syncing = false; };
-      container.onscroll = () => { if (syncing) return; syncing = true; top.scrollLeft = container.scrollLeft; syncing = false; };
-    }
-
-    // 컬럼별 상세 설정(자유입력/목록선택/동적목록/목록외 입력허용) - 이름은 위 표에서 이미 입력했으므로 여기선 라벨만 표시
-    function renderColumnDetailPanels() {
-      const container = document.getElementById('columnDetailPanels');
-      container.innerHTML = '';
-      workingColumns.forEach((col, idx) => container.appendChild(buildColumnDetailPanel(col, idx)));
-    }
-
-    function buildColumnDetailPanel(col, idx) {
-      const div = document.createElement('div');
-      div.className = 'col-config-row';
-      div.style.cssText = 'display:flex; flex-direction:column; gap:8px; margin-bottom:10px; background:#fff; padding:12px; border:1px solid #e2e8f0; border-radius:8px;';
-
-      const isSelect = col.type === 'select';
-      const isDependent = isSelect && col.mode === 'dependent';
-      const optionsMapText = Object.entries(col.optionsMap || {})
-        .map(([k, v]) => `${k}: ${(v || []).join(', ')}`)
-        .join('\n');
-
-      div.innerHTML = `
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
-          <strong id="colDetailLabel_${idx}" style="font-size:13px;">${col.name || `(컬럼 ${idx + 1})`}</strong>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <select onchange="updateColumnType(${idx}, this.value)" style="padding:6px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;">
-              <option value="text" ${!isSelect ? 'selected' : ''}>자유 입력</option>
-              <option value="select" ${isSelect ? 'selected' : ''}>목록 선택</option>
-            </select>
-            <button type="button" class="btn btn-danger btn-sm" onclick="removeColumnCell(${idx})">삭제</button>
-          </div>
-        </div>
-        ${isSelect ? `
-          <select onchange="updateColumnMode(${idx}, this.value)" style="padding:6px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; width:fit-content;">
-            <option value="flat" ${!isDependent ? 'selected' : ''}>고정 목록</option>
-            <option value="dependent" ${isDependent ? 'selected' : ''}>동적 목록 (상위 컬럼 연동)</option>
-          </select>
-          ${!isDependent ? `
-            <input type="text" value="${(col.options || []).join(', ')}" placeholder="선택 목록(쉼표로 구분) 예: 완료, 진행중, 미착수" oninput="updateColumnOptions(${idx}, this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
-          ` : `
-            <input type="text" value="${col.dependsOn || ''}" placeholder="상위 컬럼명 (예: 시/도) - 이보다 앞선 순서의 목록형 컬럼명을 정확히 입력" oninput="updateColumnDependsOn(${idx}, this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
-            <textarea rows="3" placeholder="상위 값별 하위 목록을 한 줄씩 입력&#10;예) 충청남도: 부여군, 공주시, 천안시&#10;서울특별시: 강남구, 종로구" oninput="updateColumnOptionsMap(${idx}, this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:13px; resize:vertical;">${optionsMapText}</textarea>
-          `}
-          <label style="display:flex; align-items:center; gap:5px; font-size:12px; color:#334155;">
-            <input type="checkbox" ${col.allowCustom ? 'checked' : ''} onchange="updateColumnAllowCustom(${idx}, this.checked)" />
-            목록 외 값 직접 입력 허용
-          </label>
-        ` : ''}
-      `;
-      return div;
-    }
-
-    function updateColumnType(idx, val) {
-      workingColumns[idx].type = val;
-      if (val === 'select' && !workingColumns[idx].mode) workingColumns[idx].mode = 'flat';
-      renderColumnDetailPanels();
-    }
-    function updateColumnMode(idx, val) { workingColumns[idx].mode = val; renderColumnDetailPanels(); }
-    function updateColumnOptions(idx, val) { workingColumns[idx].options = val.split(',').map(s => s.trim()).filter(s => s); }
-    function updateColumnDependsOn(idx, val) { workingColumns[idx].dependsOn = val.trim(); }
-    function updateColumnOptionsMap(idx, val) {
-      const map = {};
-      val.split('\n').forEach(line => {
-        const i = line.indexOf(':');
-        if (i === -1) return;
-        const k = line.slice(0, i).trim();
-        const children = line.slice(i + 1).split(',').map(s => s.trim()).filter(s => s);
-        if (k && children.length > 0) map[k] = children;
-      });
-      workingColumns[idx].optionsMap = map;
-    }
-    function updateColumnAllowCustom(idx, val) { workingColumns[idx].allowCustom = val; }
 
     async function saveColumnConfig() {
+      if (!columnConfigGrid) return;
+      const rows = columnConfigGrid.getData();
       const cols = [];
 
-      for (const col of workingColumns) {
-        const name = (col.name || '').trim();
+      for (const row of rows) {
+        const name = (row[0] || '').toString().trim();
         if (!name) continue;
 
-        const c = { name, type: col.type, mode: col.mode || 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: !!col.allowCustom };
+        const typeLabel = (row[1] || '').toString().trim();
+        const modeLabel = (row[2] || '').toString().trim();
+        const optionsRaw = (row[3] || '').toString().trim();
+        const dependsOn = (row[4] || '').toString().trim();
+        const mapRaw = (row[5] || '').toString().trim();
+        const allowCustom = !!row[6] && row[6] !== '0' && row[6] !== 'false';
 
-        if (col.type === 'select') {
-          if (col.mode === 'dependent') {
-            if (!col.dependsOn) { alert(`[${name}] 컬럼: 동적 목록은 상위 컬럼명을 입력해야 합니다.`); return; }
-            const parentCol = cols.find(x => x.name === col.dependsOn);
-            if (!parentCol) { alert(`[${name}] 컬럼: 상위 컬럼 [${col.dependsOn}]을(를) 찾을 수 없습니다. 상위 컬럼을 이 컬럼보다 앞 순서에 먼저 배치하세요.`); return; }
-            if (parentCol.type !== 'select') { alert(`[${name}] 컬럼: 상위 컬럼 [${col.dependsOn}]은(는) "목록 선택" 형태여야 합니다.`); return; }
-            if (!col.optionsMap || Object.keys(col.optionsMap).length === 0) { alert(`[${name}] 컬럼: 상위 값별 하위 목록을 "부모값: 하위옵션1, 하위옵션2" 형식으로 입력하세요.`); return; }
-            c.dependsOn = col.dependsOn;
-            c.optionsMap = col.optionsMap;
+        const type = typeLabel === '목록선택' ? 'select' : 'text';
+        const c = { name, type, mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom };
+
+        if (type === 'select') {
+          const mode = modeLabel === '동적목록' ? 'dependent' : 'flat';
+          c.mode = mode;
+
+          if (mode === 'dependent') {
+            if (!dependsOn) { alert(`[${name}] 컬럼: 동적목록은 상위 컬럼명을 입력해야 합니다.`); return; }
+            const parentCol = cols.find(x => x.name === dependsOn);
+            if (!parentCol) { alert(`[${name}] 컬럼: 상위 컬럼 [${dependsOn}]을(를) 찾을 수 없습니다. 상위 컬럼을 이 컬럼보다 앞 줄에 먼저 배치하세요.`); return; }
+            if (parentCol.type !== 'select') { alert(`[${name}] 컬럼: 상위 컬럼 [${dependsOn}]은(는) "목록선택" 형태여야 합니다.`); return; }
+
+            const optionsMap = {};
+            mapRaw.split(';').forEach(group => {
+              const idx = group.indexOf(':');
+              if (idx === -1) return;
+              const parentVal = group.slice(0, idx).trim();
+              const children = group.slice(idx + 1).split(',').map(s => s.trim()).filter(s => s);
+              if (parentVal && children.length > 0) optionsMap[parentVal] = children;
+            });
+            if (Object.keys(optionsMap).length === 0) { alert(`[${name}] 컬럼: 하위목록을 "부모값:하위1,하위2;부모값2:하위3" 형식으로 입력하세요.`); return; }
+            c.dependsOn = dependsOn;
+            c.optionsMap = optionsMap;
           } else {
-            if (!col.options || col.options.length === 0) { alert(`[${name}] 컬럼은 목록 선택 방식인데 옵션이 비어 있습니다. 쉼표로 구분해 옵션을 입력하세요.`); return; }
-            c.options = col.options;
+            const options = optionsRaw.split(',').map(s => s.trim()).filter(s => s);
+            if (options.length === 0) { alert(`[${name}] 컬럼은 목록선택 방식인데 선택목록이 비어 있습니다. 쉼표로 구분해 입력하세요.`); return; }
+            c.options = options;
           }
         }
         cols.push(c);
@@ -1329,6 +1245,7 @@
       renderColumnConfigEditor();
       alert('엑셀 취합 컬럼 서식이 변경되었습니다.');
     }
+
 
     function renderManagerResponses() {
       if (!currentUser || !viewingRoundMeta) return;
