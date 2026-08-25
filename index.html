@@ -301,14 +301,16 @@
         <div id="panelManageSurvey" class="hidden">
           <div class="q-card" style="background:#eff6ff; border-color:#bfdbfe;">
             <h4 style="color:#1e40af; margin-top:0;">📝 설문 문항 작성</h4>
-            <p class="grid-hint">실제 엑셀처럼 셀을 클릭/드래그하며 바로 입력하거나 붙여넣을 수 있습니다. "유형"을 객관식으로 하면 "객관식 옵션"에 쉼표로 구분해 선택지를 입력하세요.</p>
-            <div id="questionSpreadsheetWrap" style="max-height:400px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
+            <p class="grid-hint">진짜 엑셀처럼, <strong>맨 위 헤더 칸을 더블클릭해서 질문 제목(목차)을 직접 입력</strong>하세요. 열(질문)은 자유롭게 추가/삭제/이동할 수 있습니다. 헤더에서 질문을 클릭해 선택하면 아래에서 유형(주관식/객관식)과 옵션을 설정할 수 있습니다.</p>
+            <div id="questionLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 질문 구성을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
+            <div id="questionSpreadsheetWrap" style="max-height:220px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
               <div id="questionSpreadsheet"></div>
             </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="addQuestionRow()">+ 질문 추가</button>
-              <button type="button" class="btn btn-sm btn-excel" onclick="saveQuestions()">질문 저장</button>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+              <button type="button" id="addQuestionRowBtn" class="btn btn-secondary btn-sm" onclick="addQuestionRow()">+ 질문 추가</button>
+              <button type="button" id="saveQuestionsBtn" class="btn btn-sm btn-excel" onclick="saveQuestions()">질문 저장</button>
             </div>
+            <div id="questionDetailPanel"></div>
           </div>
         </div>
 
@@ -316,25 +318,25 @@
           <div class="q-card">
             <h4 style="margin-top:0;">엑셀 컬럼(항목) 설정</h4>
             <p class="grid-hint">
-              실제 엑셀처럼 셀을 클릭/드래그하며 바로 입력하거나 붙여넣을 수 있습니다.<br/>
-              "상위 목차(그룹)"에 같은 이름을 연속으로 입력하면, 기관 제출 화면에서 그 컬럼들이 하나의 상위 제목 아래로 병합되어 표시됩니다 (예: "시설현황" 아래에 점검일/점검자/비고를 묶기). 비워두면 그 컬럼은 독립적으로 표시됩니다.<br/>
-              "유형"을 목록선택으로 하면 "목록유형"(고정목록/동적목록), "선택목록", 목록외값 허용 등을 함께 채워주세요.<br/>
-              동적목록의 "하위목록"은 <code>부모값:하위1,하위2;부모값2:하위3,하위4</code> 형식으로 세미콜론(;)으로 구분해 한 셀에 입력합니다.
+              진짜 엑셀처럼, <strong>맨 위 헤더 칸을 더블클릭해서 컬럼명(목차)을 직접 입력</strong>하세요. 열(컬럼)은 자유롭게 추가/삭제/이동할 수 있습니다.<br/>
+              헤더에서 컬럼을 클릭해 선택하면 아래에서 입력 방식(자유입력/목록선택), 상위 목차(그룹), 동적목록 등을 설정할 수 있습니다.
             </p>
+            <div id="columnLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 컬럼 구성을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
 
-            <div id="columnConfigSpreadsheetWrap" style="max-height:420px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
+            <div id="columnConfigSpreadsheetWrap" style="max-height:220px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
               <div id="columnConfigSpreadsheet"></div>
             </div>
 
-            <div style="display:flex; gap:8px; margin: 10px 0; flex-wrap:wrap; align-items:center;">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="addColumnCell()">+ 컬럼 추가</button>
-              <button type="button" class="btn btn-sm btn-excel" onclick="saveColumnConfig()">서식 변경 저장</button>
-              <label class="btn btn-secondary btn-sm" style="margin:0; display:inline-flex; align-items:center;">
+            <div style="display:flex; gap:8px; margin: 10px 0 12px 0; flex-wrap:wrap; align-items:center;">
+              <button type="button" id="addColumnCellBtn" class="btn btn-secondary btn-sm" onclick="addColumnCell()">+ 컬럼 추가</button>
+              <button type="button" id="saveColumnConfigBtn" class="btn btn-sm btn-excel" onclick="saveColumnConfig()">서식 변경 저장</button>
+              <label id="importSchemaLabel" class="btn btn-secondary btn-sm" style="margin:0; display:inline-flex; align-items:center;">
                 📂 엑셀 서식 불러오기
                 <input type="file" id="importSchemaInput" accept=".xlsx,.xls" onchange="handleImportSchemaFile(event)" style="display:none;" />
               </label>
             </div>
-            <p style="font-size:11px; color:#94a3b8; margin-bottom:4px;">엑셀 파일의 첫 번째 행(헤더)을 컬럼명으로 자동 등록합니다. 불러온 뒤 "서식 변경 저장"을 눌러야 실제로 반영됩니다.</p>
+            <p style="font-size:11px; color:#94a3b8; margin-bottom:10px;">엑셀 파일의 첫 번째 행(헤더)을 컬럼명으로 자동 등록합니다. 불러온 뒤 "서식 변경 저장"을 눌러야 실제로 반영됩니다.</p>
+            <div id="columnDetailPanel"></div>
           </div>
         </div>
       </div>
@@ -833,14 +835,13 @@
           const headers = headerRow.map(h => String(h || '').trim()).filter(h => h);
 
           if (headers.length === 0) { alert('엑셀 파일에서 헤더(첫 행)를 읽지 못했습니다.'); return; }
-          if (!confirm(`엑셀에서 ${headers.length}개의 컬럼명을 찾았습니다:\n${headers.join(', ')}\n\n현재 컬럼 설정 목록에 추가하시겠습니까? (모두 "자유입력" 형식으로 추가되며, 필요하면 이후에 목록선택 등으로 직접 바꿀 수 있습니다.)`)) return;
+          if (!confirm(`엑셀에서 ${headers.length}개의 컬럼명을 찾았습니다:\n${headers.join(', ')}\n\n현재 컬럼 설정에 새 열로 추가하시겠습니까? (모두 "자유입력" 형식으로 추가되며, 필요하면 이후에 목록선택 등으로 직접 바꿀 수 있습니다.)`)) return;
 
           headers.forEach(h => {
-            columnConfigGrid.insertRow();
-            const newRowIdx = columnConfigGrid.getData().length - 1;
-            columnConfigGrid.setValueFromCoords(0, newRowIdx, h, true);
-            columnConfigGrid.setValueFromCoords(2, newRowIdx, '자유입력', true);
-            columnConfigGrid.setValueFromCoords(3, newRowIdx, '고정목록', true);
+            columnConfigGrid.insertColumn();
+            const newColIdx = columnConfigGrid.options.columns.length - 1;
+            columnConfigGrid.setHeader(newColIdx, h);
+            columnMetaByName[h] = { type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false, group: '' };
           });
           alert('컬럼이 추가되었습니다. 내용을 확인하신 뒤 "서식 변경 저장"을 눌러야 실제로 반영됩니다.');
         } catch (err) {
@@ -1167,70 +1168,146 @@
       }, err => console.error('응답 구독 오류:', err));
     }
 
-    // --- 설문 문항 작성: jspreadsheet 한 표에서 관리 (행 = 질문 하나) ---
-    let questionGrid = null;
+    // 회차에 응답이 하나라도 제출되었으면 질문/컬럼 구성을 잠금 (양식-응답 불일치 방지)
+    async function roundHasResponses(roundId) {
+      if (!roundId) return false;
+      const snap = await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(roundId).collection('responses').limit(1).get();
+      return !snap.empty;
+    }
 
-    function renderManagerQuestions() {
+    // --- 설문 문항 작성: jspreadsheet 헤더 = 실제 질문 제목(목차). 유형/옵션은 이름 기준 메타데이터로 별도 관리 ---
+    let questionGrid = null;
+    let questionMetaByName = {}; // { [질문제목]: {type, options} }
+    let selectedQuestionIndex = null;
+    let questionsLocked = false;
+
+    async function renderManagerQuestions() {
       const src = currentUser.questions || [];
       const container = document.getElementById('questionSpreadsheet');
       container.innerHTML = '';
 
-      const columnDefs = [
-        { type: 'text', title: '질문 제목', width: 260 },
-        { type: 'dropdown', title: '유형', width: 110, source: ['주관식', '객관식'] },
-        { type: 'text', title: '객관식 옵션(쉼표구분)', width: 300 }
-      ];
+      questionsLocked = currentRoundId ? await roundHasResponses(currentRoundId) : false;
+      const banner = document.getElementById('questionLockBanner');
+      if (banner) banner.classList.toggle('hidden', !questionsLocked);
+      const addBtn = document.getElementById('addQuestionRowBtn');
+      const saveBtn = document.getElementById('saveQuestionsBtn');
+      if (addBtn) addBtn.classList.toggle('hidden', questionsLocked);
+      if (saveBtn) saveBtn.classList.toggle('hidden', questionsLocked);
 
-      const data = src.map(q => [
-        q.title || '',
-        q.type === 'radio' ? '객관식' : '주관식',
-        (q.options || []).join(', ')
-      ]);
-      if (data.length === 0) data.push(['', '주관식', '']);
+      questionMetaByName = {};
+      src.forEach(q => { questionMetaByName[q.title] = { type: q.type, options: q.options || [] }; });
+
+      const titles = src.length ? src.map(q => q.title) : ['질문1'];
+      const columnDefs = titles.map(t => ({ type: 'text', title: t, width: 180, readOnly: questionsLocked }));
+      const data = [titles.map(() => '')];
 
       const created = jspreadsheet(container, {
         data: data,
         columns: columnDefs,
-        minDimensions: [3, 1],
-        allowInsertRow: true,
-        allowDeleteRow: true,
-        allowInsertColumn: false,
-        allowDeleteColumn: false,
-        allowRenameColumn: false,
+        minDimensions: [titles.length, 1],
+        allowInsertRow: false,
+        allowDeleteRow: false,
+        allowInsertColumn: !questionsLocked,
+        allowDeleteColumn: !questionsLocked,
+        allowRenameColumn: !questionsLocked,
         columnSorting: false,
         tableOverflow: true,
-        tableWidth: '100%'
+        tableWidth: '100%',
+        editable: !questionsLocked,
+        onselection: function (instance, x1) {
+          selectedQuestionIndex = parseInt(x1, 10);
+          renderQuestionDetailPanel();
+        }
       });
 
       questionGrid = Array.isArray(created) ? created[0] : created;
+      selectedQuestionIndex = 0;
+      renderQuestionDetailPanel();
+    }
+
+    function renderQuestionDetailPanel() {
+      const panel = document.getElementById('questionDetailPanel');
+      if (!panel) return;
+      if (!questionGrid || selectedQuestionIndex === null || questionsLocked) { panel.innerHTML = ''; return; }
+
+      const title = (questionGrid.getHeader(selectedQuestionIndex) || '').toString().trim();
+      if (!title) {
+        panel.innerHTML = '<p style="font-size:12px; color:#94a3b8;">먼저 위 헤더 칸을 더블클릭해서 질문 제목을 입력하세요.</p>';
+        return;
+      }
+
+      const meta = questionMetaByName[title] || { type: 'text', options: [] };
+      questionMetaByName[title] = meta;
+      const isRadio = meta.type === 'radio';
+
+      panel.innerHTML = `
+        <div class="q-card" style="background:#f8fafc;">
+          <h4 style="margin-top:0; font-size:14px;">"${title}" 질문 상세 설정</h4>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>유형</label>
+            <select onchange="updateSelectedQuestionMeta('type', this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+              <option value="text" ${!isRadio ? 'selected' : ''}>주관식</option>
+              <option value="radio" ${isRadio ? 'selected' : ''}>객관식</option>
+            </select>
+          </div>
+          ${isRadio ? `
+            <div class="form-group">
+              <label>객관식 옵션(쉼표구분)</label>
+              <input type="text" value="${(meta.options || []).join(', ')}" placeholder="예: 완료, 진행중, 미착수" oninput="updateSelectedQuestionMeta('optionsRaw', this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function updateSelectedQuestionMeta(field, value) {
+      if (!questionGrid || selectedQuestionIndex === null) return;
+      const title = (questionGrid.getHeader(selectedQuestionIndex) || '').toString().trim();
+      if (!title) return;
+      const meta = questionMetaByName[title] || { type: 'text', options: [] };
+
+      if (field === 'optionsRaw') {
+        meta.options = value.split(',').map(s => s.trim()).filter(s => s);
+      } else {
+        meta[field] = value;
+      }
+      questionMetaByName[title] = meta;
+
+      if (field === 'type') renderQuestionDetailPanel();
     }
 
     function addQuestionRow() {
-      if (questionGrid) questionGrid.insertRow();
+      if (questionGrid && !questionsLocked) questionGrid.insertColumn();
     }
 
     async function saveQuestions() {
       if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
       if (!questionGrid) return;
 
-      const rows = questionGrid.getData();
+      if (await roundHasResponses(currentRoundId)) {
+        alert('이미 응답이 제출된 회차는 질문을 수정할 수 없습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.');
+        renderManagerQuestions();
+        return;
+      }
+
+      const colCount = questionGrid.options.columns.length;
       const questions = [];
 
-      for (const row of rows) {
-        const title = (row[0] || '').toString().trim();
+      for (let i = 0; i < colCount; i++) {
+        const title = (questionGrid.getHeader(i) || '').toString().trim();
         if (!title) continue;
 
-        const typeLabel = (row[1] || '').toString().trim();
-        const optionsRaw = (row[2] || '').toString().trim();
-        const type = typeLabel === '객관식' ? 'radio' : 'text';
-
+        const meta = questionMetaByName[title] || { type: 'text', options: [] };
         let options = [];
-        if (type === 'radio') {
-          options = optionsRaw.split(',').map(s => s.trim()).filter(s => s);
-          if (options.length === 0) { alert(`[${title}] 질문: 객관식은 옵션을 쉼표로 구분해 입력해야 합니다.`); return; }
+        if (meta.type === 'radio') {
+          options = meta.options || [];
+          if (options.length === 0) { alert(`[${title}] 질문: 객관식은 옵션을 입력해야 합니다. 헤더에서 이 질문을 선택한 뒤 아래에서 옵션을 채워주세요.`); return; }
         }
-        questions.push({ id: Date.now() + questions.length, title, type, options });
+        questions.push({ id: Date.now() + questions.length, title, type: meta.type, options });
       }
+
+      if (questions.length === 0) { alert('최소 1개의 질문 제목을 입력하세요.'); return; }
 
       currentUser.questions = questions;
       await db.collection('managers').doc(currentUser.id)
@@ -1239,110 +1316,196 @@
       alert('설문 문항이 저장되었습니다.');
     }
 
-    // --- 엑셀 컬럼(항목) 설정: jspreadsheet 한 표에서 관리 ---
+    // --- 엑셀 컬럼(항목) 설정: jspreadsheet 헤더 = 실제 컬럼명(목차). 나머지 설정은 이름 기준 메타데이터로 별도 관리 ---
     let columnConfigGrid = null;
+    let columnMetaByName = {}; // { [컬럼명]: {type, mode, options, dependsOn, optionsMap, allowCustom, group} }
+    let selectedColumnIndex = null;
+    let columnsLocked = false;
 
-    function renderColumnConfigEditor() {
+    async function renderColumnConfigEditor() {
       const src = (currentUser.columns && currentUser.columns.length) ? currentUser.columns : cloneDefaultColumns();
       const container = document.getElementById('columnConfigSpreadsheet');
       container.innerHTML = '';
 
-      const columnDefs = [
-        { type: 'text', title: '컬럼명', width: 150 },
-        { type: 'text', title: '상위 목차(그룹, 선택)', width: 150 },
-        { type: 'dropdown', title: '유형', width: 100, source: ['자유입력', '목록선택'] },
-        { type: 'dropdown', title: '목록유형', width: 110, source: ['고정목록', '동적목록'] },
-        { type: 'text', title: '선택목록(쉼표구분)', width: 220 },
-        { type: 'text', title: '상위 컬럼명', width: 140 },
-        { type: 'text', title: '하위목록(부모값:하위1,하위2;부모값2:하위3)', width: 320 },
-        { type: 'checkbox', title: '목록외값 허용', width: 100 }
-      ];
+      columnsLocked = currentRoundId ? await roundHasResponses(currentRoundId) : false;
+      const banner = document.getElementById('columnLockBanner');
+      if (banner) banner.classList.toggle('hidden', !columnsLocked);
+      const addBtn = document.getElementById('addColumnCellBtn');
+      const saveBtn = document.getElementById('saveColumnConfigBtn');
+      const importLabel = document.getElementById('importSchemaLabel');
+      if (addBtn) addBtn.classList.toggle('hidden', columnsLocked);
+      if (saveBtn) saveBtn.classList.toggle('hidden', columnsLocked);
+      if (importLabel) importLabel.classList.toggle('hidden', columnsLocked);
 
-      const data = src.map(c => [
-        c.name || '',
-        c.group || '',
-        c.type === 'select' ? '목록선택' : '자유입력',
-        (c.type === 'select' && c.mode === 'dependent') ? '동적목록' : '고정목록',
-        (c.options || []).join(', '),
-        c.dependsOn || '',
-        Object.entries(c.optionsMap || {}).map(([k, v]) => `${k}:${(v || []).join(',')}`).join(';'),
-        !!c.allowCustom
-      ]);
-      if (data.length === 0) data.push(['', '', '자유입력', '고정목록', '', '', '', false]);
+      columnMetaByName = {};
+      src.forEach(c => {
+        columnMetaByName[c.name] = {
+          type: c.type, mode: c.mode || 'flat', options: c.options || [],
+          dependsOn: c.dependsOn || '', optionsMap: c.optionsMap || {},
+          allowCustom: !!c.allowCustom, group: c.group || ''
+        };
+      });
+
+      const titles = src.length ? src.map(c => c.name) : ['컬럼1'];
+      const columnDefs = titles.map(t => ({ type: 'text', title: t, width: 150, readOnly: columnsLocked }));
+      const data = [titles.map(() => '')];
 
       const created = jspreadsheet(container, {
         data: data,
         columns: columnDefs,
-        minDimensions: [8, 1],
-        allowInsertRow: true,
-        allowDeleteRow: true,
-        allowInsertColumn: false,
-        allowDeleteColumn: false,
-        allowRenameColumn: false,
+        minDimensions: [titles.length, 1],
+        allowInsertRow: false,
+        allowDeleteRow: false,
+        allowInsertColumn: !columnsLocked,
+        allowDeleteColumn: !columnsLocked,
+        allowRenameColumn: !columnsLocked,
         columnSorting: false,
         tableOverflow: true,
-        tableWidth: '100%'
+        tableWidth: '100%',
+        editable: !columnsLocked,
+        onselection: function (instance, x1) {
+          selectedColumnIndex = parseInt(x1, 10);
+          renderColumnDetailPanel();
+        }
       });
 
       columnConfigGrid = Array.isArray(created) ? created[0] : created;
+      selectedColumnIndex = 0;
+      renderColumnDetailPanel();
+    }
+
+    function renderColumnDetailPanel() {
+      const panel = document.getElementById('columnDetailPanel');
+      if (!panel) return;
+      if (!columnConfigGrid || selectedColumnIndex === null || columnsLocked) { panel.innerHTML = ''; return; }
+
+      const title = (columnConfigGrid.getHeader(selectedColumnIndex) || '').toString().trim();
+      if (!title) {
+        panel.innerHTML = '<p style="font-size:12px; color:#94a3b8;">먼저 위 헤더 칸을 더블클릭해서 컬럼명을 입력하세요.</p>';
+        return;
+      }
+
+      const meta = columnMetaByName[title] || { type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false, group: '' };
+      columnMetaByName[title] = meta;
+
+      const isSelect = meta.type === 'select';
+      const isDependent = isSelect && meta.mode === 'dependent';
+      const optionsMapText = Object.entries(meta.optionsMap || {}).map(([k, v]) => `${k}:${(v || []).join(',')}`).join(';');
+
+      panel.innerHTML = `
+        <div class="q-card" style="background:#f8fafc;">
+          <h4 style="margin-top:0; font-size:14px;">"${title}" 컬럼 상세 설정</h4>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>상위 목차(그룹, 선택)</label>
+            <input type="text" value="${meta.group || ''}" placeholder="예: 시설현황" oninput="updateSelectedColumnMeta('group', this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>입력 방식</label>
+            <select onchange="updateSelectedColumnMeta('type', this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+              <option value="text" ${!isSelect ? 'selected' : ''}>자유 입력</option>
+              <option value="select" ${isSelect ? 'selected' : ''}>목록 선택</option>
+            </select>
+          </div>
+          ${isSelect ? `
+            <div class="form-group" style="margin-bottom:8px;">
+              <label>목록 유형</label>
+              <select onchange="updateSelectedColumnMeta('mode', this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                <option value="flat" ${!isDependent ? 'selected' : ''}>고정 목록</option>
+                <option value="dependent" ${isDependent ? 'selected' : ''}>동적 목록 (상위 컬럼 연동)</option>
+              </select>
+            </div>
+            ${!isDependent ? `
+              <div class="form-group" style="margin-bottom:8px;">
+                <label>선택 목록(쉼표구분)</label>
+                <input type="text" value="${(meta.options || []).join(', ')}" placeholder="예: 완료, 진행중, 미착수" oninput="updateSelectedColumnMeta('optionsRaw', this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+            ` : `
+              <div class="form-group" style="margin-bottom:8px;">
+                <label>상위 컬럼명</label>
+                <input type="text" value="${meta.dependsOn || ''}" placeholder="예: 시/도 (이 컬럼보다 왼쪽에 있어야 함)" oninput="updateSelectedColumnMeta('dependsOn', this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+              <div class="form-group" style="margin-bottom:8px;">
+                <label>하위목록 (부모값:하위1,하위2;부모값2:하위3)</label>
+                <textarea rows="2" oninput="updateSelectedColumnMeta('optionsMapRaw', this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px; width:100%; font-family:inherit;">${optionsMapText}</textarea>
+              </div>
+            `}
+            <label style="display:flex; align-items:center; gap:5px; font-size:12px; color:#334155;">
+              <input type="checkbox" ${meta.allowCustom ? 'checked' : ''} onchange="updateSelectedColumnMeta('allowCustom', this.checked)" />
+              목록 외 값 직접 입력 허용
+            </label>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function updateSelectedColumnMeta(field, value) {
+      if (!columnConfigGrid || selectedColumnIndex === null) return;
+      const title = (columnConfigGrid.getHeader(selectedColumnIndex) || '').toString().trim();
+      if (!title) return;
+      const meta = columnMetaByName[title] || { type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false, group: '' };
+
+      if (field === 'optionsRaw') {
+        meta.options = value.split(',').map(s => s.trim()).filter(s => s);
+      } else if (field === 'optionsMapRaw') {
+        const map = {};
+        value.split(';').forEach(g => {
+          const idx = g.indexOf(':');
+          if (idx === -1) return;
+          const k = g.slice(0, idx).trim();
+          const children = g.slice(idx + 1).split(',').map(s => s.trim()).filter(s => s);
+          if (k && children.length > 0) map[k] = children;
+        });
+        meta.optionsMap = map;
+      } else {
+        meta[field] = value;
+      }
+      columnMetaByName[title] = meta;
+
+      if (field === 'type' || field === 'mode') renderColumnDetailPanel();
     }
 
     function addColumnCell() {
-      if (columnConfigGrid) columnConfigGrid.insertRow();
+      if (columnConfigGrid && !columnsLocked) columnConfigGrid.insertColumn();
     }
 
     async function saveColumnConfig() {
       if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
       if (!columnConfigGrid) return;
-      const rows = columnConfigGrid.getData();
+
+      if (await roundHasResponses(currentRoundId)) {
+        alert('이미 응답이 제출된 회차는 컬럼 구성을 수정할 수 없습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.');
+        renderColumnConfigEditor();
+        return;
+      }
+
+      const colCount = columnConfigGrid.options.columns.length;
       const cols = [];
 
-      for (const row of rows) {
-        const name = (row[0] || '').toString().trim();
+      for (let i = 0; i < colCount; i++) {
+        const name = (columnConfigGrid.getHeader(i) || '').toString().trim();
         if (!name) continue;
 
-        const group = (row[1] || '').toString().trim();
-        const typeLabel = (row[2] || '').toString().trim();
-        const modeLabel = (row[3] || '').toString().trim();
-        const optionsRaw = (row[4] || '').toString().trim();
-        const dependsOn = (row[5] || '').toString().trim();
-        const mapRaw = (row[6] || '').toString().trim();
-        const allowCustom = !!row[7] && row[7] !== '0' && row[7] !== 'false';
+        const meta = columnMetaByName[name] || { type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false, group: '' };
+        const c = { name, type: meta.type, mode: meta.mode || 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: !!meta.allowCustom, group: meta.group || '' };
 
-        const type = typeLabel === '목록선택' ? 'select' : 'text';
-        const c = { name, type, mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom, group };
-
-        if (type === 'select') {
-          const mode = modeLabel === '동적목록' ? 'dependent' : 'flat';
-          c.mode = mode;
-
-          if (mode === 'dependent') {
-            if (!dependsOn) { alert(`[${name}] 컬럼: 동적목록은 상위 컬럼명을 입력해야 합니다.`); return; }
-            const parentCol = cols.find(x => x.name === dependsOn);
-            if (!parentCol) { alert(`[${name}] 컬럼: 상위 컬럼 [${dependsOn}]을(를) 찾을 수 없습니다. 상위 컬럼을 이 컬럼보다 앞 줄에 먼저 배치하세요.`); return; }
-            if (parentCol.type !== 'select') { alert(`[${name}] 컬럼: 상위 컬럼 [${dependsOn}]은(는) "목록선택" 형태여야 합니다.`); return; }
-
-            const optionsMap = {};
-            mapRaw.split(';').forEach(group => {
-              const idx = group.indexOf(':');
-              if (idx === -1) return;
-              const parentVal = group.slice(0, idx).trim();
-              const children = group.slice(idx + 1).split(',').map(s => s.trim()).filter(s => s);
-              if (parentVal && children.length > 0) optionsMap[parentVal] = children;
-            });
-            if (Object.keys(optionsMap).length === 0) { alert(`[${name}] 컬럼: 하위목록을 "부모값:하위1,하위2;부모값2:하위3" 형식으로 입력하세요.`); return; }
-            c.dependsOn = dependsOn;
-            c.optionsMap = optionsMap;
+        if (meta.type === 'select') {
+          if (meta.mode === 'dependent') {
+            if (!meta.dependsOn) { alert(`[${name}] 컬럼: 동적목록은 상위 컬럼명을 입력해야 합니다. 헤더에서 이 컬럼을 선택한 뒤 아래에서 입력해주세요.`); return; }
+            const parentCol = cols.find(x => x.name === meta.dependsOn);
+            if (!parentCol) { alert(`[${name}] 컬럼: 상위 컬럼 [${meta.dependsOn}]을(를) 찾을 수 없습니다. 상위 컬럼이 이 컬럼보다 왼쪽에 있어야 합니다.`); return; }
+            if (parentCol.type !== 'select') { alert(`[${name}] 컬럼: 상위 컬럼 [${meta.dependsOn}]은(는) "목록선택" 형태여야 합니다.`); return; }
+            if (!meta.optionsMap || Object.keys(meta.optionsMap).length === 0) { alert(`[${name}] 컬럼: 하위목록을 입력하세요.`); return; }
+            c.dependsOn = meta.dependsOn;
+            c.optionsMap = meta.optionsMap;
           } else {
-            const options = optionsRaw.split(',').map(s => s.trim()).filter(s => s);
-            if (options.length === 0) { alert(`[${name}] 컬럼은 목록선택 방식인데 선택목록이 비어 있습니다. 쉼표로 구분해 입력하세요.`); return; }
-            c.options = options;
+            if (!meta.options || meta.options.length === 0) { alert(`[${name}] 컬럼은 목록선택 방식인데 선택목록이 비어 있습니다. 헤더에서 이 컬럼을 선택한 뒤 아래에서 입력해주세요.`); return; }
+            c.options = meta.options;
           }
         }
         cols.push(c);
       }
 
-      if (cols.length === 0) { alert('최소 1개의 컬럼을 입력하세요.'); return; }
+      if (cols.length === 0) { alert('최소 1개의 컬럼명을 입력하세요.'); return; }
 
       currentUser.columns = cols;
       await db.collection('managers').doc(currentUser.id)
