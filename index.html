@@ -300,26 +300,16 @@
       <div id="managerTabManage">
         <div id="panelManageSurvey" class="hidden">
           <div class="q-card" style="background:#eff6ff; border-color:#bfdbfe;">
-            <h4 style="color:#1e40af; margin-top:0;">➕ 새 설문 질문 추가</h4>
-            <div class="form-group">
-              <label>질문 제목</label>
-              <input type="text" id="newQTitle" placeholder="예: 2026년도 담당자 인원수" />
+            <h4 style="color:#1e40af; margin-top:0;">📝 설문 문항 작성</h4>
+            <p class="grid-hint">실제 엑셀처럼 셀을 클릭/드래그하며 바로 입력하거나 붙여넣을 수 있습니다. "유형"을 객관식으로 하면 "객관식 옵션"에 쉼표로 구분해 선택지를 입력하세요.</p>
+            <div id="questionSpreadsheetWrap" style="max-height:400px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
+              <div id="questionSpreadsheet"></div>
             </div>
-            <div class="form-group">
-              <label>질문 유형</label>
-              <select id="newQType" onchange="toggleOptionInput()">
-                <option value="text">주관식 (단답/장문)</option>
-                <option value="radio">객관식 (단일 선택)</option>
-              </select>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="addQuestionRow()">+ 질문 추가</button>
+              <button type="button" class="btn btn-sm btn-excel" onclick="saveQuestions()">질문 저장</button>
             </div>
-            <div class="form-group hidden" id="optionGroup">
-              <label>객관식 옵션 (쉼표 ','로 구분)</label>
-              <input type="text" id="newQOptions" placeholder="예: 완료, 진행중, 미착수" />
-            </div>
-            <button type="button" class="btn btn-sm" onclick="addQuestion()">질문 추가</button>
           </div>
-          <h3>등록된 질문 목록</h3>
-          <div id="managerQuestionList"></div>
         </div>
 
         <div id="panelManageExcel" class="hidden">
@@ -327,6 +317,7 @@
             <h4 style="margin-top:0;">엑셀 컬럼(항목) 설정</h4>
             <p class="grid-hint">
               실제 엑셀처럼 셀을 클릭/드래그하며 바로 입력하거나 붙여넣을 수 있습니다.<br/>
+              "상위 목차(그룹)"에 같은 이름을 연속으로 입력하면, 기관 제출 화면에서 그 컬럼들이 하나의 상위 제목 아래로 병합되어 표시됩니다 (예: "시설현황" 아래에 점검일/점검자/비고를 묶기). 비워두면 그 컬럼은 독립적으로 표시됩니다.<br/>
               "유형"을 목록선택으로 하면 "목록유형"(고정목록/동적목록), "선택목록", 목록외값 허용 등을 함께 채워주세요.<br/>
               동적목록의 "하위목록"은 <code>부모값:하위1,하위2;부모값2:하위3,하위4</code> 형식으로 세미콜론(;)으로 구분해 한 셀에 입력합니다.
             </p>
@@ -431,18 +422,37 @@
 
     // 각 컬럼: { name, type: 'text'|'select', mode: 'flat'|'dependent', options, dependsOn, optionsMap, allowCustom }
     const DEFAULT_COLUMNS = [
-      { name: "순번", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false },
-      { name: "사업/업무명", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false },
-      { name: "예산액(천원)", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false },
-      { name: "추진일정", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false },
-      { name: "비고", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false }
+      { name: "순번", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false, group: "" },
+      { name: "사업/업무명", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false, group: "" },
+      { name: "예산액(천원)", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false, group: "" },
+      { name: "추진일정", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false, group: "" },
+      { name: "비고", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false, group: "" }
     ];
     function cloneDefaultColumns() {
       return DEFAULT_COLUMNS.map(c => ({
         name: c.name, type: c.type, mode: c.mode,
         options: [...c.options], dependsOn: c.dependsOn,
-        optionsMap: JSON.parse(JSON.stringify(c.optionsMap)), allowCustom: c.allowCustom
+        optionsMap: JSON.parse(JSON.stringify(c.optionsMap)), allowCustom: c.allowCustom,
+        group: c.group || ""
       }));
+    }
+
+    // 연속된 컬럼들이 같은 group 값을 가지면 상위 목차(병합 헤더)로 묶어서 2단 헤더를 만든다
+    function buildNestedHeaders(cols) {
+      const topRow = [];
+      const bottomRow = cols.map(c => ({ title: c.name }));
+
+      let i = 0;
+      while (i < cols.length) {
+        const g = (cols[i].group || '').trim();
+        let span = 1;
+        if (g !== '') {
+          while (i + span < cols.length && (cols[i + span].group || '').trim() === g) span++;
+        }
+        topRow.push({ title: g, colspan: span });
+        i += span;
+      }
+      return [topRow, bottomRow];
     }
 
     let currentUser = null;      // { id(uid), name, email, role, surveyPw, useSurvey, useExcel, questions, columns, agencyCode, activeRoundId }
@@ -829,8 +839,8 @@
             columnConfigGrid.insertRow();
             const newRowIdx = columnConfigGrid.getData().length - 1;
             columnConfigGrid.setValueFromCoords(0, newRowIdx, h, true);
-            columnConfigGrid.setValueFromCoords(1, newRowIdx, '자유입력', true);
-            columnConfigGrid.setValueFromCoords(2, newRowIdx, '고정목록', true);
+            columnConfigGrid.setValueFromCoords(2, newRowIdx, '자유입력', true);
+            columnConfigGrid.setValueFromCoords(3, newRowIdx, '고정목록', true);
           });
           alert('컬럼이 추가되었습니다. 내용을 확인하신 뒤 "서식 변경 저장"을 눌러야 실제로 반영됩니다.');
         } catch (err) {
@@ -994,8 +1004,9 @@
 
       const columnDefs = buildJspreadsheetColumns(cols);
       const initialData = Array.from({ length: 3 }, () => cols.map(() => ''));
+      const hasGroups = cols.some(c => (c.group || '').trim() !== '');
 
-      const created = jspreadsheet(container, {
+      const options = {
         data: initialData,
         columns: columnDefs,
         minDimensions: [cols.length, 3],
@@ -1013,7 +1024,10 @@
         oneditionstart: function (instance, cell, x, y) {
           prepareDependentGridColumn(cols, parseInt(x, 10), parseInt(y, 10));
         }
-      });
+      };
+      if (hasGroups) options.nestedHeaders = buildNestedHeaders(cols);
+
+      const created = jspreadsheet(container, options);
 
       // jspreadsheet-ce는 버전에 따라 워크시트 배열을 반환하거나 인스턴스를 바로 반환할 수 있어 둘 다 처리
       gridInstance = Array.isArray(created) ? created[0] : created;
@@ -1153,61 +1167,76 @@
       }, err => console.error('응답 구독 오류:', err));
     }
 
-    function toggleOptionInput() {
-      const type = document.getElementById('newQType').value;
-      document.getElementById('optionGroup').classList.toggle('hidden', type !== 'radio');
-    }
-
-    async function addQuestion() {
-      if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
-      const title = document.getElementById('newQTitle').value.trim();
-      const type = document.getElementById('newQType').value;
-      const optionsRaw = document.getElementById('newQOptions').value.trim();
-      if (!title) { alert('질문 제목을 입력하세요.'); return; }
-
-      let options = [];
-      if (type === 'radio') {
-        if (!optionsRaw) { alert('객관식 옵션을 입력하세요.'); return; }
-        options = optionsRaw.split(',').map(s => s.trim()).filter(s => s);
-      }
-
-      currentUser.questions.push({ id: Date.now(), title, type, options });
-      await db.collection('managers').doc(currentUser.id)
-        .collection('rounds').doc(currentRoundId).update({ questions: currentUser.questions });
-
-      document.getElementById('newQTitle').value = '';
-      document.getElementById('newQOptions').value = '';
-      renderManagerQuestions();
-    }
-
-    async function deleteQuestion(qId) {
-      if (!currentRoundId) return;
-      if (!confirm('질문을 삭제하시겠습니까?')) return;
-      currentUser.questions = currentUser.questions.filter(q => q.id !== qId);
-      await db.collection('managers').doc(currentUser.id)
-        .collection('rounds').doc(currentRoundId).update({ questions: currentUser.questions });
-      renderManagerQuestions();
-    }
+    // --- 설문 문항 작성: jspreadsheet 한 표에서 관리 (행 = 질문 하나) ---
+    let questionGrid = null;
 
     function renderManagerQuestions() {
-      const container = document.getElementById('managerQuestionList');
+      const src = currentUser.questions || [];
+      const container = document.getElementById('questionSpreadsheet');
       container.innerHTML = '';
-      const myQuestions = currentUser.questions || [];
 
-      myQuestions.forEach((q, idx) => {
-        const div = document.createElement('div');
-        div.className = 'q-card';
-        div.style.display = 'flex';
-        div.style.justifyContent = 'space-between';
-        div.style.alignItems = 'center';
+      const columnDefs = [
+        { type: 'text', title: '질문 제목', width: 260 },
+        { type: 'dropdown', title: '유형', width: 110, source: ['주관식', '객관식'] },
+        { type: 'text', title: '객관식 옵션(쉼표구분)', width: 300 }
+      ];
 
-        const info = q.type === 'radio' ? `(객관식: ${q.options.join(', ')})` : '(주관식)';
-        div.innerHTML = `
-          <div><strong>${idx + 1}. ${q.title}</strong> <span style="font-size:12px; color:#64748b;">${info}</span></div>
-          <button class="btn btn-danger btn-sm" onclick="deleteQuestion(${q.id})">삭제</button>
-        `;
-        container.appendChild(div);
+      const data = src.map(q => [
+        q.title || '',
+        q.type === 'radio' ? '객관식' : '주관식',
+        (q.options || []).join(', ')
+      ]);
+      if (data.length === 0) data.push(['', '주관식', '']);
+
+      const created = jspreadsheet(container, {
+        data: data,
+        columns: columnDefs,
+        minDimensions: [3, 1],
+        allowInsertRow: true,
+        allowDeleteRow: true,
+        allowInsertColumn: false,
+        allowDeleteColumn: false,
+        allowRenameColumn: false,
+        columnSorting: false,
+        tableOverflow: true,
+        tableWidth: '100%'
       });
+
+      questionGrid = Array.isArray(created) ? created[0] : created;
+    }
+
+    function addQuestionRow() {
+      if (questionGrid) questionGrid.insertRow();
+    }
+
+    async function saveQuestions() {
+      if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
+      if (!questionGrid) return;
+
+      const rows = questionGrid.getData();
+      const questions = [];
+
+      for (const row of rows) {
+        const title = (row[0] || '').toString().trim();
+        if (!title) continue;
+
+        const typeLabel = (row[1] || '').toString().trim();
+        const optionsRaw = (row[2] || '').toString().trim();
+        const type = typeLabel === '객관식' ? 'radio' : 'text';
+
+        let options = [];
+        if (type === 'radio') {
+          options = optionsRaw.split(',').map(s => s.trim()).filter(s => s);
+          if (options.length === 0) { alert(`[${title}] 질문: 객관식은 옵션을 쉼표로 구분해 입력해야 합니다.`); return; }
+        }
+        questions.push({ id: Date.now() + questions.length, title, type, options });
+      }
+
+      currentUser.questions = questions;
+      await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(currentRoundId).update({ questions });
+      renderManagerQuestions();
+      alert('설문 문항이 저장되었습니다.');
     }
 
     // --- 엑셀 컬럼(항목) 설정: jspreadsheet 한 표에서 관리 ---
@@ -1220,6 +1249,7 @@
 
       const columnDefs = [
         { type: 'text', title: '컬럼명', width: 150 },
+        { type: 'text', title: '상위 목차(그룹, 선택)', width: 150 },
         { type: 'dropdown', title: '유형', width: 100, source: ['자유입력', '목록선택'] },
         { type: 'dropdown', title: '목록유형', width: 110, source: ['고정목록', '동적목록'] },
         { type: 'text', title: '선택목록(쉼표구분)', width: 220 },
@@ -1230,6 +1260,7 @@
 
       const data = src.map(c => [
         c.name || '',
+        c.group || '',
         c.type === 'select' ? '목록선택' : '자유입력',
         (c.type === 'select' && c.mode === 'dependent') ? '동적목록' : '고정목록',
         (c.options || []).join(', '),
@@ -1237,12 +1268,12 @@
         Object.entries(c.optionsMap || {}).map(([k, v]) => `${k}:${(v || []).join(',')}`).join(';'),
         !!c.allowCustom
       ]);
-      if (data.length === 0) data.push(['', '자유입력', '고정목록', '', '', '', false]);
+      if (data.length === 0) data.push(['', '', '자유입력', '고정목록', '', '', '', false]);
 
       const created = jspreadsheet(container, {
         data: data,
         columns: columnDefs,
-        minDimensions: [7, 1],
+        minDimensions: [8, 1],
         allowInsertRow: true,
         allowDeleteRow: true,
         allowInsertColumn: false,
@@ -1270,15 +1301,16 @@
         const name = (row[0] || '').toString().trim();
         if (!name) continue;
 
-        const typeLabel = (row[1] || '').toString().trim();
-        const modeLabel = (row[2] || '').toString().trim();
-        const optionsRaw = (row[3] || '').toString().trim();
-        const dependsOn = (row[4] || '').toString().trim();
-        const mapRaw = (row[5] || '').toString().trim();
-        const allowCustom = !!row[6] && row[6] !== '0' && row[6] !== 'false';
+        const group = (row[1] || '').toString().trim();
+        const typeLabel = (row[2] || '').toString().trim();
+        const modeLabel = (row[3] || '').toString().trim();
+        const optionsRaw = (row[4] || '').toString().trim();
+        const dependsOn = (row[5] || '').toString().trim();
+        const mapRaw = (row[6] || '').toString().trim();
+        const allowCustom = !!row[7] && row[7] !== '0' && row[7] !== 'false';
 
         const type = typeLabel === '목록선택' ? 'select' : 'text';
-        const c = { name, type, mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom };
+        const c = { name, type, mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom, group };
 
         if (type === 'select') {
           const mode = modeLabel === '동적목록' ? 'dependent' : 'flat';
