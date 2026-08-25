@@ -334,13 +334,12 @@
     // 🔧 Firebase 설정
     // ============================================================
     const firebaseConfig = {
-      apiKey: "AIzaSyBqf_Nfq_uUiPyMaAS9b6ke6XnrMXhPBl8",
-  authDomain: "data-compile-970cf.firebaseapp.com",
-  projectId: "data-compile-970cf",
-  storageBucket: "data-compile-970cf.firebasestorage.app",
-  messagingSenderId: "954054731108",
-  appId: "1:954054731108:web:36d489db5be3759ebcc671",
-  measurementId: "G-Q4KFD8BL29"
+      apiKey: "여기에_API_KEY_입력",
+      authDomain: "여기에_PROJECTID.firebaseapp.com",
+      projectId: "여기에_PROJECTID",
+      storageBucket: "여기에_PROJECTID.appspot.com",
+      messagingSenderId: "여기에_SENDER_ID",
+      appId: "여기에_APP_ID"
     };
 
     let db = null;
@@ -813,7 +812,7 @@
               rowVals.push(v);
               if (v !== '') hasVal = true;
             });
-            if (hasVal) submittedRows.push(rowVals);
+            if (hasVal) submittedRows.push({ cells: rowVals }); // Firestore는 배열 안에 배열을 직접 저장할 수 없어 객체로 감쌈
           });
           responseObj.rows = submittedRows;
         }
@@ -1066,7 +1065,8 @@
         }).join('');
 
         if (useExcel && Array.isArray(res.rows) && res.rows.length > 0) {
-          res.rows.forEach(rVals => {
+          res.rows.forEach(rowObj => {
+            const rVals = rowObj && rowObj.cells ? rowObj.cells : [];
             const tr = document.createElement('tr');
             const rowHtml = rVals.map(v => `<td>${v}</td>`).join('');
             tr.innerHTML = `<td><strong>${res.agencyName}</strong></td><td>${res.submittedAt}</td>${answerCells}${rowHtml}`;
