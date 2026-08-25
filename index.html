@@ -97,15 +97,43 @@
     .mode-check { position: absolute; top: 10px; right: 12px; font-size: 13px; font-weight: bold; color: #2563eb; }
     .mode-hint { font-size: 11px; color: #94a3b8; margin: 0 0 16px 0; text-align: left; }
 
-    .grid-container {
-      overflow-x: auto; border: 1px solid #cbd5e1; border-radius: 8px;
-      max-height: 400px; margin-bottom: 16px;
+    .grid-top-scroll {
+      overflow-x: auto; overflow-y: hidden; height: 16px; margin-bottom: 4px;
     }
-    table.data-grid { width: 100%; border-collapse: collapse; background-color: white; font-size: 13px; }
-    table.data-grid th, table.data-grid td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
-    table.data-grid th { background-color: #f1f5f9; color: #334155; font-weight: bold; position: sticky; top: 0; z-index: 10; }
+    .grid-top-scroll-inner { height: 1px; }
+    .grid-top-scroll::-webkit-scrollbar { height: 14px; }
+    .grid-top-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 7px; }
+    .grid-top-scroll::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 7px; border: 3px solid #f1f5f9; }
+    .grid-top-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+    .grid-container {
+      overflow-x: auto; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 8px;
+      max-height: 450px; margin-bottom: 4px;
+    }
+    .grid-container::-webkit-scrollbar { height: 14px; width: 14px; }
+    .grid-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 7px; }
+    .grid-container::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 7px; border: 3px solid #f1f5f9; }
+    .grid-container::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    .grid-hint { font-size: 11px; color: #94a3b8; margin: 0 0 10px 0; }
+
+    table.data-grid { width: 100%; border-collapse: collapse; background-color: white; font-size: 13px; table-layout: fixed; }
+    table.data-grid th, table.data-grid td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; min-width: 130px; }
+    table.data-grid th:first-child, table.data-grid td:first-child { min-width: 44px; width: 44px; text-align: center; }
+    table.data-grid th {
+      background-color: #f1f5f9; color: #334155; font-weight: bold;
+      position: sticky; top: 0; z-index: 10;
+    }
+    table.data-grid th:first-child { left: 0; z-index: 20; }
+    table.data-grid td:first-child {
+      position: sticky; left: 0; z-index: 5;
+      background-color: #f8fafc; color: #94a3b8; font-weight: bold;
+    }
+    table.data-grid tbody tr:nth-child(even) td { background-color: #fafbfc; }
+    table.data-grid tbody tr:nth-child(even) td:first-child { background-color: #f1f5f9; }
+    table.data-grid tbody tr:hover td { background-color: #eff6ff; }
+    table.data-grid tbody tr:hover td:first-child { background-color: #dbeafe; }
     table.data-grid td input, table.data-grid td select { width: 100%; border: none; outline: none; background: transparent; font-size: 13px; }
-    table.data-grid td input:focus, table.data-grid td select:focus { background-color: #e0f2fe; }
+    table.data-grid td input:focus, table.data-grid td select:focus { background-color: #e0f2fe !important; }
 
     .hidden { display: none !important; }
     .status-banner { font-size: 12px; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; text-align: center; }
@@ -203,8 +231,9 @@
 
         <div id="excelGridSection" class="hidden">
           <div class="section-heading">📊 엑셀 자료 입력</div>
-          <p style="font-size:12px; color:#64748b; margin-top:-4px;">기존 엑셀에서 복사(Ctrl+C) 후 첫 셀을 클릭하고 붙여넣기(Ctrl+V) 하세요.</p>
-          <div class="grid-container">
+          <p class="grid-hint">기존 엑셀에서 복사(Ctrl+C) 후 첫 셀을 클릭하고 붙여넣기(Ctrl+V) 하세요. 문항이 많으면 표 위/아래 가로 스크롤바로 좌우 이동할 수 있습니다.</p>
+          <div class="grid-top-scroll" id="gridTopScroll"><div class="grid-top-scroll-inner" id="gridTopScrollInner"></div></div>
+          <div class="grid-container" id="gridContainer">
             <table class="data-grid">
               <thead><tr id="surveyGridHeader"></tr></thead>
               <tbody id="surveyGridBody"></tbody>
@@ -224,6 +253,13 @@
       <div class="user-info-bar">
         <span>👤 담당자: <strong id="managerNameDisplay"></strong> <span id="managerEmailDisplay" style="color:#64748b; font-weight:normal;"></span></span>
         <button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
+      </div>
+
+      <div class="q-card" style="background:#fefce8; border-color:#fde68a; margin-bottom: 20px;">
+        <h4 style="color:#92400e; margin-top:0;">🗂️ 취합 회차 관리</h4>
+        <p style="font-size:12px; color:#78350f; margin:4px 0 10px 0;">회차를 종료하면 그동안의 응답은 그대로 보존되고, 새 회차를 시작하면 기관은 새로 제출하게 됩니다. 질문/컬럼 설정은 현재 회차 것을 그대로 복사해서 시작합니다.</p>
+        <p style="font-size:13px; margin:4px 0;">현재 진행 중인 회차: <strong id="activeRoundName">-</strong></p>
+        <button class="btn btn-sm" onclick="startNewRound()">🔄 새 회차 시작 (현재 회차 종료)</button>
       </div>
 
       <div class="q-card" style="background:#eff6ff; border-color:#bfdbfe; margin-bottom: 20px;">
@@ -289,15 +325,27 @@
             <h4 style="margin-top:0;">엑셀 컬럼(항목) 설정</h4>
             <p style="font-size:12px; color:#64748b;">각 컬럼의 이름과 입력 방식을 설정하세요. "목록 선택"으로 지정하면 기관은 자유롭게 입력하지 못하고 지정한 목록 중에서만 선택할 수 있습니다.</p>
             <div id="columnConfigList"></div>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="addColumnConfigRow()">+ 컬럼 추가</button>
-            <button type="button" class="btn btn-sm btn-excel" style="margin-top:8px;" onclick="saveColumnConfig()">서식 변경 저장</button>
+            <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="addColumnConfigRow()">+ 컬럼 추가</button>
+              <button type="button" class="btn btn-sm btn-excel" onclick="saveColumnConfig()">서식 변경 저장</button>
+              <label class="btn btn-secondary btn-sm" style="margin:0; display:inline-flex; align-items:center;">
+                📂 엑셀 서식 불러오기
+                <input type="file" id="importSchemaInput" accept=".xlsx,.xls" onchange="handleImportSchemaFile(event)" style="display:none;" />
+              </label>
+            </div>
+            <p style="font-size:11px; color:#94a3b8; margin-top:6px;">엑셀 파일의 첫 번째 행(헤더)을 컬럼명으로 자동 등록합니다. 불러온 뒤 "서식 변경 저장"을 눌러야 실제로 반영됩니다.</p>
           </div>
         </div>
       </div>
 
       <div id="managerTabResponses" class="hidden">
+        <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center;">
+          <label style="font-size:12px; color:#334155;">회차 선택:</label>
+          <select id="roundSelector" onchange="switchViewingRound(this.value)" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;"></select>
+        </div>
         <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap: wrap; align-items:center;">
           <button class="btn btn-excel btn-sm" onclick="exportToExcel()">📥 취합 응답 엑셀 다운로드 (.xlsx)</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportSchemaExcel()">📄 이 회차 서식(빈 양식) 다운로드</button>
           <span id="responseLiveHint" style="font-size:11px; color:#94a3b8;">🔄 실시간 반영 중 (새로고침 불필요)</span>
         </div>
         <div style="overflow-x: auto;">
@@ -334,13 +382,12 @@
     // 🔧 Firebase 설정
     // ============================================================
     const firebaseConfig = {
-    apiKey: "AIzaSyBqf_Nfq_uUiPyMaAS9b6ke6XnrMXhPBl8",
-  authDomain: "data-compile-970cf.firebaseapp.com",
-  projectId: "data-compile-970cf",
-  storageBucket: "data-compile-970cf.firebasestorage.app",
-  messagingSenderId: "954054731108",
-  appId: "1:954054731108:web:36d489db5be3759ebcc671",
-  measurementId: "G-Q4KFD8BL29"
+      apiKey: "여기에_API_KEY_입력",
+      authDomain: "여기에_PROJECTID.firebaseapp.com",
+      projectId: "여기에_PROJECTID",
+      storageBucket: "여기에_PROJECTID.appspot.com",
+      messagingSenderId: "여기에_SENDER_ID",
+      appId: "여기에_APP_ID"
     };
 
     let db = null;
@@ -386,11 +433,15 @@
       }));
     }
 
-    let currentUser = null;      // { id(uid), name, email, role, surveyPw, useSurvey, useExcel, questions, columns, agencyCode }
-    let activeSurveyInfo = null; // { managerId(uid), agencyName, useSurvey, useExcel, questions, columns }
+    let currentUser = null;      // { id(uid), name, email, role, surveyPw, useSurvey, useExcel, questions, columns, agencyCode, activeRoundId }
+    let activeSurveyInfo = null; // { managerId(uid), roundId, agencyName, useSurvey, useExcel, questions, columns }
     let responsesUnsub = null;
     let cachedResponseDocs = [];
     let pendingGoogleUser = null; // 가입 절차 중 Google 로그인은 됐지만 아직 Firestore 문서를 만들지 않은 상태
+    let currentRoundId = null;   // 담당자가 편집 중인(=현재 활성) 회차 ID
+    let viewingRoundId = null;   // 응답 취합 탭에서 조회 중인 회차 ID (과거 회차 조회 가능)
+    let viewingRoundMeta = null; // 조회 중인 회차의 questions/columns (응답 헤더 렌더링용)
+    let roundsList = [];         // 담당자의 전체 회차 목록 캐시
 
     // 로그인/가입/기관 탭 스위치
     function switchLoginMode(mode) {
@@ -437,6 +488,9 @@
           questions: data.questions || [],
           columns: (data.columns && data.columns.length) ? data.columns : cloneDefaultColumns()
         };
+
+        await ensureActiveRound();
+        await loadRoundsList();
 
         document.getElementById('viewLogin').classList.add('hidden');
         document.getElementById('managerNameDisplay').innerText = currentUser.name;
@@ -535,12 +589,177 @@
       cachedResponseDocs = [];
       currentUser = null;
       pendingGoogleUser = null;
+      currentRoundId = null;
+      viewingRoundId = null;
+      viewingRoundMeta = null;
+      roundsList = [];
       if (auth) auth.signOut();
       document.getElementById('viewLogin').classList.remove('hidden');
       document.getElementById('viewSurvey').classList.add('hidden');
       document.getElementById('viewManager').classList.add('hidden');
       document.getElementById('viewSuperAdmin').classList.add('hidden');
       switchLoginMode('login');
+    }
+
+    // --- 취합 회차(rounds) 관리 ---
+
+    // 로그인 시 호출: 활성 회차가 있으면 그걸 currentUser에 반영, 없으면(최초 로그인/구버전 계정)
+    // 기존 top-level questions/columns로 1차 회차를 자동 생성해 이어서 쓸 수 있게 한다.
+    async function ensureActiveRound() {
+      if (currentUser.activeRoundId) {
+        const roundSnap = await db.collection('managers').doc(currentUser.id)
+          .collection('rounds').doc(currentUser.activeRoundId).get();
+        if (roundSnap.exists && roundSnap.data().status === 'open') {
+          const rd = roundSnap.data();
+          currentUser.questions = rd.questions || [];
+          currentUser.columns = (rd.columns && rd.columns.length) ? rd.columns : cloneDefaultColumns();
+          currentUser.useSurvey = !!rd.useSurvey;
+          currentUser.useExcel = !!rd.useExcel;
+          currentRoundId = currentUser.activeRoundId;
+          return;
+        }
+      }
+
+      const roundRef = db.collection('managers').doc(currentUser.id).collection('rounds').doc();
+      const roundData = {
+        name: '1차',
+        questions: currentUser.questions || [],
+        columns: (currentUser.columns && currentUser.columns.length) ? currentUser.columns : cloneDefaultColumns(),
+        useSurvey: currentUser.useSurvey !== false,
+        useExcel: !!currentUser.useExcel,
+        status: 'open',
+        createdAt: Date.now(),
+        closedAt: null
+      };
+      await roundRef.set(roundData);
+      await db.collection('managers').doc(currentUser.id).update({ activeRoundId: roundRef.id });
+      currentUser.activeRoundId = roundRef.id;
+      currentUser.questions = roundData.questions;
+      currentUser.columns = roundData.columns;
+      currentUser.useSurvey = roundData.useSurvey;
+      currentUser.useExcel = roundData.useExcel;
+      currentRoundId = roundRef.id;
+    }
+
+    async function loadRoundsList() {
+      const snap = await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').orderBy('createdAt', 'desc').get();
+      roundsList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      viewingRoundId = currentRoundId;
+      renderRoundManagementPanel();
+      renderRoundSelector();
+    }
+
+    function renderRoundManagementPanel() {
+      const active = roundsList.find(r => r.id === currentRoundId);
+      document.getElementById('activeRoundName').innerText = active ? active.name : '-';
+    }
+
+    function renderRoundSelector() {
+      const sel = document.getElementById('roundSelector');
+      sel.innerHTML = roundsList.map(r => {
+        const label = r.status === 'open' ? `${r.name} (진행중)` : `${r.name} (종료됨)`;
+        return `<option value="${r.id}" ${r.id === viewingRoundId ? 'selected' : ''}>${label}</option>`;
+      }).join('');
+    }
+
+    // 현재 회차를 종료하고, 같은 질문/컬럼 설정을 복사해 새 회차를 시작
+    async function startNewRound() {
+      if (!currentUser) return;
+      const name = prompt('새 회차의 이름을 입력하세요 (예: 2026년 하반기, 3차 등):');
+      if (!name) return;
+
+      const managerRef = db.collection('managers').doc(currentUser.id);
+      const oldRoundRef = managerRef.collection('rounds').doc(currentRoundId);
+
+      await oldRoundRef.update({ status: 'closed', closedAt: Date.now() });
+
+      const newRoundRef = managerRef.collection('rounds').doc();
+      const newRoundData = {
+        name,
+        questions: currentUser.questions || [],
+        columns: currentUser.columns || cloneDefaultColumns(),
+        useSurvey: !!currentUser.useSurvey,
+        useExcel: !!currentUser.useExcel,
+        status: 'open',
+        createdAt: Date.now(),
+        closedAt: null
+      };
+      await newRoundRef.set(newRoundData);
+      await managerRef.update({ activeRoundId: newRoundRef.id });
+
+      currentUser.activeRoundId = newRoundRef.id;
+      currentRoundId = newRoundRef.id;
+
+      alert(`"${name}" 회차를 새로 시작했습니다. 이전 회차의 응답은 "응답 취합" 탭에서 회차를 선택해 계속 조회할 수 있습니다.`);
+
+      await loadRoundsList();
+      renderManagerQuestions();
+      renderColumnConfigEditor();
+      if (!document.getElementById('managerTabResponses').classList.contains('hidden')) {
+        switchViewingRound(currentRoundId);
+      }
+    }
+
+    // 응답 취합 탭에서 조회할 회차를 변경 (과거 회차도 조회 가능, 실시간 구독 대상만 바뀜)
+    async function switchViewingRound(roundId) {
+      viewingRoundId = roundId;
+      const roundSnap = await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(roundId).get();
+      viewingRoundMeta = roundSnap.exists ? roundSnap.data() : { questions: [], columns: [], useSurvey: false, useExcel: false };
+      subscribeResponses();
+    }
+
+    // 회차의 질문/컬럼 구성을 빈 엑셀 서식으로 다운로드 (재사용/공유용)
+    function exportSchemaExcel() {
+      const meta = viewingRoundMeta || { questions: currentUser.questions, columns: currentUser.columns };
+      const headers = [];
+      (meta.questions || []).forEach(q => headers.push(q.title));
+      (meta.columns || []).forEach(c => headers.push(c.name));
+
+      if (headers.length === 0) { alert('내려받을 서식(질문/컬럼)이 없습니다.'); return; }
+
+      const ws = XLSX.utils.aoa_to_sheet([headers]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '서식');
+      const roundInfo = roundsList.find(r => r.id === viewingRoundId);
+      const fileLabel = roundInfo ? roundInfo.name : viewingRoundId;
+      XLSX.writeFile(wb, `취합서식_${fileLabel}.xlsx`);
+    }
+
+    // 다른 사람이 만든(또는 과거에 받은) 엑셀 파일의 첫 행(헤더)을 읽어 엑셀 컬럼 설정에 반영
+    function handleImportSchemaFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, { type: 'array' });
+          const firstSheet = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+          const headerRow = (rows && rows[0]) ? rows[0] : [];
+          const headers = headerRow.map(h => String(h || '').trim()).filter(h => h);
+
+          if (headers.length === 0) { alert('엑셀 파일에서 헤더(첫 행)를 읽지 못했습니다.'); return; }
+          if (!confirm(`엑셀에서 ${headers.length}개의 컬럼명을 찾았습니다:\n${headers.join(', ')}\n\n현재 컬럼 설정 목록에 추가하시겠습니까? (모두 "자유 입력" 형식으로 추가되며, 필요하면 이후에 목록 선택 등으로 직접 바꿀 수 있습니다.)`)) return;
+
+          const container = document.getElementById('columnConfigList');
+          headers.forEach(h => {
+            container.appendChild(buildColumnConfigRow({
+              name: h, type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false
+            }));
+          });
+          alert('컬럼이 추가되었습니다. 내용을 확인하신 뒤 "서식 변경 저장"을 눌러야 실제로 반영됩니다.');
+        } catch (err) {
+          console.error(err);
+          alert('엑셀 파일을 읽는 중 오류가 발생했습니다: ' + err.message);
+        } finally {
+          event.target.value = '';
+        }
+      };
+      reader.readAsArrayBuffer(file);
     }
 
     // 취합 방식 토글
@@ -556,7 +775,8 @@
       }
 
       currentUser[key] = newVal;
-      await db.collection('managers').doc(currentUser.id).update({ [key]: newVal });
+      await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(currentRoundId).update({ [key]: newVal });
       renderModeSelection();
       renderManagerResponses();
     }
@@ -596,13 +816,23 @@
         if (!data.surveyPw || data.surveyPw !== surveyPw) {
           alert("제출 전용 비밀번호가 올바르지 않습니다."); return;
         }
+        if (!data.activeRoundId) {
+          alert("현재 진행 중인 취합 회차가 없습니다. 담당자에게 문의해주세요."); return;
+        }
+
+        const roundSnap = await db.collection('managers').doc(managerUid)
+          .collection('rounds').doc(data.activeRoundId).get();
+        if (!roundSnap.exists || roundSnap.data().status !== 'open') {
+          alert("현재 진행 중인 취합 회차가 없습니다. 담당자에게 문의해주세요."); return;
+        }
+        const roundData = roundSnap.data();
 
         activeSurveyInfo = {
-          managerId: managerUid, agencyName,
-          useSurvey: !!data.useSurvey,
-          useExcel: !!data.useExcel,
-          questions: data.questions || [],
-          columns: (data.columns && data.columns.length) ? data.columns : cloneDefaultColumns()
+          managerId: managerUid, roundId: data.activeRoundId, agencyName,
+          useSurvey: !!roundData.useSurvey,
+          useExcel: !!roundData.useExcel,
+          questions: roundData.questions || [],
+          columns: (roundData.columns && roundData.columns.length) ? roundData.columns : cloneDefaultColumns()
         };
 
         document.getElementById('displayAgencyName').innerText = agencyName;
@@ -662,6 +892,32 @@
       headerRow.innerHTML = '<th>#</th>' + cols.map(c => `<th>${c.name}</th>`).join('');
       body.innerHTML = '';
       for (let i = 0; i < 10; i++) addSurveyGridRow();
+      syncGridScrollbars();
+    }
+
+    // 표 위쪽의 보조 가로 스크롤바를 실제 표(아래쪽 grid-container)와 서로 연동시킴
+    // - 문항(컬럼)이 많아 표가 넓을 때, 아래로 스크롤하지 않아도 위쪽에서 바로 좌우 이동 가능
+    function syncGridScrollbars() {
+      const top = document.getElementById('gridTopScroll');
+      const inner = document.getElementById('gridTopScrollInner');
+      const container = document.getElementById('gridContainer');
+      if (!top || !inner || !container) return;
+      const table = container.querySelector('table');
+      if (!table) return;
+
+      inner.style.width = table.scrollWidth + 'px';
+
+      let syncing = false;
+      top.onscroll = () => {
+        if (syncing) return; syncing = true;
+        container.scrollLeft = top.scrollLeft;
+        syncing = false;
+      };
+      container.onscroll = () => {
+        if (syncing) return; syncing = true;
+        top.scrollLeft = container.scrollLeft;
+        syncing = false;
+      };
     }
 
     function addSurveyGridRow() {
@@ -700,6 +956,7 @@
       });
       tr.innerHTML = html;
       body.appendChild(tr);
+      syncGridScrollbars();
     }
 
     function handleParentColumnChange(rIdx, parentColIdx) {
@@ -823,15 +1080,14 @@
         const hasRows = responseObj.rows && responseObj.rows.length > 0;
         if (!hasAnswers && !hasRows) { alert('입력된 내용이 없습니다.'); return; }
 
-        console.log('[진단] 제출 데이터:', JSON.stringify(responseObj, null, 2));
-
         await db.collection('managers').doc(activeSurveyInfo.managerId)
+          .collection('rounds').doc(activeSurveyInfo.roundId)
           .collection('responses').add(responseObj);
 
         alert('자료가 성공적으로 제출되었습니다!');
         exitSurvey();
       } catch (err) {
-        console.error('[진단] 제출 오류 상세:', err);
+        console.error('제출 오류:', err);
         alert('제출 중 오류가 발생했습니다: ' + err.message);
       } finally {
         btn.disabled = false;
@@ -855,17 +1111,20 @@
       document.getElementById('managerTabResponses').classList.toggle('hidden', tab !== 'responses');
 
       if (tab === 'responses') {
-        subscribeResponses();
+        if (!viewingRoundId) viewingRoundId = currentRoundId;
+        renderRoundSelector();
+        switchViewingRound(viewingRoundId);
       } else if (responsesUnsub) {
         responsesUnsub(); responsesUnsub = null;
       }
     }
 
     function subscribeResponses() {
-      if (!currentUser) return;
+      if (!currentUser || !viewingRoundId) return;
       if (responsesUnsub) { responsesUnsub(); responsesUnsub = null; }
       cachedResponseDocs = [];
       const ref = db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(viewingRoundId)
         .collection('responses').orderBy('submittedAtTs', 'desc');
 
       responsesUnsub = ref.onSnapshot(snap => {
@@ -892,7 +1151,8 @@
       }
 
       currentUser.questions.push({ id: Date.now(), title, type, options });
-      await db.collection('managers').doc(currentUser.id).update({ questions: currentUser.questions });
+      await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(currentRoundId).update({ questions: currentUser.questions });
 
       document.getElementById('newQTitle').value = '';
       document.getElementById('newQOptions').value = '';
@@ -902,7 +1162,8 @@
     async function deleteQuestion(qId) {
       if (!confirm('질문을 삭제하시겠습니까?')) return;
       currentUser.questions = currentUser.questions.filter(q => q.id !== qId);
-      await db.collection('managers').doc(currentUser.id).update({ questions: currentUser.questions });
+      await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(currentRoundId).update({ questions: currentUser.questions });
       renderManagerQuestions();
     }
 
@@ -1040,18 +1301,19 @@
       if (cols.length === 0) { alert('최소 1개의 컬럼을 입력하세요.'); return; }
 
       currentUser.columns = cols;
-      await db.collection('managers').doc(currentUser.id).update({ columns: cols });
+      await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(currentRoundId).update({ columns: cols });
       renderColumnConfigEditor();
       alert('엑셀 취합 컬럼 서식이 변경되었습니다.');
     }
 
     function renderManagerResponses() {
-      if (!currentUser) return;
-      const useSurvey = !!currentUser.useSurvey;
-      const useExcel = !!currentUser.useExcel;
+      if (!currentUser || !viewingRoundMeta) return;
+      const useSurvey = !!viewingRoundMeta.useSurvey;
+      const useExcel = !!viewingRoundMeta.useExcel;
 
-      const myQuestions = useSurvey ? (currentUser.questions || []) : [];
-      const cols = useExcel ? (currentUser.columns || []) : [];
+      const myQuestions = useSurvey ? (viewingRoundMeta.questions || []) : [];
+      const cols = useExcel ? (viewingRoundMeta.columns || []) : [];
 
       const thead = document.getElementById('responseTableHeader');
       const tbody = document.getElementById('responseTableBody');
@@ -1089,7 +1351,9 @@
       if (cachedResponseDocs.length === 0) { alert('다운로드할 취합 데이터가 없습니다.'); return; }
       const table = document.getElementById('responseTable');
       const wb = XLSX.utils.table_to_book(table, { sheet: "응답취합" });
-      XLSX.writeFile(wb, `취합결과_${currentUser.agencyCode || currentUser.id}.xlsx`);
+      const roundInfo = roundsList.find(r => r.id === viewingRoundId);
+      const fileLabel = roundInfo ? roundInfo.name : (currentUser.agencyCode || currentUser.id);
+      XLSX.writeFile(wb, `취합결과_${fileLabel}.xlsx`);
     }
 
     // --- 전체 관리자 기능 (색인 문서 기반, managers 컬렉션 전체 조회 안 함) ---
@@ -1132,11 +1396,25 @@
     }
 
     async function deleteManager(uid, agencyCode) {
-      if (!confirm(`정말 이 담당자 계정을 삭제하시겠습니까? 제출된 응답도 함께 삭제됩니다.`)) return;
+      if (!confirm(`정말 이 담당자 계정을 삭제하시겠습니까? 모든 회차와 제출된 응답이 함께 삭제됩니다.`)) return;
 
-      const responsesSnap = await db.collection('managers').doc(uid).collection('responses').get();
-      const batch = db.batch();
-      responsesSnap.forEach(d => batch.delete(d.ref));
+      const roundsSnap = await db.collection('managers').doc(uid).collection('rounds').get();
+      let batch = db.batch();
+      let opCount = 0;
+
+      for (const roundDoc of roundsSnap.docs) {
+        const responsesSnap = await db.collection('managers').doc(uid)
+          .collection('rounds').doc(roundDoc.id).collection('responses').get();
+        for (const rDoc of responsesSnap.docs) {
+          batch.delete(rDoc.ref);
+          opCount++;
+          if (opCount >= 400) { await batch.commit(); batch = db.batch(); opCount = 0; }
+        }
+        batch.delete(roundDoc.ref);
+        opCount++;
+        if (opCount >= 400) { await batch.commit(); batch = db.batch(); opCount = 0; }
+      }
+
       batch.delete(db.collection('managers').doc(uid));
       batch.update(db.collection('system').doc('manager_index'), {
         [uid]: firebase.firestore.FieldValue.delete()
