@@ -301,16 +301,19 @@
         <div id="panelManageSurvey" class="hidden">
           <div class="q-card" style="background:#eff6ff; border-color:#bfdbfe;">
             <h4 style="color:#1e40af; margin-top:0;">📝 설문 문항 작성</h4>
-            <p class="grid-hint">진짜 엑셀처럼, <strong>맨 위 헤더 칸을 더블클릭해서 질문 제목(목차)을 직접 입력</strong>하세요. 열(질문)은 자유롭게 추가/삭제/이동할 수 있습니다. 헤더에서 질문을 클릭해 선택하면 아래에서 유형(주관식/객관식)과 옵션을 설정할 수 있습니다.</p>
+            <p class="grid-hint">진짜 엑셀처럼, <strong>맨 위 헤더 칸을 더블클릭해서 질문 제목(목차)을 직접 입력</strong>하세요. 열(질문)과 행 모두 자유롭게 추가/삭제/이동할 수 있습니다. 헤더에서 질문을 클릭해 선택하면 아래에서 유형(주관식/객관식)과 옵션을 설정할 수 있습니다.</p>
             <div id="questionLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 질문 구성을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
-            <div id="questionSpreadsheetWrap" style="max-height:220px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
+            <div id="questionSpreadsheetWrap" style="max-height:280px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
               <div id="questionSpreadsheet"></div>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-              <button type="button" id="addQuestionRowBtn" class="btn btn-secondary btn-sm" onclick="addQuestionRow()">+ 질문 추가</button>
+              <button type="button" id="addQuestionColBtn" class="btn btn-secondary btn-sm" onclick="addQuestionColumn()">+ 질문 추가 (열)</button>
+              <button type="button" id="addQuestionRowBtn" class="btn btn-secondary btn-sm" onclick="addQuestionRow()">+ 행 추가</button>
               <button type="button" id="saveQuestionsBtn" class="btn btn-sm btn-excel" onclick="saveQuestions()">질문 저장</button>
             </div>
             <div id="questionDetailPanel"></div>
+            <h4 style="margin:16px 0 8px 0; font-size:13px; color:#334155;">📋 실시간 미리보기</h4>
+            <div id="questionLivePreview" style="font-size:12px; color:#64748b;"></div>
           </div>
         </div>
 
@@ -318,17 +321,18 @@
           <div class="q-card">
             <h4 style="margin-top:0;">엑셀 컬럼(항목) 설정</h4>
             <p class="grid-hint">
-              진짜 엑셀처럼, <strong>맨 위 헤더 칸을 더블클릭해서 컬럼명(목차)을 직접 입력</strong>하세요. 열(컬럼)은 자유롭게 추가/삭제/이동할 수 있습니다.<br/>
+              진짜 엑셀처럼, <strong>맨 위 헤더 칸을 더블클릭해서 컬럼명(목차)을 직접 입력</strong>하세요. 열(컬럼)과 행 모두 자유롭게 추가/삭제/이동할 수 있습니다.<br/>
               헤더에서 컬럼을 클릭해 선택하면 아래에서 입력 방식(자유입력/목록선택), 상위 목차(그룹), 동적목록 등을 설정할 수 있습니다.
             </p>
             <div id="columnLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 컬럼 구성을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
 
-            <div id="columnConfigSpreadsheetWrap" style="max-height:220px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
+            <div id="columnConfigSpreadsheetWrap" style="max-height:280px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
               <div id="columnConfigSpreadsheet"></div>
             </div>
 
             <div style="display:flex; gap:8px; margin: 10px 0 12px 0; flex-wrap:wrap; align-items:center;">
-              <button type="button" id="addColumnCellBtn" class="btn btn-secondary btn-sm" onclick="addColumnCell()">+ 컬럼 추가</button>
+              <button type="button" id="addColumnColBtn" class="btn btn-secondary btn-sm" onclick="addColumnCell()">+ 컬럼 추가 (열)</button>
+              <button type="button" id="addColumnRowBtn" class="btn btn-secondary btn-sm" onclick="addColumnRow()">+ 행 추가</button>
               <button type="button" id="saveColumnConfigBtn" class="btn btn-sm btn-excel" onclick="saveColumnConfig()">서식 변경 저장</button>
               <label id="importSchemaLabel" class="btn btn-secondary btn-sm" style="margin:0; display:inline-flex; align-items:center;">
                 📂 엑셀 서식 불러오기
@@ -337,6 +341,8 @@
             </div>
             <p style="font-size:11px; color:#94a3b8; margin-bottom:10px;">엑셀 파일의 첫 번째 행(헤더)을 컬럼명으로 자동 등록합니다. 불러온 뒤 "서식 변경 저장"을 눌러야 실제로 반영됩니다.</p>
             <div id="columnDetailPanel"></div>
+            <h4 style="margin:16px 0 8px 0; font-size:13px; color:#334155;">📋 실시간 미리보기</h4>
+            <div id="columnLivePreview" style="font-size:12px; color:#64748b;"></div>
           </div>
         </div>
       </div>
@@ -1190,9 +1196,11 @@
       questionsLocked = currentRoundId ? await roundHasResponses(currentRoundId) : false;
       const banner = document.getElementById('questionLockBanner');
       if (banner) banner.classList.toggle('hidden', !questionsLocked);
-      const addBtn = document.getElementById('addQuestionRowBtn');
+      const colBtn = document.getElementById('addQuestionColBtn');
+      const rowBtn = document.getElementById('addQuestionRowBtn');
       const saveBtn = document.getElementById('saveQuestionsBtn');
-      if (addBtn) addBtn.classList.toggle('hidden', questionsLocked);
+      if (colBtn) colBtn.classList.toggle('hidden', questionsLocked);
+      if (rowBtn) rowBtn.classList.toggle('hidden', questionsLocked);
       if (saveBtn) saveBtn.classList.toggle('hidden', questionsLocked);
 
       questionMetaByName = {};
@@ -1200,14 +1208,14 @@
 
       const titles = src.length ? src.map(q => q.title) : ['질문1'];
       const columnDefs = titles.map(t => ({ type: 'text', title: t, width: 180, readOnly: questionsLocked }));
-      const data = [titles.map(() => '')];
+      const data = [titles.map(() => ''), titles.map(() => '')];
 
       const created = jspreadsheet(container, {
         data: data,
         columns: columnDefs,
-        minDimensions: [titles.length, 1],
-        allowInsertRow: false,
-        allowDeleteRow: false,
+        minDimensions: [titles.length, 2],
+        allowInsertRow: !questionsLocked,
+        allowDeleteRow: !questionsLocked,
         allowInsertColumn: !questionsLocked,
         allowDeleteColumn: !questionsLocked,
         allowRenameColumn: !questionsLocked,
@@ -1218,12 +1226,19 @@
         onselection: function (instance, x1) {
           selectedQuestionIndex = parseInt(x1, 10);
           renderQuestionDetailPanel();
-        }
+        },
+        onchange: function () {
+          renderQuestionLivePreview();
+        },
+        oninsertcolumn: function () { renderQuestionLivePreview(); },
+        ondeletecolumn: function () { renderQuestionLivePreview(); },
+        onmoveheader: function () { renderQuestionLivePreview(); }
       });
 
       questionGrid = Array.isArray(created) ? created[0] : created;
       selectedQuestionIndex = 0;
       renderQuestionDetailPanel();
+      renderQuestionLivePreview();
     }
 
     function renderQuestionDetailPanel() {
@@ -1275,10 +1290,33 @@
       questionMetaByName[title] = meta;
 
       if (field === 'type') renderQuestionDetailPanel();
+      renderQuestionLivePreview();
+    }
+
+    // 현재 그리드 상태(저장 전) 기준으로 등록될 질문 목록을 실시간으로 보여줌
+    function renderQuestionLivePreview() {
+      const el = document.getElementById('questionLivePreview');
+      if (!el) return;
+      if (!questionGrid) { el.innerHTML = ''; return; }
+
+      const colCount = questionGrid.options.columns.length;
+      const items = [];
+      for (let i = 0; i < colCount; i++) {
+        const title = (questionGrid.getHeader(i) || '').toString().trim();
+        if (!title) continue;
+        const meta = questionMetaByName[title] || { type: 'text', options: [] };
+        const info = meta.type === 'radio' ? `(객관식: ${(meta.options || []).join(', ') || '옵션 미입력'})` : '(주관식)';
+        items.push(`<div>${items.length + 1}. <strong>${title}</strong> <span style="color:#94a3b8;">${info}</span></div>`);
+      }
+      el.innerHTML = items.length ? items.join('') : '<span style="color:#94a3b8;">헤더에 질문 제목을 입력하면 여기 실시간으로 표시됩니다.</span>';
+    }
+
+    function addQuestionColumn() {
+      if (questionGrid && !questionsLocked) { questionGrid.insertColumn(); renderQuestionLivePreview(); }
     }
 
     function addQuestionRow() {
-      if (questionGrid && !questionsLocked) questionGrid.insertColumn();
+      if (questionGrid && !questionsLocked) questionGrid.insertRow();
     }
 
     async function saveQuestions() {
@@ -1330,10 +1368,12 @@
       columnsLocked = currentRoundId ? await roundHasResponses(currentRoundId) : false;
       const banner = document.getElementById('columnLockBanner');
       if (banner) banner.classList.toggle('hidden', !columnsLocked);
-      const addBtn = document.getElementById('addColumnCellBtn');
+      const colBtn = document.getElementById('addColumnColBtn');
+      const rowBtn = document.getElementById('addColumnRowBtn');
       const saveBtn = document.getElementById('saveColumnConfigBtn');
       const importLabel = document.getElementById('importSchemaLabel');
-      if (addBtn) addBtn.classList.toggle('hidden', columnsLocked);
+      if (colBtn) colBtn.classList.toggle('hidden', columnsLocked);
+      if (rowBtn) rowBtn.classList.toggle('hidden', columnsLocked);
       if (saveBtn) saveBtn.classList.toggle('hidden', columnsLocked);
       if (importLabel) importLabel.classList.toggle('hidden', columnsLocked);
 
@@ -1348,14 +1388,14 @@
 
       const titles = src.length ? src.map(c => c.name) : ['컬럼1'];
       const columnDefs = titles.map(t => ({ type: 'text', title: t, width: 150, readOnly: columnsLocked }));
-      const data = [titles.map(() => '')];
+      const data = [titles.map(() => ''), titles.map(() => '')];
 
       const created = jspreadsheet(container, {
         data: data,
         columns: columnDefs,
-        minDimensions: [titles.length, 1],
-        allowInsertRow: false,
-        allowDeleteRow: false,
+        minDimensions: [titles.length, 2],
+        allowInsertRow: !columnsLocked,
+        allowDeleteRow: !columnsLocked,
         allowInsertColumn: !columnsLocked,
         allowDeleteColumn: !columnsLocked,
         allowRenameColumn: !columnsLocked,
@@ -1366,12 +1406,19 @@
         onselection: function (instance, x1) {
           selectedColumnIndex = parseInt(x1, 10);
           renderColumnDetailPanel();
-        }
+        },
+        onchange: function () {
+          renderColumnLivePreview();
+        },
+        oninsertcolumn: function () { renderColumnLivePreview(); },
+        ondeletecolumn: function () { renderColumnLivePreview(); },
+        onmoveheader: function () { renderColumnLivePreview(); }
       });
 
       columnConfigGrid = Array.isArray(created) ? created[0] : created;
       selectedColumnIndex = 0;
       renderColumnDetailPanel();
+      renderColumnLivePreview();
     }
 
     function renderColumnDetailPanel() {
@@ -1462,10 +1509,39 @@
       columnMetaByName[title] = meta;
 
       if (field === 'type' || field === 'mode') renderColumnDetailPanel();
+      renderColumnLivePreview();
+    }
+
+    // 현재 그리드 상태(저장 전) 기준으로 등록될 컬럼 목록을 실시간으로 보여줌
+    function renderColumnLivePreview() {
+      const el = document.getElementById('columnLivePreview');
+      if (!el) return;
+      if (!columnConfigGrid) { el.innerHTML = ''; return; }
+
+      const colCount = columnConfigGrid.options.columns.length;
+      const items = [];
+      for (let i = 0; i < colCount; i++) {
+        const title = (columnConfigGrid.getHeader(i) || '').toString().trim();
+        if (!title) continue;
+        const meta = columnMetaByName[title] || { type: 'text', mode: 'flat', options: [], group: '' };
+        let info = '(자유입력)';
+        if (meta.type === 'select') {
+          info = meta.mode === 'dependent'
+            ? `(동적목록, 상위: ${meta.dependsOn || '미지정'})`
+            : `(목록선택: ${(meta.options || []).join(', ') || '옵션 미입력'})`;
+        }
+        const groupTag = meta.group ? `[${meta.group}] ` : '';
+        items.push(`<div>${items.length + 1}. ${groupTag}<strong>${title}</strong> <span style="color:#94a3b8;">${info}</span></div>`);
+      }
+      el.innerHTML = items.length ? items.join('') : '<span style="color:#94a3b8;">헤더에 컬럼명을 입력하면 여기 실시간으로 표시됩니다.</span>';
     }
 
     function addColumnCell() {
-      if (columnConfigGrid && !columnsLocked) columnConfigGrid.insertColumn();
+      if (columnConfigGrid && !columnsLocked) { columnConfigGrid.insertColumn(); renderColumnLivePreview(); }
+    }
+
+    function addColumnRow() {
+      if (columnConfigGrid && !columnsLocked) columnConfigGrid.insertRow();
     }
 
     async function saveColumnConfig() {
