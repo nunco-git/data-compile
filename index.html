@@ -207,8 +207,9 @@
           <input type="text" id="accessAgencyName" placeholder="예: 부여읍 행정복지센터" required />
         </div>
         <div class="form-group">
-          <label>담당자 접속 코드</label>
-          <input type="text" id="accessManagerId" placeholder="안내받은 접속 코드 입력" required />
+          <label>설문 접속 코드</label>
+          <input type="text" id="accessRoundCode" placeholder="안내받은 설문 접속 코드 입력" required />
+          <p style="font-size:11px; color:#94a3b8; margin:4px 0 0 0;">여러 설문이 동시에 진행 중일 수 있으니, 참여하려는 설문의 접속 코드를 정확히 입력해주세요.</p>
         </div>
         <div class="form-group">
           <label>제출 전용 비밀번호</label>
@@ -268,9 +269,23 @@
 
       <div class="q-card" style="background:#fefce8; border-color:#fde68a; margin-bottom: 20px;">
         <h4 style="color:#92400e; margin-top:0;">🗂️ 취합 회차 관리</h4>
-        <p style="font-size:12px; color:#78350f; margin:4px 0 10px 0;">회차를 종료하면 그동안의 응답은 그대로 보존되고, 새 회차를 시작하면 기관은 새로 제출하게 됩니다. 질문/컬럼 설정은 현재 회차 것을 그대로 복사해서 시작합니다.</p>
-        <p style="font-size:13px; margin:4px 0;">현재 진행 중인 회차: <strong id="activeRoundName">-</strong></p>
-        <button class="btn btn-sm" onclick="startNewRound()">🔄 새 회차 시작 (현재 회차 종료)</button>
+        <p style="font-size:12px; color:#78350f; margin:4px 0 10px 0;">
+          이제 여러 설문을 <strong>동시에</strong> 진행할 수 있습니다. 새 회차를 추가해도 기존에 진행 중인 회차는 닫히지 않으며, 각 회차마다 별도의 접속 코드로 기관이 원하는 설문에 각각 참여합니다. 설문이 끝나면 "이 회차 종료"를 눌러 마감하세요.
+        </p>
+
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>지금 편집할 회차</label>
+          <select id="editingRoundSelector" onchange="switchEditingRound(this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></select>
+        </div>
+        <p style="font-size:12px; margin:4px 0 10px 0;">이 회차 접속 코드: <strong id="displayRoundCode">-</strong> (기관에게 이 코드를 안내하세요)</p>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-sm" onclick="startNewRound()">➕ 새 회차 추가</button>
+          <button class="btn btn-sm btn-danger" id="closeRoundBtn" onclick="closeCurrentEditingRound()">🔒 이 회차 종료</button>
+        </div>
+
+        <h4 style="margin:16px 0 6px 0; font-size:13px; color:#78350f;">진행 중인 회차 목록</h4>
+        <div id="openRoundsList" style="font-size:12px;"></div>
       </div>
 
       <div class="q-card" style="background:#eff6ff; border-color:#bfdbfe; margin-bottom: 20px;">
@@ -687,6 +702,27 @@
 
     // 로그인 시 호출: 활성 회차가 있으면 그걸 currentUser에 반영, 없으면(최초 로그인/구버전 계정)
     // 기존 top-level questions/columns로 1차 회차를 자동 생성해 이어서 쓸 수 있게 한다.
+    // 회차 접속 코드를 자동 생성 (담당자 접속코드 + 짧은 임의 문자열)
+    function generateRoundCode() {
+      const base = (currentUser.agencyCode || 'survey').toLowerCase().replace(/[^a-z0-9-]/g, '');
+      const suffix = Math.random().toString(36).slice(2, 6);
+      return `${base}-${suffix}`;
+    }
+
+    async function registerRoundCode(code, roundId) {
+      await db.collection('system').doc('round_code_index').set(
+        { [code]: { managerId: currentUser.id, roundId } }, { merge: true }
+      );
+    }
+
+    async function unregisterRoundCode(code) {
+      if (!code) return;
+      await db.collection('system').doc('round_code_index').update({
+        [code]: firebase.firestore.FieldValue.delete()
+      });
+    }
+
+    // 로그인 시 호출: 편집 대상 회차가 없으면(최초 로그인/구버전 계정) 기존 top-level questions/columns로 1차 회차를 자동 생성
     async function ensureActiveRound() {
       if (currentUser.activeRoundId) {
         const roundSnap = await db.collection('managers').doc(currentUser.id)
@@ -707,8 +743,10 @@
       }
 
       const roundRef = db.collection('managers').doc(currentUser.id).collection('rounds').doc();
+      const roundCode = generateRoundCode();
       const roundData = {
         name: '1차',
+        roundCode,
         questions: currentUser.questions || [],
         columns: (currentUser.columns && currentUser.columns.length) ? currentUser.columns : cloneDefaultColumns(),
         useSurvey: currentUser.useSurvey !== false,
@@ -722,6 +760,7 @@
         closedAt: null
       };
       await roundRef.set(roundData);
+      await registerRoundCode(roundCode, roundRef.id);
       await db.collection('managers').doc(currentUser.id).update({ activeRoundId: roundRef.id });
       currentUser.activeRoundId = roundRef.id;
       currentUser.questions = roundData.questions;
@@ -744,9 +783,28 @@
       renderRoundSelector();
     }
 
+    // 편집 대상 회차 선택 드롭다운 + 진행 중인 회차 목록 렌더링
     function renderRoundManagementPanel() {
-      const active = roundsList.find(r => r.id === currentRoundId);
-      document.getElementById('activeRoundName').innerText = active ? active.name : '-';
+      const editingSel = document.getElementById('editingRoundSelector');
+      const openRounds = roundsList.filter(r => r.status === 'open');
+
+      editingSel.innerHTML = openRounds.map(r =>
+        `<option value="${r.id}" ${r.id === currentRoundId ? 'selected' : ''}>${r.name}</option>`
+      ).join('');
+
+      const current = roundsList.find(r => r.id === currentRoundId);
+      document.getElementById('displayRoundCode').innerText = current ? (current.roundCode || '-') : '-';
+
+      const listEl = document.getElementById('openRoundsList');
+      if (openRounds.length === 0) {
+        listEl.innerHTML = '<span style="color:#94a3b8;">진행 중인 회차가 없습니다.</span>';
+      } else {
+        listEl.innerHTML = openRounds.map(r => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #fde68a;">
+            <span>${r.id === currentRoundId ? '✏️ ' : ''}<strong>${r.name}</strong> — 접속코드: <code>${r.roundCode || '-'}</code></span>
+          </div>
+        `).join('');
+      }
     }
 
     function renderRoundSelector() {
@@ -757,34 +815,60 @@
       }).join('');
     }
 
-    // 현재 회차를 종료하고, 같은 질문/컬럼 설정을 복사해 새 회차를 시작
+    // 편집할 회차를 전환 (여러 회차가 동시에 열려 있을 때, 그중 어느 것을 편집할지 선택)
+    async function switchEditingRound(roundId) {
+      if (!roundId || roundId === currentRoundId) return;
+      const roundSnap = await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(roundId).get();
+      if (!roundSnap.exists) return;
+      const rd = roundSnap.data();
+
+      currentRoundId = roundId;
+      currentUser.activeRoundId = roundId; // 마지막으로 편집한 회차를 기억(편의용)
+      await db.collection('managers').doc(currentUser.id).update({ activeRoundId: roundId });
+
+      currentUser.questions = rd.questions || [];
+      currentUser.columns = (rd.columns && rd.columns.length) ? rd.columns : cloneDefaultColumns();
+      currentUser.useSurvey = !!rd.useSurvey;
+      currentUser.useExcel = !!rd.useExcel;
+      currentUser.useTemplate = !!rd.useTemplate;
+      currentUser.templateData = unwrapTemplateRows(rd.templateData);
+      currentUser.templateTitle = rd.templateTitle || '';
+      currentUser.templateConfirmed = !!rd.templateConfirmed;
+
+      renderRoundManagementPanel();
+      renderModeSelection();
+      renderManagerQuestions();
+      renderColumnConfigEditor();
+    }
+
+    // 새 회차를 "추가"로 시작 (기존에 진행 중인 다른 회차는 닫지 않음 - 여러 설문 동시 진행 가능)
     async function startNewRound() {
       if (!currentUser) return;
       const name = prompt('새 회차의 이름을 입력하세요 (예: 2026년 하반기, 3차 등):');
       if (!name) return;
 
       const managerRef = db.collection('managers').doc(currentUser.id);
-
-      if (currentRoundId) {
-        await managerRef.collection('rounds').doc(currentRoundId).update({ status: 'closed', closedAt: Date.now() });
-      }
+      const roundCode = generateRoundCode();
 
       const newRoundRef = managerRef.collection('rounds').doc();
       const newRoundData = {
         name,
-        questions: currentUser.questions || [],
-        columns: (currentUser.columns && currentUser.columns.length) ? currentUser.columns : cloneDefaultColumns(),
-        useSurvey: currentUser.useSurvey !== false,
-        useExcel: !!currentUser.useExcel,
-        useTemplate: !!currentUser.useTemplate,
-        templateData: wrapTemplateRows(currentUser.templateData || []),
-        templateTitle: currentUser.templateTitle || '',
+        roundCode,
+        questions: [],
+        columns: cloneDefaultColumns(),
+        useSurvey: true,
+        useExcel: false,
+        useTemplate: false,
+        templateData: wrapTemplateRows([]),
+        templateTitle: '',
         templateConfirmed: false,
         status: 'open',
         createdAt: Date.now(),
         closedAt: null
       };
       await newRoundRef.set(newRoundData);
+      await registerRoundCode(roundCode, newRoundRef.id);
       await managerRef.update({ activeRoundId: newRoundRef.id });
 
       currentUser.activeRoundId = newRoundRef.id;
@@ -794,11 +878,11 @@
       currentUser.useSurvey = newRoundData.useSurvey;
       currentUser.useExcel = newRoundData.useExcel;
       currentUser.useTemplate = newRoundData.useTemplate;
-      currentUser.templateData = unwrapTemplateRows(newRoundData.templateData);
-      currentUser.templateTitle = newRoundData.templateTitle;
-      currentUser.templateConfirmed = newRoundData.templateConfirmed;
+      currentUser.templateData = [];
+      currentUser.templateTitle = '';
+      currentUser.templateConfirmed = false;
 
-      alert(`"${name}" 회차를 새로 시작했습니다. 서식을 사용하고 계셨다면 다시 "서식 확정"을 눌러야 기관이 제출할 수 있습니다. 이전 회차의 응답은 "응답 취합" 탭에서 회차를 선택해 계속 조회할 수 있습니다.`);
+      alert(`"${name}" 회차를 새로 추가했습니다. 접속 코드: ${roundCode}\n기존에 진행 중이던 다른 회차는 그대로 열려 있습니다.`);
 
       await loadRoundsList();
       renderModeSelection();
@@ -806,6 +890,37 @@
       renderColumnConfigEditor();
       if (!document.getElementById('managerTabResponses').classList.contains('hidden')) {
         switchViewingRound(currentRoundId);
+      }
+    }
+
+    // 지금 편집 중인 회차를 종료 (다른 열린 회차는 영향 없음)
+    async function closeCurrentEditingRound() {
+      if (!currentRoundId) return;
+      const round = roundsList.find(r => r.id === currentRoundId);
+      if (!round) return;
+
+      if (!confirm(`"${round.name}" 회차를 종료하시겠습니까? 종료하면 기관은 더 이상 이 회차에 제출할 수 없게 됩니다. (응답은 보존됩니다)`)) return;
+
+      await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(currentRoundId).update({ status: 'closed', closedAt: Date.now() });
+      if (round.roundCode) await unregisterRoundCode(round.roundCode);
+
+      await loadRoundsList();
+
+      const stillOpen = roundsList.filter(r => r.status === 'open');
+      if (stillOpen.length > 0) {
+        await switchEditingRound(stillOpen[0].id);
+      } else {
+        currentRoundId = null;
+        currentUser.activeRoundId = null;
+        currentUser.questions = [];
+        currentUser.columns = cloneDefaultColumns();
+        currentUser.templateData = [];
+        renderModeSelection();
+        renderManagerQuestions();
+        renderColumnConfigEditor();
+        renderRoundManagementPanel();
+        alert('진행 중인 회차가 모두 종료되었습니다. "새 회차 추가"를 눌러 새로 시작해주세요.');
       }
     }
 
@@ -833,8 +948,8 @@
       const round = roundsList.find(r => r.id === roundId);
       if (!round) return;
 
-      const isActive = roundId === currentRoundId;
-      const warnMsg = isActive
+      const isEditing = roundId === currentRoundId;
+      const warnMsg = round.status === 'open'
         ? `"${round.name}"는 현재 진행 중인 회차입니다. 삭제하면 기관은 더 이상 이 회차에 제출할 수 없게 되고, 그동안 제출된 응답도 모두 함께 삭제됩니다.\n정말 삭제하시겠습니까?`
         : `"${round.name}" 회차와 그동안 제출된 응답이 모두 삭제됩니다. 되돌릴 수 없습니다.\n정말 삭제하시겠습니까?`;
       if (!confirm(warnMsg)) return;
@@ -852,22 +967,29 @@
       }
       batch.delete(roundRef);
       await batch.commit();
+      if (round.roundCode) await unregisterRoundCode(round.roundCode);
 
-      if (isActive) {
+      if (isEditing) {
         await db.collection('managers').doc(currentUser.id).update({ activeRoundId: firebase.firestore.FieldValue.delete() });
         currentUser.activeRoundId = null;
         currentRoundId = null;
         currentUser.questions = [];
         currentUser.columns = cloneDefaultColumns();
-        renderModeSelection();
-        renderManagerQuestions();
-        renderColumnConfigEditor();
+        currentUser.templateData = [];
       }
 
       await loadRoundsList();
 
-      if (!currentRoundId) {
-        alert('활성 회차가 삭제되었습니다. "새 회차 시작" 버튼을 눌러 새 회차를 시작해주세요.');
+      if (isEditing) {
+        const stillOpen = roundsList.filter(r => r.status === 'open');
+        if (stillOpen.length > 0) {
+          await switchEditingRound(stillOpen[0].id);
+        } else {
+          renderModeSelection();
+          renderManagerQuestions();
+          renderColumnConfigEditor();
+          alert('편집 중이던 회차가 삭제되었습니다. "새 회차 추가"를 눌러 새로 시작해주세요.');
+        }
       } else {
         alert('회차가 삭제되었습니다.');
       }
@@ -975,16 +1097,18 @@
       e.preventDefault();
       if (!db) { alert('Firebase 설정이 되어 있지 않습니다.'); return; }
       const agencyName = document.getElementById('accessAgencyName').value.trim();
-      const agencyCode = document.getElementById('accessManagerId').value.trim();
+      const roundCode = document.getElementById('accessRoundCode').value.trim();
       const surveyPw = document.getElementById('accessSurveyPw').value.trim();
       const btn = e.target.querySelector('button[type="submit"]');
       btn.disabled = true; btn.innerText = '확인 중...';
 
       try {
-        const codeSnap = await db.collection('system').doc('agency_code_index').get();
+        const codeSnap = await db.collection('system').doc('round_code_index').get();
         const codeMap = codeSnap.exists ? codeSnap.data() : {};
-        const managerUid = codeMap[agencyCode];
-        if (!managerUid) { alert("존재하지 않는 접속 코드입니다."); return; }
+        const entry = codeMap[roundCode];
+        if (!entry || !entry.managerId || !entry.roundId) { alert("존재하지 않는 설문 접속 코드입니다."); return; }
+        const managerUid = entry.managerId;
+        const roundId = entry.roundId;
 
         const snap = await db.collection('managers').doc(managerUid).get();
         if (!snap.exists) { alert("존재하지 않는 담당자입니다."); return; }
@@ -992,20 +1116,17 @@
         if (!data.surveyPw || data.surveyPw !== surveyPw) {
           alert("제출 전용 비밀번호가 올바르지 않습니다."); return;
         }
-        if (!data.activeRoundId) {
-          alert("현재 진행 중인 취합 회차가 없습니다. 담당자에게 문의해주세요."); return;
-        }
 
         const roundSnap = await db.collection('managers').doc(managerUid)
-          .collection('rounds').doc(data.activeRoundId).get();
+          .collection('rounds').doc(roundId).get();
         if (!roundSnap.exists || roundSnap.data().status !== 'open') {
-          alert("현재 진행 중인 취합 회차가 없습니다. 담당자에게 문의해주세요."); return;
+          alert("이 설문은 현재 제출 기간이 아닙니다. 담당자에게 문의해주세요."); return;
         }
         const roundData = roundSnap.data();
         const templateReady = !!roundData.useTemplate && !!roundData.templateConfirmed;
 
         activeSurveyInfo = {
-          managerId: managerUid, roundId: data.activeRoundId, agencyName,
+          managerId: managerUid, roundId, agencyName,
           useSurvey: !!roundData.useSurvey,
           useExcel: !!roundData.useExcel,
           useTemplate: templateReady,
@@ -1021,7 +1142,7 @@
         }
 
         document.getElementById('displayAgencyName').innerText = agencyName;
-        document.getElementById('displayManagerId').innerText = agencyCode;
+        document.getElementById('displayManagerId').innerText = roundCode;
         document.getElementById('viewLogin').classList.add('hidden');
         document.getElementById('viewSurvey').classList.remove('hidden');
         document.querySelector('.container').classList.add('container-wide');
@@ -1992,8 +2113,12 @@
       const roundsSnap = await db.collection('managers').doc(uid).collection('rounds').get();
       let batch = db.batch();
       let opCount = 0;
+      const roundCodesToRemove = [];
 
       for (const roundDoc of roundsSnap.docs) {
+        const rd = roundDoc.data();
+        if (rd.roundCode) roundCodesToRemove.push(rd.roundCode);
+
         const responsesSnap = await db.collection('managers').doc(uid)
           .collection('rounds').doc(roundDoc.id).collection('responses').get();
         for (const rDoc of responsesSnap.docs) {
@@ -2014,6 +2139,11 @@
         batch.update(db.collection('system').doc('agency_code_index'), {
           [agencyCode]: firebase.firestore.FieldValue.delete()
         });
+      }
+      if (roundCodesToRemove.length > 0) {
+        const roundCodeUpdates = {};
+        roundCodesToRemove.forEach(code => { roundCodeUpdates[code] = firebase.firestore.FieldValue.delete(); });
+        batch.update(db.collection('system').doc('round_code_index'), roundCodeUpdates);
       }
       await batch.commit();
       renderSuperAdminView();
