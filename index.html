@@ -1091,12 +1091,14 @@
 
       const colCount = templateData[0] ? templateData[0].length : 1;
       const columnDefs = Array.from({ length: colCount }, () => ({ type: 'text', width: 120 }));
-      const initialData = templateData.map(row => row.slice());
+      // 맨 오른쪽 실제 열이 잘리는 문제를 우회하기 위해, 입력 불가능한 여유 열을 하나 더 붙인다
+      columnDefs.push({ type: 'text', title: '', width: 24, readOnly: true });
+      const initialData = templateData.map(row => row.slice().concat(['']));
 
       const created = jspreadsheet(container, {
         data: initialData,
         columns: columnDefs,
-        minDimensions: [colCount, templateData.length],
+        minDimensions: [colCount + 1, templateData.length],
         allowInsertRow: false,
         allowDeleteRow: false,
         allowInsertColumn: false,
@@ -1106,6 +1108,7 @@
         autoIncrement: false,
         onbeforechange: function (instance, cell, x, y, value) {
           const yi = parseInt(y, 10), xi = parseInt(x, 10);
+          if (xi >= colCount) return ''; // 여유 열은 항상 빈 값 유지
           const orig = (templateData[yi] && templateData[yi][xi]) || '';
           if (orig.toString().trim() !== '') return orig; // 라벨 칸: 원래 값으로 되돌려 편집 차단
           return value;
@@ -1149,13 +1152,16 @@
       container.innerHTML = '';
 
       const columnDefs = buildJspreadsheetColumns(cols);
-      const initialData = Array.from({ length: 3 }, () => cols.map(() => ''));
+      // 맨 오른쪽 실제 열이 잘리는 문제를 우회하기 위해, 입력 불가능한 여유 열을 하나 더 붙인다
+      columnDefs.push({ type: 'text', title: '', width: 24, readOnly: true });
+
+      const initialData = Array.from({ length: 3 }, () => cols.map(() => '').concat(['']));
       const hasGroups = cols.some(c => (c.group || '').trim() !== '');
 
       const options = {
         data: initialData,
         columns: columnDefs,
-        minDimensions: [cols.length, 3],
+        minDimensions: [cols.length + 1, 3],
         allowInsertRow: true,
         allowDeleteRow: true,
         allowInsertColumn: false,
@@ -1171,7 +1177,11 @@
           prepareDependentGridColumn(cols, parseInt(x, 10), parseInt(y, 10));
         }
       };
-      if (hasGroups) options.nestedHeaders = buildNestedHeaders(cols);
+      if (hasGroups) {
+        const nested = buildNestedHeaders(cols);
+        nested.forEach(row => row.push({ title: '', colspan: 1 }));
+        options.nestedHeaders = nested;
+      }
 
       const created = jspreadsheet(container, options);
 
@@ -1245,10 +1255,11 @@
         }
 
         if (activeSurveyInfo.useExcel && gridInstance) {
-          const gridData = gridInstance.getData(); // 배열의 배열
+          const realColCount = (activeSurveyInfo.columns || DEFAULT_COLUMNS).length;
+          const gridData = gridInstance.getData(); // 배열의 배열 (맨 뒤 여유 열 포함)
           const submittedRows = [];
           gridData.forEach(row => {
-            const rowVals = row.map(v => (v === null || v === undefined ? '' : String(v).trim()));
+            const rowVals = row.slice(0, realColCount).map(v => (v === null || v === undefined ? '' : String(v).trim()));
             const hasVal = rowVals.some(v => v !== '');
             if (hasVal) submittedRows.push({ cells: rowVals }); // Firestore는 배열 안에 배열을 직접 저장할 수 없어 객체로 감쌈
           });
@@ -1256,9 +1267,11 @@
         }
 
         if (activeSurveyInfo.useTemplate && templateFillGrid) {
+          const realTemplateColCount = (activeSurveyInfo.templateData && activeSurveyInfo.templateData[0])
+            ? activeSurveyInfo.templateData[0].length : 0;
           const filledData = templateFillGrid.getData();
           const templateRows = filledData.map(row =>
-            ({ cells: row.map(v => (v === null || v === undefined ? '' : String(v).trim())) })
+            ({ cells: row.slice(0, realTemplateColCount).map(v => (v === null || v === undefined ? '' : String(v).trim())) })
           );
           responseObj.templateAnswers = templateRows;
         }
