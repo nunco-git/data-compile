@@ -248,7 +248,7 @@
         </div>
 
         <div id="templateFillSection" class="hidden">
-          <div class="section-heading">📐 서식 작성</div>
+          <div class="section-heading" id="templateFillTitle">📐 서식 작성</div>
           <p class="grid-hint">회색으로 표시된 칸은 고정된 항목이며, 흰색 빈칸에만 내용을 입력할 수 있습니다.</p>
           <div id="templateFillWrap" style="max-height:480px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:16px;">
             <div id="templateFillSpreadsheet"></div>
@@ -365,9 +365,17 @@
             <h4 style="margin-top:0;">자유 서식(템플릿) 디자인</h4>
             <p class="grid-hint">
               원하는 칸에 라벨(제목/문구)을 직접 입력하세요. <strong>글자를 입력한 칸은 기관 화면에 고정 텍스트로 표시되고, 비워둔 칸만 기관이 입력할 수 있는 빈칸이 됩니다.</strong><br/>
-              예: "사업명"이라고 쓴 칸 바로 옆 빈칸에 기관이 실제 사업명을 입력하는 식입니다. 행/열은 자유롭게 추가/삭제할 수 있습니다.
+              예: "사업명"이라고 쓴 칸 바로 옆 빈칸에 기관이 실제 사업명을 입력하는 식입니다. 행/열은 자유롭게 추가/삭제할 수 있습니다.<br/>
+              <strong>"서식 저장"은 임시 저장이며, 기관에게는 아직 보이지 않습니다. 다 작성한 뒤 "서식 확정"을 눌러야 기관이 제출을 시작할 수 있습니다.</strong>
             </p>
             <div id="templateLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 서식을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
+            <div id="templateConfirmedBanner" class="status-banner ok hidden">✅ 확정된 서식입니다. 기관이 제출할 수 있습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
+            <div id="templateDraftBanner" class="status-banner hidden" style="background:#fff7ed; color:#9a3412;">✏️ 아직 확정되지 않은 임시 서식입니다. 기관 화면에는 표시되지 않습니다.</div>
+
+            <div class="form-group" style="margin-bottom:10px;">
+              <label>서식 제목</label>
+              <input type="text" id="templateTitleInput" placeholder="예: 2026년 시설 안전점검 서식" />
+            </div>
 
             <div id="templateSpreadsheetWrap" style="max-height:360px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
               <div id="templateSpreadsheet"></div>
@@ -376,7 +384,8 @@
             <div style="display:flex; gap:8px; margin: 10px 0 12px 0; flex-wrap:wrap; align-items:center;">
               <button type="button" id="addTemplateRowBtn" class="btn btn-secondary btn-sm" onclick="addTemplateRow()">+ 행 추가</button>
               <button type="button" id="addTemplateColBtn" class="btn btn-secondary btn-sm" onclick="addTemplateCol()">+ 열 추가</button>
-              <button type="button" id="saveTemplateBtn" class="btn btn-sm btn-excel" onclick="saveTemplate()">서식 저장</button>
+              <button type="button" id="saveTemplateBtn" class="btn btn-sm btn-secondary" onclick="saveTemplate()">임시 저장</button>
+              <button type="button" id="confirmTemplateBtn" class="btn btn-sm btn-excel" onclick="confirmTemplate()">🔒 서식 확정</button>
             </div>
           </div>
         </div>
@@ -682,6 +691,8 @@
           currentUser.useExcel = !!rd.useExcel;
           currentUser.useTemplate = !!rd.useTemplate;
           currentUser.templateData = rd.templateData || [];
+          currentUser.templateTitle = rd.templateTitle || '';
+          currentUser.templateConfirmed = !!rd.templateConfirmed;
           currentRoundId = currentUser.activeRoundId;
           return;
         }
@@ -696,6 +707,8 @@
         useExcel: !!currentUser.useExcel,
         useTemplate: !!currentUser.useTemplate,
         templateData: currentUser.templateData || [],
+        templateTitle: currentUser.templateTitle || '',
+        templateConfirmed: false,
         status: 'open',
         createdAt: Date.now(),
         closedAt: null
@@ -709,6 +722,8 @@
       currentUser.useExcel = roundData.useExcel;
       currentUser.useTemplate = roundData.useTemplate;
       currentUser.templateData = roundData.templateData;
+      currentUser.templateTitle = roundData.templateTitle;
+      currentUser.templateConfirmed = roundData.templateConfirmed;
       currentRoundId = roundRef.id;
     }
 
@@ -755,6 +770,8 @@
         useExcel: !!currentUser.useExcel,
         useTemplate: !!currentUser.useTemplate,
         templateData: currentUser.templateData || [],
+        templateTitle: currentUser.templateTitle || '',
+        templateConfirmed: false,
         status: 'open',
         createdAt: Date.now(),
         closedAt: null
@@ -770,8 +787,10 @@
       currentUser.useExcel = newRoundData.useExcel;
       currentUser.useTemplate = newRoundData.useTemplate;
       currentUser.templateData = newRoundData.templateData;
+      currentUser.templateTitle = newRoundData.templateTitle;
+      currentUser.templateConfirmed = newRoundData.templateConfirmed;
 
-      alert(`"${name}" 회차를 새로 시작했습니다. 이전 회차의 응답은 "응답 취합" 탭에서 회차를 선택해 계속 조회할 수 있습니다.`);
+      alert(`"${name}" 회차를 새로 시작했습니다. 서식을 사용하고 계셨다면 다시 "서식 확정"을 눌러야 기관이 제출할 수 있습니다. 이전 회차의 응답은 "응답 취합" 탭에서 회차를 선택해 계속 조회할 수 있습니다.`);
 
       await loadRoundsList();
       renderModeSelection();
@@ -975,16 +994,23 @@
           alert("현재 진행 중인 취합 회차가 없습니다. 담당자에게 문의해주세요."); return;
         }
         const roundData = roundSnap.data();
+        const templateReady = !!roundData.useTemplate && !!roundData.templateConfirmed;
 
         activeSurveyInfo = {
           managerId: managerUid, roundId: data.activeRoundId, agencyName,
           useSurvey: !!roundData.useSurvey,
           useExcel: !!roundData.useExcel,
-          useTemplate: !!roundData.useTemplate,
+          useTemplate: templateReady,
           questions: roundData.questions || [],
           columns: (roundData.columns && roundData.columns.length) ? roundData.columns : cloneDefaultColumns(),
-          templateData: roundData.templateData || []
+          templateData: roundData.templateData || [],
+          templateTitle: roundData.templateTitle || ''
         };
+
+        if (!activeSurveyInfo.useSurvey && !activeSurveyInfo.useExcel && !activeSurveyInfo.useTemplate) {
+          alert('현재 제출 가능한 항목이 없습니다. 담당자에게 문의해주세요.');
+          return;
+        }
 
         document.getElementById('displayAgencyName').innerText = agencyName;
         document.getElementById('displayManagerId').innerText = agencyCode;
@@ -995,6 +1021,8 @@
         document.getElementById('surveyQuestionsSection').classList.toggle('hidden', !activeSurveyInfo.useSurvey);
         document.getElementById('excelGridSection').classList.toggle('hidden', !activeSurveyInfo.useExcel);
         document.getElementById('templateFillSection').classList.toggle('hidden', !activeSurveyInfo.useTemplate);
+        const templateTitleEl = document.getElementById('templateFillTitle');
+        if (templateTitleEl) templateTitleEl.innerText = '📐 ' + (activeSurveyInfo.templateTitle || '서식 작성');
 
         if (activeSurveyInfo.useSurvey) renderCustomSurvey();
         if (activeSurveyInfo.useExcel) renderSurveyGrid();
@@ -1711,15 +1739,30 @@
       if (!container) return;
       container.innerHTML = '';
 
-      templateLocked = currentRoundId ? await roundHasResponses(currentRoundId) : false;
-      const banner = document.getElementById('templateLockBanner');
-      if (banner) banner.classList.toggle('hidden', !templateLocked);
+      const hasResponses = currentRoundId ? await roundHasResponses(currentRoundId) : false;
+      const isConfirmed = !!currentUser.templateConfirmed;
+      templateLocked = hasResponses || isConfirmed;
+
+      const responseLockBanner = document.getElementById('templateLockBanner');
+      const confirmedBanner = document.getElementById('templateConfirmedBanner');
+      const draftBanner = document.getElementById('templateDraftBanner');
+      if (responseLockBanner) responseLockBanner.classList.toggle('hidden', !hasResponses);
+      if (confirmedBanner) confirmedBanner.classList.toggle('hidden', !(isConfirmed && !hasResponses));
+      if (draftBanner) draftBanner.classList.toggle('hidden', isConfirmed || hasResponses);
+
       const rowBtn = document.getElementById('addTemplateRowBtn');
       const colBtn = document.getElementById('addTemplateColBtn');
       const saveBtn = document.getElementById('saveTemplateBtn');
+      const confirmBtn = document.getElementById('confirmTemplateBtn');
+      const titleInput = document.getElementById('templateTitleInput');
       if (rowBtn) rowBtn.classList.toggle('hidden', templateLocked);
       if (colBtn) colBtn.classList.toggle('hidden', templateLocked);
       if (saveBtn) saveBtn.classList.toggle('hidden', templateLocked);
+      if (confirmBtn) confirmBtn.classList.toggle('hidden', templateLocked);
+      if (titleInput) {
+        titleInput.value = currentUser.templateTitle || '';
+        titleInput.readOnly = templateLocked;
+      }
 
       const saved = (currentUser.templateData && currentUser.templateData.length)
         ? currentUser.templateData
@@ -1753,6 +1796,7 @@
       if (templateGrid && !templateLocked) templateGrid.insertColumn();
     }
 
+    // 임시 저장: 기관에게는 아직 보이지 않음(useTemplate가 켜져 있어도 확정 전에는 기관 화면에 노출 안 함)
     async function saveTemplate() {
       if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
       if (!templateGrid) return;
@@ -1767,10 +1811,41 @@
       const hasAnyContent = data.some(row => row.some(v => (v || '').toString().trim() !== ''));
       if (!hasAnyContent) { alert('서식에 라벨을 하나 이상 입력하세요.'); return; }
 
+      const title = (document.getElementById('templateTitleInput').value || '').trim();
       currentUser.templateData = data;
+      currentUser.templateTitle = title;
       await db.collection('managers').doc(currentUser.id)
-        .collection('rounds').doc(currentRoundId).update({ templateData: data });
-      alert('서식이 저장되었습니다.');
+        .collection('rounds').doc(currentRoundId).update({ templateData: data, templateTitle: title });
+      alert('서식이 임시 저장되었습니다. (아직 확정 전이라 기관 화면에는 표시되지 않습니다) 다 작성하셨으면 "서식 확정"을 눌러주세요.');
+    }
+
+    // 확정: 이후 수정 불가, 기관이 이 서식으로 제출을 시작할 수 있게 됨
+    async function confirmTemplate() {
+      if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
+      if (!templateGrid) return;
+
+      if (await roundHasResponses(currentRoundId)) {
+        alert('이미 응답이 제출된 회차는 서식을 수정할 수 없습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.');
+        renderTemplateEditor();
+        return;
+      }
+
+      const data = templateGrid.getData();
+      const hasAnyContent = data.some(row => row.some(v => (v || '').toString().trim() !== ''));
+      if (!hasAnyContent) { alert('서식에 라벨을 하나 이상 입력하세요.'); return; }
+
+      if (!confirm('서식을 확정하시겠습니까? 확정 후에는 이 회차에서 서식을 수정할 수 없으며, 기관이 이 서식으로 제출을 시작할 수 있게 됩니다.')) return;
+
+      const title = (document.getElementById('templateTitleInput').value || '').trim();
+      currentUser.templateData = data;
+      currentUser.templateTitle = title;
+      currentUser.templateConfirmed = true;
+      await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(currentRoundId).update({
+          templateData: data, templateTitle: title, templateConfirmed: true
+        });
+      renderTemplateEditor();
+      alert('서식이 확정되었습니다. 이제 기관이 제출할 수 있습니다.');
     }
 
 
