@@ -338,29 +338,35 @@
       <div id="managerTabManage">
         <div id="panelManageSurvey" class="hidden">
           <div class="q-card" style="background:#eff6ff; border-color:#bfdbfe;">
-            <h4 style="color:#1e40af; margin-top:0;">📝 설문 문항 작성</h4>
-            <p class="grid-hint">진짜 엑셀처럼, <strong>맨 위 헤더 칸을 더블클릭해서 질문 제목(목차)을 직접 입력</strong>하세요. 열(질문)과 행 모두 자유롭게 추가/삭제/이동할 수 있습니다. 헤더에서 질문을 클릭해 선택하면 아래에서 유형(주관식/객관식)과 옵션을 설정할 수 있습니다.</p>
+            <h4 style="color:#1e40af; margin-top:0;">➕ 새 설문 질문 추가</h4>
             <div id="questionLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 질문 구성을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
-            <div id="questionSpreadsheetWrap" style="max-height:280px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
-              <div id="questionSpreadsheet"></div>
+            <div class="form-group">
+              <label>질문 제목</label>
+              <input type="text" id="newQTitle" placeholder="예: 2026년도 담당자 인원수" />
             </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-              <button type="button" id="addQuestionColBtn" class="btn btn-secondary btn-sm" onclick="addQuestionColumn()">+ 질문 추가 (열)</button>
-              <button type="button" id="addQuestionRowBtn" class="btn btn-secondary btn-sm" onclick="addQuestionRow()">+ 행 추가</button>
-              <button type="button" id="saveQuestionsBtn" class="btn btn-sm btn-excel" onclick="saveQuestions()">질문 저장</button>
+            <div class="form-group">
+              <label>질문 유형</label>
+              <select id="newQType" onchange="toggleOptionInput()">
+                <option value="text">주관식 (단답/장문)</option>
+                <option value="radio">객관식 (단일 선택)</option>
+              </select>
             </div>
-            <div id="questionDetailPanel"></div>
-            <h4 style="margin:16px 0 8px 0; font-size:13px; color:#334155;">📋 실시간 미리보기</h4>
-            <div id="questionLivePreview" style="font-size:12px; color:#64748b;"></div>
+            <div class="form-group hidden" id="optionGroup">
+              <label>객관식 옵션 (쉼표 ','로 구분)</label>
+              <input type="text" id="newQOptions" placeholder="예: 완료, 진행중, 미착수" />
+            </div>
+            <button type="button" class="btn btn-sm" id="addQuestionBtn" onclick="addQuestion()">질문 추가</button>
           </div>
+          <h3>등록된 질문 목록</h3>
+          <div id="managerQuestionList"></div>
         </div>
 
         <div id="panelManageExcel" class="hidden">
           <div class="q-card">
             <h4 style="margin-top:0;">엑셀 컬럼(항목) 설정</h4>
             <p class="grid-hint">
-              진짜 엑셀처럼, <strong>맨 위 헤더 칸을 더블클릭해서 컬럼명(목차)을 직접 입력</strong>하세요. 열(컬럼)과 행 모두 자유롭게 추가/삭제/이동할 수 있습니다.<br/>
-              헤더에서 컬럼을 클릭해 선택하면 아래에서 입력 방식(자유입력/목록선택), 상위 목차(그룹), 동적목록 등을 설정할 수 있습니다.
+              헤더는 혼동을 줄이기 위해 1, 2, 3 순서 번호로만 표시됩니다. <strong>1행의 셀에 실제 컬럼명을 입력</strong>하세요. 열(컬럼)과 행 모두 자유롭게 추가/삭제할 수 있습니다.<br/>
+              1행에 컬럼명을 입력한 뒤 그 칸을 클릭해 선택하면 아래에서 입력 방식(자유입력/목록선택), 상위 목차(그룹), 동적목록 등을 설정할 수 있습니다.
             </p>
             <div id="columnLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 컬럼 구성을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
 
@@ -1048,9 +1054,10 @@
           headers.forEach(h => {
             columnConfigGrid.insertColumn();
             const newColIdx = columnConfigGrid.options.columns.length - 1;
-            columnConfigGrid.setHeader(newColIdx, h);
+            columnConfigGrid.setValueFromCoords(newColIdx, 0, h, true);
             columnMetaByName[h] = { type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false, group: '' };
           });
+          renderColumnLivePreview();
           alert('컬럼이 추가되었습니다. 내용을 확인하신 뒤 "서식 변경 저장"을 눌러야 실제로 반영됩니다.');
         } catch (err) {
           console.error(err);
@@ -1364,7 +1371,13 @@
     }
 
     function addSurveyGridRow() {
-      if (gridInstance) gridInstance.insertRow();
+      try {
+        if (!gridInstance) { alert('입력 표를 아직 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'); return; }
+        gridInstance.insertRow();
+      } catch (err) {
+        console.error('[진단] 행 추가 오류:', err);
+        alert('행 추가 중 오류가 발생했습니다: ' + err.message);
+      }
     }
 
     // 상위 컬럼 값이 바뀌면, 그 값에 종속된 동적목록 컬럼의 선택지를 갱신
@@ -1517,176 +1530,75 @@
       return !snap.empty;
     }
 
-    // --- 설문 문항 작성: jspreadsheet 헤더 = 실제 질문 제목(목차). 유형/옵션은 이름 기준 메타데이터로 별도 관리 ---
-    let questionGrid = null;
-    let questionMetaByName = {}; // { [질문제목]: {type, options} }
-    let selectedQuestionIndex = null;
-    let questionsLocked = false;
-
+    // --- 설문 문항 작성: 원래의 간단한 카드형 폼 (jspreadsheet 미사용) ---
     async function renderManagerQuestions() {
-      const src = currentUser.questions || [];
-      const container = document.getElementById('questionSpreadsheet');
-      container.innerHTML = '';
-
-      questionsLocked = currentRoundId ? await roundHasResponses(currentRoundId) : false;
+      const questionsLocked = currentRoundId ? await roundHasResponses(currentRoundId) : false;
       const banner = document.getElementById('questionLockBanner');
       if (banner) banner.classList.toggle('hidden', !questionsLocked);
-      const colBtn = document.getElementById('addQuestionColBtn');
-      const rowBtn = document.getElementById('addQuestionRowBtn');
-      const saveBtn = document.getElementById('saveQuestionsBtn');
-      if (colBtn) colBtn.classList.toggle('hidden', questionsLocked);
-      if (rowBtn) rowBtn.classList.toggle('hidden', questionsLocked);
-      if (saveBtn) saveBtn.classList.toggle('hidden', questionsLocked);
+      const addBtn = document.getElementById('addQuestionBtn');
+      if (addBtn) addBtn.classList.toggle('hidden', questionsLocked);
 
-      questionMetaByName = {};
-      src.forEach(q => { questionMetaByName[q.title] = { type: q.type, options: q.options || [] }; });
+      const container = document.getElementById('managerQuestionList');
+      container.innerHTML = '';
+      const myQuestions = currentUser.questions || [];
 
-      const titles = src.length ? src.map(q => q.title) : ['질문1'];
-      const columnDefs = titles.map(t => ({ type: 'text', title: t, width: 180, readOnly: questionsLocked }));
-      const data = [titles.map(() => ''), titles.map(() => '')];
+      myQuestions.forEach((q, idx) => {
+        const div = document.createElement('div');
+        div.className = 'q-card';
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+        div.style.alignItems = 'center';
 
-      const created = jspreadsheet(container, {
-        data: data,
-        columns: columnDefs,
-        minDimensions: [titles.length, 2],
-        allowInsertRow: !questionsLocked,
-        allowDeleteRow: !questionsLocked,
-        allowInsertColumn: !questionsLocked,
-        allowDeleteColumn: !questionsLocked,
-        allowRenameColumn: !questionsLocked,
-        columnSorting: false,
-        tableOverflow: true,
-        autoIncrement: false,
-        editable: !questionsLocked,
-        onselection: function (instance, x1) {
-          selectedQuestionIndex = parseInt(x1, 10);
-          renderQuestionDetailPanel();
-        },
-        onchange: function () {
-          renderQuestionLivePreview();
-        },
-        oninsertcolumn: function () { renderQuestionLivePreview(); },
-        ondeletecolumn: function () { renderQuestionLivePreview(); },
-        onmoveheader: function () { renderQuestionLivePreview(); }
+        const info = q.type === 'radio' ? `(객관식: ${(q.options || []).join(', ')})` : '(주관식)';
+        div.innerHTML = `
+          <div><strong>${idx + 1}. ${q.title}</strong> <span style="font-size:12px; color:#64748b;">${info}</span></div>
+          ${questionsLocked ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteQuestion(${q.id})">삭제</button>`}
+        `;
+        container.appendChild(div);
       });
-
-      questionGrid = Array.isArray(created) ? created[0] : created;
-      selectedQuestionIndex = 0;
-      renderQuestionDetailPanel();
-      renderQuestionLivePreview();
     }
 
-    function renderQuestionDetailPanel() {
-      const panel = document.getElementById('questionDetailPanel');
-      if (!panel) return;
-      if (!questionGrid || selectedQuestionIndex === null || questionsLocked) { panel.innerHTML = ''; return; }
-
-      const title = (questionGrid.getHeader(selectedQuestionIndex) || '').toString().trim();
-      if (!title) {
-        panel.innerHTML = '<p style="font-size:12px; color:#94a3b8;">먼저 위 헤더 칸을 더블클릭해서 질문 제목을 입력하세요.</p>';
-        return;
-      }
-
-      const meta = questionMetaByName[title] || { type: 'text', options: [] };
-      questionMetaByName[title] = meta;
-      const isRadio = meta.type === 'radio';
-
-      panel.innerHTML = `
-        <div class="q-card" style="background:#f8fafc;">
-          <h4 style="margin-top:0; font-size:14px;">"${title}" 질문 상세 설정</h4>
-          <div class="form-group" style="margin-bottom:8px;">
-            <label>유형</label>
-            <select onchange="updateSelectedQuestionMeta('type', this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
-              <option value="text" ${!isRadio ? 'selected' : ''}>주관식</option>
-              <option value="radio" ${isRadio ? 'selected' : ''}>객관식</option>
-            </select>
-          </div>
-          ${isRadio ? `
-            <div class="form-group">
-              <label>객관식 옵션(쉼표구분)</label>
-              <input type="text" value="${(meta.options || []).join(', ')}" placeholder="예: 완료, 진행중, 미착수" oninput="updateSelectedQuestionMeta('optionsRaw', this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
-            </div>
-          ` : ''}
-        </div>
-      `;
+    function toggleOptionInput() {
+      const type = document.getElementById('newQType').value;
+      document.getElementById('optionGroup').classList.toggle('hidden', type !== 'radio');
     }
 
-    function updateSelectedQuestionMeta(field, value) {
-      if (!questionGrid || selectedQuestionIndex === null) return;
-      const title = (questionGrid.getHeader(selectedQuestionIndex) || '').toString().trim();
-      if (!title) return;
-      const meta = questionMetaByName[title] || { type: 'text', options: [] };
-
-      if (field === 'optionsRaw') {
-        meta.options = value.split(',').map(s => s.trim()).filter(s => s);
-      } else {
-        meta[field] = value;
-      }
-      questionMetaByName[title] = meta;
-
-      if (field === 'type') renderQuestionDetailPanel();
-      renderQuestionLivePreview();
-    }
-
-    // 현재 그리드 상태(저장 전) 기준으로 등록될 질문 목록을 실시간으로 보여줌
-    function renderQuestionLivePreview() {
-      const el = document.getElementById('questionLivePreview');
-      if (!el) return;
-      if (!questionGrid) { el.innerHTML = ''; return; }
-
-      const colCount = questionGrid.options.columns.length;
-      const items = [];
-      for (let i = 0; i < colCount; i++) {
-        const title = (questionGrid.getHeader(i) || '').toString().trim();
-        if (!title) continue;
-        const meta = questionMetaByName[title] || { type: 'text', options: [] };
-        const info = meta.type === 'radio' ? `(객관식: ${(meta.options || []).join(', ') || '옵션 미입력'})` : '(주관식)';
-        items.push(`<div>${items.length + 1}. <strong>${title}</strong> <span style="color:#94a3b8;">${info}</span></div>`);
-      }
-      el.innerHTML = items.length ? items.join('') : '<span style="color:#94a3b8;">헤더에 질문 제목을 입력하면 여기 실시간으로 표시됩니다.</span>';
-    }
-
-    function addQuestionColumn() {
-      if (questionGrid && !questionsLocked) { questionGrid.insertColumn(); renderQuestionLivePreview(); }
-    }
-
-    function addQuestionRow() {
-      if (questionGrid && !questionsLocked) questionGrid.insertRow();
-    }
-
-    async function saveQuestions() {
+    async function addQuestion() {
       if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
-      if (!questionGrid) return;
-
       if (await roundHasResponses(currentRoundId)) {
         alert('이미 응답이 제출된 회차는 질문을 수정할 수 없습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.');
         renderManagerQuestions();
         return;
       }
 
-      const colCount = questionGrid.options.columns.length;
-      const questions = [];
+      const title = document.getElementById('newQTitle').value.trim();
+      const type = document.getElementById('newQType').value;
+      const optionsRaw = document.getElementById('newQOptions').value.trim();
+      if (!title) { alert('질문 제목을 입력하세요.'); return; }
 
-      for (let i = 0; i < colCount; i++) {
-        const title = (questionGrid.getHeader(i) || '').toString().trim();
-        if (!title) continue;
-
-        const meta = questionMetaByName[title] || { type: 'text', options: [] };
-        let options = [];
-        if (meta.type === 'radio') {
-          options = meta.options || [];
-          if (options.length === 0) { alert(`[${title}] 질문: 객관식은 옵션을 입력해야 합니다. 헤더에서 이 질문을 선택한 뒤 아래에서 옵션을 채워주세요.`); return; }
-        }
-        questions.push({ id: Date.now() + questions.length, title, type: meta.type, options });
+      let options = [];
+      if (type === 'radio') {
+        if (!optionsRaw) { alert('객관식 옵션을 입력하세요.'); return; }
+        options = optionsRaw.split(',').map(s => s.trim()).filter(s => s);
       }
 
-      if (questions.length === 0) { alert('최소 1개의 질문 제목을 입력하세요.'); return; }
-
-      currentUser.questions = questions;
+      currentUser.questions = currentUser.questions || [];
+      currentUser.questions.push({ id: Date.now(), title, type, options });
       await db.collection('managers').doc(currentUser.id)
-        .collection('rounds').doc(currentRoundId).update({ questions });
+        .collection('rounds').doc(currentRoundId).update({ questions: currentUser.questions });
+
+      document.getElementById('newQTitle').value = '';
+      document.getElementById('newQOptions').value = '';
       renderManagerQuestions();
-      alert('설문 문항이 저장되었습니다.');
+    }
+
+    async function deleteQuestion(qId) {
+      if (!currentRoundId) return;
+      if (!confirm('질문을 삭제하시겠습니까?')) return;
+      currentUser.questions = currentUser.questions.filter(q => q.id !== qId);
+      await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(currentRoundId).update({ questions: currentUser.questions });
+      renderManagerQuestions();
     }
 
     // --- 엑셀 컬럼(항목) 설정: jspreadsheet 헤더 = 실제 컬럼명(목차). 나머지 설정은 이름 기준 메타데이터로 별도 관리 ---
@@ -1694,6 +1606,13 @@
     let columnMetaByName = {}; // { [컬럼명]: {type, mode, options, dependsOn, optionsMap, allowCustom, group} }
     let selectedColumnIndex = null;
     let columnsLocked = false;
+
+    // 그리드의 특정 열의 "컬럼명"을 읽음 (헤더가 아니라 1행 셀 값이 이름)
+    function getColumnName(idx) {
+      if (!columnConfigGrid) return '';
+      const v = columnConfigGrid.getValueFromCoords(idx, 0);
+      return (v || '').toString().trim();
+    }
 
     async function renderColumnConfigEditor() {
       const src = (currentUser.columns && currentUser.columns.length) ? currentUser.columns : cloneDefaultColumns();
@@ -1721,19 +1640,20 @@
         };
       });
 
-      const titles = src.length ? src.map(c => c.name) : ['컬럼1'];
-      const columnDefs = titles.map(t => ({ type: 'text', title: t, width: 150, readOnly: columnsLocked }));
-      const data = [titles.map(() => ''), titles.map(() => '')];
+      const names = src.length ? src.map(c => c.name) : ['컬럼1'];
+      // 헤더는 혼동을 줄이기 위해 실제 이름 대신 1,2,3... 연번만 표시. 실제 컬럼명은 1행 셀에 입력
+      const columnDefs = names.map((_, i) => ({ type: 'text', title: String(i + 1), width: 150, readOnly: columnsLocked }));
+      const data = [names.slice(), names.map(() => '')];
 
       const created = jspreadsheet(container, {
         data: data,
         columns: columnDefs,
-        minDimensions: [titles.length, 2],
+        minDimensions: [names.length, 2],
         allowInsertRow: !columnsLocked,
         allowDeleteRow: !columnsLocked,
         allowInsertColumn: !columnsLocked,
         allowDeleteColumn: !columnsLocked,
-        allowRenameColumn: !columnsLocked,
+        allowRenameColumn: false,
         columnSorting: false,
         tableOverflow: true,
         autoIncrement: false,
@@ -1746,8 +1666,7 @@
           renderColumnLivePreview();
         },
         oninsertcolumn: function () { renderColumnLivePreview(); },
-        ondeletecolumn: function () { renderColumnLivePreview(); },
-        onmoveheader: function () { renderColumnLivePreview(); }
+        ondeletecolumn: function () { renderColumnLivePreview(); }
       });
 
       columnConfigGrid = Array.isArray(created) ? created[0] : created;
@@ -1761,9 +1680,9 @@
       if (!panel) return;
       if (!columnConfigGrid || selectedColumnIndex === null || columnsLocked) { panel.innerHTML = ''; return; }
 
-      const title = (columnConfigGrid.getHeader(selectedColumnIndex) || '').toString().trim();
+      const title = getColumnName(selectedColumnIndex);
       if (!title) {
-        panel.innerHTML = '<p style="font-size:12px; color:#94a3b8;">먼저 위 헤더 칸을 더블클릭해서 컬럼명을 입력하세요.</p>';
+        panel.innerHTML = '<p style="font-size:12px; color:#94a3b8;">먼저 1행의 셀에 컬럼명을 입력하세요.</p>';
         return;
       }
 
@@ -1822,7 +1741,7 @@
 
     function updateSelectedColumnMeta(field, value) {
       if (!columnConfigGrid || selectedColumnIndex === null) return;
-      const title = (columnConfigGrid.getHeader(selectedColumnIndex) || '').toString().trim();
+      const title = getColumnName(selectedColumnIndex);
       if (!title) return;
       const meta = columnMetaByName[title] || { type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false, group: '' };
 
@@ -1856,7 +1775,7 @@
       const colCount = columnConfigGrid.options.columns.length;
       const items = [];
       for (let i = 0; i < colCount; i++) {
-        const title = (columnConfigGrid.getHeader(i) || '').toString().trim();
+        const title = getColumnName(i);
         if (!title) continue;
         const meta = columnMetaByName[title] || { type: 'text', mode: 'flat', options: [], group: '' };
         let info = '(자유입력)';
@@ -1893,7 +1812,7 @@
       const cols = [];
 
       for (let i = 0; i < colCount; i++) {
-        const name = (columnConfigGrid.getHeader(i) || '').toString().trim();
+        const name = getColumnName(i);
         if (!name) continue;
 
         const meta = columnMetaByName[name] || { type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false, group: '' };
