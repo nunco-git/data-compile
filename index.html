@@ -489,6 +489,14 @@
       }));
     }
 
+    // Firestore는 배열 안에 배열을 직접 저장할 수 없어, 템플릿의 2차원 표 데이터를 저장/조회할 때 객체로 감싸고 풂
+    function wrapTemplateRows(data) {
+      return (data || []).map(row => ({ cells: row }));
+    }
+    function unwrapTemplateRows(wrapped) {
+      return (wrapped || []).map(r => (r && Array.isArray(r.cells)) ? r.cells : (Array.isArray(r) ? r : []));
+    }
+
     // 연속된 컬럼들이 같은 group 값을 가지면 상위 목차(병합 헤더)로 묶어서 2단 헤더를 만든다
     function buildNestedHeaders(cols) {
       const topRow = [];
@@ -690,7 +698,7 @@
           currentUser.useSurvey = !!rd.useSurvey;
           currentUser.useExcel = !!rd.useExcel;
           currentUser.useTemplate = !!rd.useTemplate;
-          currentUser.templateData = rd.templateData || [];
+          currentUser.templateData = unwrapTemplateRows(rd.templateData);
           currentUser.templateTitle = rd.templateTitle || '';
           currentUser.templateConfirmed = !!rd.templateConfirmed;
           currentRoundId = currentUser.activeRoundId;
@@ -706,7 +714,7 @@
         useSurvey: currentUser.useSurvey !== false,
         useExcel: !!currentUser.useExcel,
         useTemplate: !!currentUser.useTemplate,
-        templateData: currentUser.templateData || [],
+        templateData: wrapTemplateRows(currentUser.templateData || []),
         templateTitle: currentUser.templateTitle || '',
         templateConfirmed: false,
         status: 'open',
@@ -721,7 +729,7 @@
       currentUser.useSurvey = roundData.useSurvey;
       currentUser.useExcel = roundData.useExcel;
       currentUser.useTemplate = roundData.useTemplate;
-      currentUser.templateData = roundData.templateData;
+      currentUser.templateData = unwrapTemplateRows(roundData.templateData);
       currentUser.templateTitle = roundData.templateTitle;
       currentUser.templateConfirmed = roundData.templateConfirmed;
       currentRoundId = roundRef.id;
@@ -769,7 +777,7 @@
         useSurvey: currentUser.useSurvey !== false,
         useExcel: !!currentUser.useExcel,
         useTemplate: !!currentUser.useTemplate,
-        templateData: currentUser.templateData || [],
+        templateData: wrapTemplateRows(currentUser.templateData || []),
         templateTitle: currentUser.templateTitle || '',
         templateConfirmed: false,
         status: 'open',
@@ -786,7 +794,7 @@
       currentUser.useSurvey = newRoundData.useSurvey;
       currentUser.useExcel = newRoundData.useExcel;
       currentUser.useTemplate = newRoundData.useTemplate;
-      currentUser.templateData = newRoundData.templateData;
+      currentUser.templateData = unwrapTemplateRows(newRoundData.templateData);
       currentUser.templateTitle = newRoundData.templateTitle;
       currentUser.templateConfirmed = newRoundData.templateConfirmed;
 
@@ -1003,7 +1011,7 @@
           useTemplate: templateReady,
           questions: roundData.questions || [],
           columns: (roundData.columns && roundData.columns.length) ? roundData.columns : cloneDefaultColumns(),
-          templateData: roundData.templateData || [],
+          templateData: unwrapTemplateRows(roundData.templateData),
           templateTitle: roundData.templateTitle || ''
         };
 
@@ -1816,7 +1824,7 @@
         currentUser.templateData = data;
         currentUser.templateTitle = title;
         await db.collection('managers').doc(currentUser.id)
-          .collection('rounds').doc(currentRoundId).update({ templateData: data, templateTitle: title });
+          .collection('rounds').doc(currentRoundId).update({ templateData: wrapTemplateRows(data), templateTitle: title });
         alert('서식이 임시 저장되었습니다. (아직 확정 전이라 기관 화면에는 표시되지 않습니다) 다 작성하셨으면 "서식 확정"을 눌러주세요.');
       } catch (err) {
         console.error('[진단] 서식 임시저장 오류:', err);
@@ -1848,7 +1856,7 @@
         currentUser.templateConfirmed = true;
         await db.collection('managers').doc(currentUser.id)
           .collection('rounds').doc(currentRoundId).update({
-            templateData: data, templateTitle: title, templateConfirmed: true
+            templateData: wrapTemplateRows(data), templateTitle: title, templateConfirmed: true
           });
         await renderTemplateEditor();
         alert('서식이 확정되었습니다. 이제 기관이 제출할 수 있습니다.');
