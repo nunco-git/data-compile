@@ -1103,7 +1103,7 @@
         allowDeleteColumn: false,
         columnSorting: false,
         tableOverflow: true,
-        tableWidth: '100%',
+        autoIncrement: false,
         onbeforechange: function (instance, cell, x, y, value) {
           const yi = parseInt(y, 10), xi = parseInt(x, 10);
           const orig = (templateData[yi] && templateData[yi][xi]) || '';
@@ -1163,7 +1163,7 @@
         allowRenameColumn: false,
         columnSorting: false,
         tableOverflow: true,
-        tableWidth: '100%',
+        autoIncrement: false,
         onchange: function (instance, cell, x, y) {
           updateDependentGridColumns(cols, parseInt(x, 10), parseInt(y, 10));
         },
@@ -1369,7 +1369,7 @@
         allowRenameColumn: !questionsLocked,
         columnSorting: false,
         tableOverflow: true,
-        tableWidth: '100%',
+        autoIncrement: false,
         editable: !questionsLocked,
         onselection: function (instance, x1) {
           selectedQuestionIndex = parseInt(x1, 10);
@@ -1549,7 +1549,7 @@
         allowRenameColumn: !columnsLocked,
         columnSorting: false,
         tableOverflow: true,
-        tableWidth: '100%',
+        autoIncrement: false,
         editable: !columnsLocked,
         onselection: function (instance, x1) {
           selectedColumnIndex = parseInt(x1, 10);
@@ -1790,7 +1790,7 @@
         allowRenameColumn: false,
         columnSorting: false,
         tableOverflow: true,
-        tableWidth: '100%',
+        autoIncrement: false,
         editable: !templateLocked
       });
 
