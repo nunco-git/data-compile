@@ -2113,8 +2113,36 @@
 
     function exportToExcel() {
       if (cachedResponseDocs.length === 0) { alert('다운로드할 취합 데이터가 없습니다.'); return; }
-      const table = document.getElementById('responseTable');
-      const wb = XLSX.utils.table_to_book(table, { sheet: "응답취합" });
+      if (!viewingRoundMeta) { alert('회차 정보를 불러오지 못했습니다.'); return; }
+
+      const useSurvey = !!viewingRoundMeta.useSurvey;
+      const useExcel = !!viewingRoundMeta.useExcel;
+      const myQuestions = useSurvey ? (viewingRoundMeta.questions || []) : [];
+      const cols = useExcel ? (viewingRoundMeta.columns || []) : [];
+
+      const header = ['제출 기관명', '제출일시']
+        .concat(myQuestions.map(q => q.title))
+        .concat(cols.map(c => c.name));
+      const aoa = [header];
+
+      cachedResponseDocs.forEach(res => {
+        const answerVals = myQuestions.map(q => (res.answers && res.answers[q.id]) || '');
+
+        if (useExcel && Array.isArray(res.rows) && res.rows.length > 0) {
+          res.rows.forEach(rowObj => {
+            const rVals = (rowObj && Array.isArray(rowObj.cells)) ? rowObj.cells : [];
+            const paddedRow = cols.map((c, i) => (rVals[i] !== undefined ? rVals[i] : ''));
+            aoa.push([res.agencyName, res.submittedAt].concat(answerVals).concat(paddedRow));
+          });
+        } else {
+          const emptyRow = cols.map(() => '');
+          aoa.push([res.agencyName, res.submittedAt].concat(answerVals).concat(emptyRow));
+        }
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '응답취합');
       const roundInfo = roundsList.find(r => r.id === viewingRoundId);
       const fileLabel = roundInfo ? roundInfo.name : (currentUser.agencyCode || currentUser.id);
       XLSX.writeFile(wb, `취합결과_${fileLabel}.xlsx`);
