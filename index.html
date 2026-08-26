@@ -207,9 +207,8 @@
           <input type="text" id="accessAgencyName" placeholder="예: 부여읍 행정복지센터" required />
         </div>
         <div class="form-group">
-          <label>설문 접속 코드</label>
-          <input type="text" id="accessRoundCode" placeholder="안내받은 설문 접속 코드 입력" required />
-          <p style="font-size:11px; color:#94a3b8; margin:4px 0 0 0;">여러 설문이 동시에 진행 중일 수 있으니, 참여하려는 설문의 접속 코드를 정확히 입력해주세요.</p>
+          <label>담당자 접속 코드</label>
+          <input type="text" id="accessManagerId" placeholder="안내받은 접속 코드 입력" required />
         </div>
         <div class="form-group">
           <label>제출 전용 비밀번호</label>
@@ -217,7 +216,18 @@
         </div>
         <button type="submit" class="btn">작성/제출 시작하기</button>
       </form>
+
+      <!-- 진행 중인 설문이 여럿일 때 고르는 화면 -->
+      <div id="roundPickerSection" class="hidden">
+        <div class="header">
+          <h1>어떤 설문에 참여하시겠어요?</h1>
+          <p>현재 진행 중인 설문이 여러 개 있습니다. 하나를 선택해주세요.</p>
+        </div>
+        <div id="roundPickerList"></div>
+        <button class="btn btn-secondary" style="margin-top:12px;" onclick="cancelRoundPicker()">취소</button>
+      </div>
     </div>
+
 
     <!-- 2. 기관용 제출 화면 -->
     <div id="viewSurvey" class="hidden">
@@ -270,14 +280,13 @@
       <div class="q-card" style="background:#fefce8; border-color:#fde68a; margin-bottom: 20px;">
         <h4 style="color:#92400e; margin-top:0;">🗂️ 취합 회차 관리</h4>
         <p style="font-size:12px; color:#78350f; margin:4px 0 10px 0;">
-          이제 여러 설문을 <strong>동시에</strong> 진행할 수 있습니다. 새 회차를 추가해도 기존에 진행 중인 회차는 닫히지 않으며, 각 회차마다 별도의 접속 코드로 기관이 원하는 설문에 각각 참여합니다. 설문이 끝나면 "이 회차 종료"를 눌러 마감하세요.
+          여러 설문을 <strong>동시에</strong> 진행할 수 있습니다. 새 회차를 추가해도 기존에 진행 중인 회차는 닫히지 않습니다. 기관은 아래쪽 "🔗 기관 접속 정보"의 접속 코드로 동일하게 들어오며, 진행 중인 설문이 여러 개면 어떤 설문에 참여할지 목록에서 고르게 됩니다. 설문이 끝나면 "이 회차 종료"를 눌러 마감하세요.
         </p>
 
         <div class="form-group" style="margin-bottom:10px;">
           <label>지금 편집할 회차</label>
           <select id="editingRoundSelector" onchange="switchEditingRound(this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></select>
         </div>
-        <p style="font-size:12px; margin:4px 0 10px 0;">이 회차 접속 코드: <strong id="displayRoundCode">-</strong> (기관에게 이 코드를 안내하세요)</p>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="btn btn-sm" onclick="startNewRound()">➕ 새 회차 추가</button>
@@ -549,6 +558,8 @@
       document.getElementById('panelLogin').classList.toggle('hidden', mode !== 'login');
       document.getElementById('panelRegister').classList.toggle('hidden', mode !== 'register');
       document.getElementById('formSurveyAccess').classList.toggle('hidden', mode !== 'surveyAccess');
+      document.getElementById('roundPickerSection').classList.add('hidden');
+      pendingAgencyAccess = null;
     }
 
     // --- 담당자 Google 로그인 ---
@@ -792,16 +803,13 @@
         `<option value="${r.id}" ${r.id === currentRoundId ? 'selected' : ''}>${r.name}</option>`
       ).join('');
 
-      const current = roundsList.find(r => r.id === currentRoundId);
-      document.getElementById('displayRoundCode').innerText = current ? (current.roundCode || '-') : '-';
-
       const listEl = document.getElementById('openRoundsList');
       if (openRounds.length === 0) {
         listEl.innerHTML = '<span style="color:#94a3b8;">진행 중인 회차가 없습니다.</span>';
       } else {
         listEl.innerHTML = openRounds.map(r => `
           <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #fde68a;">
-            <span>${r.id === currentRoundId ? '✏️ ' : ''}<strong>${r.name}</strong> — 접속코드: <code>${r.roundCode || '-'}</code></span>
+            <span>${r.id === currentRoundId ? '✏️ ' : ''}<strong>${r.name}</strong></span>
           </div>
         `).join('');
       }
@@ -882,7 +890,7 @@
       currentUser.templateTitle = '';
       currentUser.templateConfirmed = false;
 
-      alert(`"${name}" 회차를 새로 추가했습니다. 접속 코드: ${roundCode}\n기존에 진행 중이던 다른 회차는 그대로 열려 있습니다.`);
+      alert(`"${name}" 회차를 새로 추가했습니다. 기존에 진행 중이던 다른 회차는 그대로 열려 있습니다. 기관은 기존 접속 코드로 들어와서 진행 중인 설문 목록 중 이 회차를 선택하면 됩니다.`);
 
       await loadRoundsList();
       renderModeSelection();
@@ -1093,22 +1101,22 @@
     }
 
     // --- 기관 접속 (접속 코드 → uid 매핑 조회) ---
+    let pendingAgencyAccess = null; // 여러 설문 중 선택 대기 중인 기관 정보
+
     async function handleSurveyAccess(e) {
       e.preventDefault();
       if (!db) { alert('Firebase 설정이 되어 있지 않습니다.'); return; }
       const agencyName = document.getElementById('accessAgencyName').value.trim();
-      const roundCode = document.getElementById('accessRoundCode').value.trim();
+      const agencyCode = document.getElementById('accessManagerId').value.trim();
       const surveyPw = document.getElementById('accessSurveyPw').value.trim();
       const btn = e.target.querySelector('button[type="submit"]');
       btn.disabled = true; btn.innerText = '확인 중...';
 
       try {
-        const codeSnap = await db.collection('system').doc('round_code_index').get();
+        const codeSnap = await db.collection('system').doc('agency_code_index').get();
         const codeMap = codeSnap.exists ? codeSnap.data() : {};
-        const entry = codeMap[roundCode];
-        if (!entry || !entry.managerId || !entry.roundId) { alert("존재하지 않는 설문 접속 코드입니다."); return; }
-        const managerUid = entry.managerId;
-        const roundId = entry.roundId;
+        const managerUid = codeMap[agencyCode];
+        if (!managerUid) { alert("존재하지 않는 접속 코드입니다."); return; }
 
         const snap = await db.collection('managers').doc(managerUid).get();
         if (!snap.exists) { alert("존재하지 않는 담당자입니다."); return; }
@@ -1117,58 +1125,103 @@
           alert("제출 전용 비밀번호가 올바르지 않습니다."); return;
         }
 
-        const roundSnap = await db.collection('managers').doc(managerUid)
-          .collection('rounds').doc(roundId).get();
-        if (!roundSnap.exists || roundSnap.data().status !== 'open') {
-          alert("이 설문은 현재 제출 기간이 아닙니다. 담당자에게 문의해주세요."); return;
-        }
-        const roundData = roundSnap.data();
-        const templateReady = !!roundData.useTemplate && !!roundData.templateConfirmed;
+        const roundsSnap = await db.collection('managers').doc(managerUid).collection('rounds').get();
+        const openRounds = roundsSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(r => r.status === 'open');
 
-        activeSurveyInfo = {
-          managerId: managerUid, roundId, agencyName,
-          useSurvey: !!roundData.useSurvey,
-          useExcel: !!roundData.useExcel,
-          useTemplate: templateReady,
-          questions: roundData.questions || [],
-          columns: (roundData.columns && roundData.columns.length) ? roundData.columns : cloneDefaultColumns(),
-          templateData: unwrapTemplateRows(roundData.templateData),
-          templateTitle: roundData.templateTitle || ''
-        };
-
-        if (!activeSurveyInfo.useSurvey && !activeSurveyInfo.useExcel && !activeSurveyInfo.useTemplate) {
-          alert('현재 제출 가능한 항목이 없습니다. 담당자에게 문의해주세요.');
+        if (openRounds.length === 0) {
+          alert('현재 진행 중인 설문이 없습니다. 담당자에게 문의해주세요.');
           return;
         }
 
-        document.getElementById('displayAgencyName').innerText = agencyName;
-        document.getElementById('displayManagerId').innerText = roundCode;
-        document.getElementById('viewLogin').classList.add('hidden');
-        document.getElementById('viewSurvey').classList.remove('hidden');
-        document.querySelector('.container').classList.add('container-wide');
+        if (openRounds.length === 1) {
+          enterSurveyForRound(managerUid, agencyCode, agencyName, openRounds[0]);
+          return;
+        }
 
-        document.getElementById('surveyQuestionsSection').classList.toggle('hidden', !activeSurveyInfo.useSurvey);
-        document.getElementById('excelGridSection').classList.toggle('hidden', !activeSurveyInfo.useExcel);
-        document.getElementById('templateFillSection').classList.toggle('hidden', !activeSurveyInfo.useTemplate);
-        const templateTitleEl = document.getElementById('templateFillTitle');
-        if (templateTitleEl) templateTitleEl.innerText = '📐 ' + (activeSurveyInfo.templateTitle || '서식 작성');
-
-        if (activeSurveyInfo.useSurvey) renderCustomSurvey();
-        if (activeSurveyInfo.useExcel) renderSurveyGrid();
-        if (activeSurveyInfo.useTemplate) renderTemplateFill();
+        // 진행 중인 설문이 여러 개면 선택 화면으로
+        pendingAgencyAccess = { managerUid, agencyCode, agencyName };
+        showRoundPicker(openRounds);
       } finally {
         btn.disabled = false; btn.innerText = '작성/제출 시작하기';
       }
+    }
+
+    function showRoundPicker(openRounds) {
+      const listEl = document.getElementById('roundPickerList');
+      listEl.innerHTML = openRounds.map(r => `
+        <button type="button" class="btn" style="margin-bottom:8px;" onclick="selectRoundToAnswer('${r.id}')">${r.name}</button>
+      `).join('');
+      document.getElementById('formSurveyAccess').classList.add('hidden');
+      document.getElementById('roundPickerSection').classList.remove('hidden');
+      window.__openRoundsCache = openRounds;
+    }
+
+    function selectRoundToAnswer(roundId) {
+      if (!pendingAgencyAccess) return;
+      const round = (window.__openRoundsCache || []).find(r => r.id === roundId);
+      if (!round) return;
+      const { managerUid, agencyCode, agencyName } = pendingAgencyAccess;
+      pendingAgencyAccess = null;
+      document.getElementById('roundPickerSection').classList.add('hidden');
+      enterSurveyForRound(managerUid, agencyCode, agencyName, round);
+    }
+
+    function cancelRoundPicker() {
+      pendingAgencyAccess = null;
+      document.getElementById('roundPickerSection').classList.add('hidden');
+      document.getElementById('formSurveyAccess').classList.remove('hidden');
+    }
+
+    // 특정 회차로 실제 제출 화면 진입 (단일 설문일 때 자동, 또는 선택 화면에서 고른 뒤)
+    function enterSurveyForRound(managerUid, agencyCode, agencyName, roundData) {
+      const templateReady = !!roundData.useTemplate && !!roundData.templateConfirmed;
+
+      activeSurveyInfo = {
+        managerId: managerUid, roundId: roundData.id, agencyName,
+        useSurvey: !!roundData.useSurvey,
+        useExcel: !!roundData.useExcel,
+        useTemplate: templateReady,
+        questions: roundData.questions || [],
+        columns: (roundData.columns && roundData.columns.length) ? roundData.columns : cloneDefaultColumns(),
+        templateData: unwrapTemplateRows(roundData.templateData),
+        templateTitle: roundData.templateTitle || ''
+      };
+
+      if (!activeSurveyInfo.useSurvey && !activeSurveyInfo.useExcel && !activeSurveyInfo.useTemplate) {
+        alert('현재 제출 가능한 항목이 없습니다. 담당자에게 문의해주세요.');
+        return;
+      }
+
+      document.getElementById('displayAgencyName').innerText = agencyName;
+      document.getElementById('displayManagerId').innerText = agencyCode;
+      document.getElementById('viewLogin').classList.add('hidden');
+      document.getElementById('viewSurvey').classList.remove('hidden');
+      document.querySelector('.container').classList.add('container-wide');
+
+      document.getElementById('surveyQuestionsSection').classList.toggle('hidden', !activeSurveyInfo.useSurvey);
+      document.getElementById('excelGridSection').classList.toggle('hidden', !activeSurveyInfo.useExcel);
+      document.getElementById('templateFillSection').classList.toggle('hidden', !activeSurveyInfo.useTemplate);
+      const templateTitleEl = document.getElementById('templateFillTitle');
+      if (templateTitleEl) templateTitleEl.innerText = '📐 ' + (activeSurveyInfo.templateTitle || '서식 작성');
+
+      if (activeSurveyInfo.useSurvey) renderCustomSurvey();
+      if (activeSurveyInfo.useExcel) renderSurveyGrid();
+      if (activeSurveyInfo.useTemplate) renderTemplateFill();
     }
 
     function exitSurvey() {
       activeSurveyInfo = null;
       gridInstance = null;
       templateFillGrid = null;
+      pendingAgencyAccess = null;
       const gc = document.getElementById('jspreadsheetContainer');
       if (gc) gc.innerHTML = '';
       const tc = document.getElementById('templateFillSpreadsheet');
       if (tc) tc.innerHTML = '';
+      document.getElementById('roundPickerSection').classList.add('hidden');
+      document.getElementById('formSurveyAccess').classList.remove('hidden');
       document.getElementById('viewSurvey').classList.add('hidden');
       document.getElementById('viewLogin').classList.remove('hidden');
       document.querySelector('.container').classList.remove('container-wide');
