@@ -569,59 +569,93 @@
     }
 
     // --- 담당자 Google 로그인 ---
+    let pendingLoginAlert = false;    // "로그인" 버튼으로 직접 시도했는데 미가입 계정일 때만 안내창을 띄우기 위한 플래그
+    let registrationInProgress = false; // 가입 절차(2단계 진행) 중에는 자동 로그인 처리를 건너뛰기 위한 플래그
+    let authHandledUid = null;        // 이미 처리 완료한 사용자 uid (중복 처리 방지)
+
     async function handleGoogleLogin() {
       if (!auth || !db) { alert('Firebase 설정이 되어 있지 않습니다.'); return; }
       const btn = document.getElementById('googleLoginBtn');
       btn.disabled = true;
+      pendingLoginAlert = true;
 
       try {
-        const result = await auth.signInWithPopup(googleProvider);
-        const user = result.user;
-
-        // 1) 전체관리자인지 확인
-        const adminSnap = await db.collection('system').doc('superadmins').collection('list').doc(user.email).get();
-        if (adminSnap.exists) {
-          document.getElementById('superAdminEmailDisplay').innerText = `(${user.email})`;
-          document.getElementById('viewLogin').classList.add('hidden');
-          document.getElementById('viewSuperAdmin').classList.remove('hidden');
-          renderSuperAdminView();
-          return;
-        }
-
-        // 2) 담당자 계정 확인
-        const managerSnap = await db.collection('managers').doc(user.uid).get();
-        if (!managerSnap.exists) {
-          alert('등록되지 않은 계정입니다. "담당자 계정생성" 탭에서 먼저 계정을 만들어주세요.');
-          await auth.signOut();
-          return;
-        }
-
-        const data = managerSnap.data();
-        currentUser = {
-          id: user.uid, email: user.email, ...data,
-          questions: data.questions || [],
-          columns: (data.columns && data.columns.length) ? data.columns : cloneDefaultColumns()
-        };
-
-        await ensureActiveRound();
-        await loadRoundsList();
-
-        document.getElementById('viewLogin').classList.add('hidden');
-        document.getElementById('managerNameDisplay').innerText = currentUser.name;
-        document.getElementById('managerEmailDisplay').innerText = `(${currentUser.email})`;
-        document.getElementById('displayOwnAgencyCode').innerText = currentUser.agencyCode || '(미설정)';
-        document.getElementById('surveyPasswordInput').value = currentUser.surveyPw || '';
-        document.getElementById('viewManager').classList.remove('hidden');
-        renderModeSelection();
-        renderManagerQuestions();
-        renderColumnConfigEditor();
-        switchManagerTab('manage');
+        await auth.signInWithPopup(googleProvider);
+        // 실제 화면 전환은 아래 onAuthStateChanged 리스너가 처리합니다.
       } catch (err) {
         console.error(err);
         alert('로그인 중 오류가 발생했습니다: ' + err.message);
+        pendingLoginAlert = false;
       } finally {
         btn.disabled = false;
       }
+    }
+
+    // 로그인 성공(또는 새로고침 시 기존 세션 복원) 후 공통으로 실행되는 화면 진입 로직
+    // 반환값: 정상적으로 화면에 들어갔으면 true, 등록되지 않은 계정이면 false
+    async function enterAppForUser(user) {
+      // 1) 전체관리자인지 확인
+      const adminSnap = await db.collection('system').doc('superadmins').collection('list').doc(user.email).get();
+      if (adminSnap.exists) {
+        document.getElementById('superAdminEmailDisplay').innerText = `(${user.email})`;
+        document.getElementById('viewLogin').classList.add('hidden');
+        document.getElementById('viewSuperAdmin').classList.remove('hidden');
+        renderSuperAdminView();
+        return true;
+      }
+
+      // 2) 담당자 계정 확인
+      const managerSnap = await db.collection('managers').doc(user.uid).get();
+      if (!managerSnap.exists) return false;
+
+      const data = managerSnap.data();
+      currentUser = {
+        id: user.uid, email: user.email, ...data,
+        questions: data.questions || [],
+        columns: (data.columns && data.columns.length) ? data.columns : cloneDefaultColumns()
+      };
+
+      await ensureActiveRound();
+      await loadRoundsList();
+
+      document.getElementById('viewLogin').classList.add('hidden');
+      document.getElementById('managerNameDisplay').innerText = currentUser.name;
+      document.getElementById('managerEmailDisplay').innerText = `(${currentUser.email})`;
+      document.getElementById('displayOwnAgencyCode').innerText = currentUser.agencyCode || '(미설정)';
+      document.getElementById('surveyPasswordInput').value = currentUser.surveyPw || '';
+      document.getElementById('viewManager').classList.remove('hidden');
+      renderModeSelection();
+      renderManagerQuestions();
+      renderColumnConfigEditor();
+      switchManagerTab('manage');
+      return true;
+    }
+
+    // 새로고침해도 로그인이 풀리지 않도록: Firebase가 브라우저에 유지해둔 인증 상태를 이 리스너 하나로 처리
+    // (로그인 버튼을 눌렀을 때도, 페이지를 새로고침했을 때도 결국 이 콜백이 실행되므로 경로를 하나로 통일함)
+    if (auth) {
+      auth.onAuthStateChanged(async (user) => {
+        if (!user) { authHandledUid = null; return; }         // 로그아웃 상태 - 아무것도 안 함
+        if (registrationInProgress) return;                    // 가입 절차 진행 중에는 건드리지 않음
+        if (authHandledUid === user.uid) return;                // 이미 이 사용자로 처리 완료 - 중복 방지
+        authHandledUid = user.uid;
+
+        try {
+          const entered = await enterAppForUser(user);
+          if (!entered) {
+            if (pendingLoginAlert) {
+              alert('등록되지 않은 계정입니다. "담당자 계정생성" 탭에서 먼저 계정을 만들어주세요.');
+            }
+            await auth.signOut();
+            authHandledUid = null;
+          }
+        } catch (err) {
+          console.error('로그인 처리 오류:', err);
+          authHandledUid = null;
+        } finally {
+          pendingLoginAlert = false;
+        }
+      });
     }
 
     // --- 담당자 가입: 1단계(Google 로그인) ---
@@ -629,6 +663,7 @@
       if (!auth || !db) { alert('Firebase 설정이 되어 있지 않습니다.'); return; }
       const btn = document.getElementById('googleRegisterBtn');
       btn.disabled = true;
+      registrationInProgress = true;
 
       try {
         const result = await auth.signInWithPopup(googleProvider);
@@ -637,6 +672,7 @@
         const existing = await db.collection('managers').doc(user.uid).get();
         if (existing.exists) {
           alert('이미 가입된 계정입니다. "담당자 로그인" 탭에서 로그인해주세요.');
+          registrationInProgress = false;
           await auth.signOut();
           return;
         }
@@ -647,6 +683,7 @@
       } catch (err) {
         console.error(err);
         alert('Google 로그인 중 오류가 발생했습니다: ' + err.message);
+        registrationInProgress = false;
       } finally {
         btn.disabled = false;
       }
@@ -685,6 +722,7 @@
 
         alert('계정이 생성되었습니다! 이제 "담당자 로그인" 탭에서 Google 계정으로 로그인해주세요.');
         pendingGoogleUser = null;
+        registrationInProgress = false;
         await auth.signOut();
         document.getElementById('formCompleteRegister').classList.add('hidden');
         document.getElementById('googleRegisterBtn').classList.remove('hidden');
@@ -703,6 +741,8 @@
       cachedResponseDocs = [];
       currentUser = null;
       pendingGoogleUser = null;
+      registrationInProgress = false;
+      authHandledUid = null;
       currentRoundId = null;
       viewingRoundId = null;
       viewingRoundMeta = null;
