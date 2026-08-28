@@ -380,6 +380,7 @@
             <div style="display:flex; gap:8px; margin: 10px 0 12px 0; flex-wrap:wrap; align-items:center;">
               <button type="button" id="addColumnColBtn" class="btn btn-secondary btn-sm" onclick="addColumnCell()">+ 컬럼 추가 (열)</button>
               <button type="button" id="addColumnRowBtn" class="btn btn-secondary btn-sm" onclick="addColumnRow()">+ 행 추가</button>
+              <button type="button" id="clearColumnsBtn" class="btn btn-sm btn-danger" onclick="clearAllColumns()">🗑️ 전체 지우기</button>
               <button type="button" id="saveColumnConfigBtn" class="btn btn-sm btn-excel" onclick="saveColumnConfig()">서식 변경 저장</button>
               <label id="importSchemaLabel" class="btn btn-secondary btn-sm" style="margin:0; display:inline-flex; align-items:center;">
                 📂 엑셀 서식 불러오기
@@ -1845,6 +1846,51 @@
 
     function addColumnRow() {
       if (columnConfigGrid && !columnsLocked) columnConfigGrid.insertRow();
+    }
+
+    // 컬럼 설정을 전부 지우고 빈 컬럼 1개로 초기화 (기존에 저장되어 있던 기본값 등을 한번에 정리할 때 사용)
+    function clearAllColumns() {
+      if (!columnConfigGrid || columnsLocked) return;
+      if (!confirm('현재 표에 입력된 모든 컬럼 내용을 지우고 빈 칸 하나로 초기화하시겠습니까? (아직 "서식 변경 저장"을 누르기 전까지는 실제 저장되지 않습니다)')) return;
+
+      columnMetaByName = {};
+      renderColumnConfigEditor_resetTo(['']);
+    }
+
+    // 컬럼 설정 표를 주어진 이름 목록으로 다시 그림 (전체 지우기 등에서 사용)
+    function renderColumnConfigEditor_resetTo(names) {
+      const container = document.getElementById('columnConfigSpreadsheet');
+      container.innerHTML = '';
+
+      const columnDefs = names.map((_, i) => ({ type: 'text', title: String(i + 1), width: 150 }));
+      const data = [names.slice(), names.map(() => '')];
+
+      const created = jspreadsheet(container, {
+        data: data,
+        columns: columnDefs,
+        minDimensions: [names.length, 2],
+        allowInsertRow: true,
+        allowDeleteRow: true,
+        allowInsertColumn: true,
+        allowDeleteColumn: true,
+        allowRenameColumn: false,
+        columnSorting: false,
+        tableOverflow: true,
+        autoIncrement: false,
+        editable: true,
+        onselection: function (instance, x1) {
+          selectedColumnIndex = parseInt(x1, 10);
+          renderColumnDetailPanel();
+        },
+        onchange: function () { renderColumnLivePreview(); },
+        oninsertcolumn: function () { renderColumnLivePreview(); },
+        ondeletecolumn: function () { renderColumnLivePreview(); }
+      });
+
+      columnConfigGrid = Array.isArray(created) ? created[0] : created;
+      selectedColumnIndex = 0;
+      renderColumnDetailPanel();
+      renderColumnLivePreview();
     }
 
     async function saveColumnConfig() {
