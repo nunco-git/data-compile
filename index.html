@@ -506,12 +506,9 @@
     });
 
     // 각 컬럼: { name, type: 'text'|'select', mode: 'flat'|'dependent', options, dependsOn, optionsMap, allowCustom }
+    // 새 회차/계정을 시작할 때 미리 채워지는 값 없이 빈 컬럼 1개로 시작 (예전엔 순번/사업명 등이 자동 입력되어 있어 혼동을 줬음)
     const DEFAULT_COLUMNS = [
-      { name: "순번", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false, group: "" },
-      { name: "사업/업무명", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false, group: "" },
-      { name: "예산액(천원)", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false, group: "" },
-      { name: "추진일정", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false, group: "" },
-      { name: "비고", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false, group: "" }
+      { name: "", type: "text", mode: "flat", options: [], dependsOn: "", optionsMap: {}, allowCustom: false, group: "" }
     ];
     function cloneDefaultColumns() {
       return DEFAULT_COLUMNS.map(c => ({
