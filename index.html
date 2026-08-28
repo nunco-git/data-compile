@@ -342,7 +342,10 @@
         <div id="panelManageSurvey" class="hidden">
           <div class="q-card" style="background:#eff6ff; border-color:#bfdbfe;">
             <h4 style="color:#1e40af; margin-top:0;">➕ 새 설문 질문 추가</h4>
+            <p style="font-size:11px; color:#64748b; margin-top:-6px;"><strong>"취합서식 확정"을 눌러야 기관이 이 질문에 답변할 수 있습니다.</strong> 확정 전까지는 자유롭게 추가/삭제할 수 있고 기관 화면에는 보이지 않습니다.</p>
             <div id="questionLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 질문 구성을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
+            <div id="questionConfirmedBanner" class="status-banner ok hidden">✅ 확정된 질문입니다. 기관이 답변할 수 있습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
+            <div id="questionDraftBanner" class="status-banner hidden" style="background:#fff7ed; color:#9a3412;">✏️ 아직 확정되지 않았습니다. 기관 화면에는 표시되지 않습니다.</div>
             <div class="form-group">
               <label>질문 제목</label>
               <input type="text" id="newQTitle" placeholder="예: 2026년도 담당자 인원수" />
@@ -358,7 +361,10 @@
               <label>객관식 옵션 (쉼표 ','로 구분)</label>
               <input type="text" id="newQOptions" placeholder="예: 완료, 진행중, 미착수" />
             </div>
-            <button type="button" class="btn btn-sm" id="addQuestionBtn" onclick="addQuestion()">질문 추가</button>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-sm" id="addQuestionBtn" onclick="addQuestion()">질문 추가</button>
+              <button type="button" class="btn btn-sm btn-excel" id="confirmQuestionsBtn" onclick="confirmQuestions()">🔒 취합서식 확정</button>
+            </div>
           </div>
           <h3>등록된 질문 목록</h3>
           <div id="managerQuestionList"></div>
@@ -369,9 +375,12 @@
             <h4 style="margin-top:0;">엑셀 컬럼(항목) 설정</h4>
             <p class="grid-hint">
               헤더는 혼동을 줄이기 위해 1, 2, 3 순서 번호로만 표시됩니다. <strong>1행의 셀에 실제 컬럼명을 입력</strong>하세요. 열(컬럼)과 행 모두 자유롭게 추가/삭제할 수 있습니다.<br/>
-              1행에 컬럼명을 입력한 뒤 그 칸을 클릭해 선택하면 아래에서 입력 방식(자유입력/목록선택), 상위 목차(그룹), 동적목록 등을 설정할 수 있습니다.
+              1행에 컬럼명을 입력한 뒤 그 칸을 클릭해 선택하면 아래에서 입력 방식(자유입력/목록선택), 상위 목차(그룹), 동적목록 등을 설정할 수 있습니다.<br/>
+              <strong>"서식 변경 저장"은 임시 저장이며 기관에게는 아직 보이지 않습니다. "취합서식 확정"을 눌러야 기관이 제출을 시작할 수 있습니다.</strong>
             </p>
             <div id="columnLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 컬럼 구성을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
+            <div id="columnConfirmedBanner" class="status-banner ok hidden">✅ 확정된 서식입니다. 기관이 제출할 수 있습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
+            <div id="columnDraftBanner" class="status-banner hidden" style="background:#fff7ed; color:#9a3412;">✏️ 아직 확정되지 않은 임시 서식입니다. 기관 화면에는 표시되지 않습니다.</div>
 
             <div id="columnConfigSpreadsheetWrap" style="max-height:280px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
               <div id="columnConfigSpreadsheet"></div>
@@ -381,13 +390,14 @@
               <button type="button" id="addColumnColBtn" class="btn btn-secondary btn-sm" onclick="addColumnCell()">+ 컬럼 추가 (열)</button>
               <button type="button" id="addColumnRowBtn" class="btn btn-secondary btn-sm" onclick="addColumnRow()">+ 행 추가</button>
               <button type="button" id="clearColumnsBtn" class="btn btn-sm btn-danger" onclick="clearAllColumns()">🗑️ 전체 지우기</button>
-              <button type="button" id="saveColumnConfigBtn" class="btn btn-sm btn-excel" onclick="saveColumnConfig()">서식 변경 저장</button>
+              <button type="button" id="saveColumnConfigBtn" class="btn btn-sm btn-secondary" onclick="saveColumnConfig()">임시 저장</button>
+              <button type="button" id="confirmColumnsBtn" class="btn btn-sm btn-excel" onclick="confirmColumns()">🔒 취합서식 확정</button>
               <label id="importSchemaLabel" class="btn btn-secondary btn-sm" style="margin:0; display:inline-flex; align-items:center;">
                 📂 엑셀 서식 불러오기
                 <input type="file" id="importSchemaInput" accept=".xlsx,.xls" onchange="handleImportSchemaFile(event)" style="display:none;" />
               </label>
             </div>
-            <p style="font-size:11px; color:#94a3b8; margin-bottom:10px;">엑셀 파일의 첫 번째 행(헤더)을 컬럼명으로 자동 등록합니다. 불러온 뒤 "서식 변경 저장"을 눌러야 실제로 반영됩니다.</p>
+            <p style="font-size:11px; color:#94a3b8; margin-bottom:10px;">엑셀 파일의 첫 번째 행(헤더)을 컬럼명으로 자동 등록합니다. 불러온 뒤 "서식 변경 저장" 또는 "취합서식 확정"을 눌러야 실제로 반영됩니다.</p>
             <div id="columnDetailPanel"></div>
             <h4 style="margin:16px 0 8px 0; font-size:13px; color:#334155;">📋 실시간 미리보기</h4>
             <div id="columnLivePreview" style="font-size:12px; color:#64748b;"></div>
@@ -400,7 +410,7 @@
             <p class="grid-hint">
               원하는 칸에 라벨(제목/문구)을 직접 입력하세요. <strong>글자를 입력한 칸은 기관 화면에 고정 텍스트로 표시되고, 비워둔 칸만 기관이 입력할 수 있는 빈칸이 됩니다.</strong><br/>
               예: "사업명"이라고 쓴 칸 바로 옆 빈칸에 기관이 실제 사업명을 입력하는 식입니다. 행/열은 자유롭게 추가/삭제할 수 있습니다.<br/>
-              <strong>"서식 저장"은 임시 저장이며, 기관에게는 아직 보이지 않습니다. 다 작성한 뒤 "서식 확정"을 눌러야 기관이 제출을 시작할 수 있습니다.</strong>
+              <strong>"서식 저장"은 임시 저장이며, 기관에게는 아직 보이지 않습니다. 다 작성한 뒤 "취합서식 확정"을 눌러야 기관이 제출을 시작할 수 있습니다.</strong>
             </p>
             <div id="templateLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 서식을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
             <div id="templateConfirmedBanner" class="status-banner ok hidden">✅ 확정된 서식입니다. 기관이 제출할 수 있습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
@@ -419,7 +429,7 @@
               <button type="button" id="addTemplateRowBtn" class="btn btn-secondary btn-sm" onclick="addTemplateRow()">+ 행 추가</button>
               <button type="button" id="addTemplateColBtn" class="btn btn-secondary btn-sm" onclick="addTemplateCol()">+ 열 추가</button>
               <button type="button" id="saveTemplateBtn" class="btn btn-sm btn-secondary" onclick="saveTemplate()">임시 저장</button>
-              <button type="button" id="confirmTemplateBtn" class="btn btn-sm btn-excel" onclick="confirmTemplate()">🔒 서식 확정</button>
+              <button type="button" id="confirmTemplateBtn" class="btn btn-sm btn-excel" onclick="confirmTemplate()">🔒 취합서식 확정</button>
             </div>
           </div>
         </div>
@@ -795,6 +805,8 @@
           currentUser.templateData = unwrapTemplateRows(rd.templateData);
           currentUser.templateTitle = rd.templateTitle || '';
           currentUser.templateConfirmed = !!rd.templateConfirmed;
+          currentUser.questionsConfirmed = !!rd.questionsConfirmed;
+          currentUser.columnsConfirmed = !!rd.columnsConfirmed;
           currentRoundId = currentUser.activeRoundId;
           return;
         }
@@ -813,6 +825,8 @@
         templateData: wrapTemplateRows(currentUser.templateData || []),
         templateTitle: currentUser.templateTitle || '',
         templateConfirmed: false,
+        questionsConfirmed: false,
+        columnsConfirmed: false,
         status: 'open',
         createdAt: Date.now(),
         closedAt: null
@@ -829,6 +843,8 @@
       currentUser.templateData = unwrapTemplateRows(roundData.templateData);
       currentUser.templateTitle = roundData.templateTitle;
       currentUser.templateConfirmed = roundData.templateConfirmed;
+      currentUser.questionsConfirmed = roundData.questionsConfirmed;
+      currentUser.columnsConfirmed = roundData.columnsConfirmed;
       currentRoundId = roundRef.id;
     }
 
@@ -918,6 +934,8 @@
         templateData: wrapTemplateRows([]),
         templateTitle: '',
         templateConfirmed: false,
+        questionsConfirmed: false,
+        columnsConfirmed: false,
         status: 'open',
         createdAt: Date.now(),
         closedAt: null
@@ -936,6 +954,8 @@
       currentUser.templateData = [];
       currentUser.templateTitle = '';
       currentUser.templateConfirmed = false;
+      currentUser.questionsConfirmed = false;
+      currentUser.columnsConfirmed = false;
 
       alert(`"${name}" 회차를 새로 추가했습니다. 기존에 진행 중이던 다른 회차는 그대로 열려 있습니다. 기관은 기존 접속 코드로 들어와서 진행 중인 설문 목록 중 이 회차를 선택하면 됩니다.`);
 
@@ -1176,10 +1196,15 @@
         const roundsSnap = await db.collection('managers').doc(managerUid).collection('rounds').get();
         const openRounds = roundsSnap.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(r => r.status === 'open');
+          .filter(r => r.status === 'open')
+          .filter(r =>
+            (r.useSurvey && r.questionsConfirmed) ||
+            (r.useExcel && r.columnsConfirmed) ||
+            (r.useTemplate && r.templateConfirmed)
+          );
 
         if (openRounds.length === 0) {
-          alert('현재 진행 중인 설문이 없습니다. 담당자에게 문의해주세요.');
+          alert('현재 제출 가능한 설문이 없습니다. 담당자에게 문의해주세요.');
           return;
         }
 
@@ -1225,11 +1250,13 @@
     // 특정 회차로 실제 제출 화면 진입 (단일 설문일 때 자동, 또는 선택 화면에서 고른 뒤)
     function enterSurveyForRound(managerUid, agencyCode, agencyName, roundData) {
       const templateReady = !!roundData.useTemplate && !!roundData.templateConfirmed;
+      const surveyReady = !!roundData.useSurvey && !!roundData.questionsConfirmed;
+      const excelReady = !!roundData.useExcel && !!roundData.columnsConfirmed;
 
       activeSurveyInfo = {
         managerId: managerUid, roundId: roundData.id, agencyName,
-        useSurvey: !!roundData.useSurvey,
-        useExcel: !!roundData.useExcel,
+        useSurvey: surveyReady,
+        useExcel: excelReady,
         useTemplate: templateReady,
         questions: roundData.questions || [],
         columns: (roundData.columns && roundData.columns.length) ? roundData.columns : cloneDefaultColumns(),
@@ -1582,11 +1609,21 @@
 
     // --- 설문 문항 작성: 원래의 간단한 카드형 폼 (jspreadsheet 미사용) ---
     async function renderManagerQuestions() {
-      const questionsLocked = currentRoundId ? await roundHasResponses(currentRoundId) : false;
-      const banner = document.getElementById('questionLockBanner');
-      if (banner) banner.classList.toggle('hidden', !questionsLocked);
+      const hasResponses = currentRoundId ? await roundHasResponses(currentRoundId) : false;
+      const isConfirmed = !!currentUser.questionsConfirmed;
+      const questionsLocked = hasResponses || isConfirmed;
+
+      const responseLockBanner = document.getElementById('questionLockBanner');
+      const confirmedBanner = document.getElementById('questionConfirmedBanner');
+      const draftBanner = document.getElementById('questionDraftBanner');
+      if (responseLockBanner) responseLockBanner.classList.toggle('hidden', !hasResponses);
+      if (confirmedBanner) confirmedBanner.classList.toggle('hidden', !(isConfirmed && !hasResponses));
+      if (draftBanner) draftBanner.classList.toggle('hidden', isConfirmed || hasResponses);
+
       const addBtn = document.getElementById('addQuestionBtn');
+      const confirmBtn = document.getElementById('confirmQuestionsBtn');
       if (addBtn) addBtn.classList.toggle('hidden', questionsLocked);
+      if (confirmBtn) confirmBtn.classList.toggle('hidden', questionsLocked);
 
       const container = document.getElementById('managerQuestionList');
       container.innerHTML = '';
@@ -1615,8 +1652,8 @@
 
     async function addQuestion() {
       if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
-      if (await roundHasResponses(currentRoundId)) {
-        alert('이미 응답이 제출된 회차는 질문을 수정할 수 없습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.');
+      if (await roundHasResponses(currentRoundId) || currentUser.questionsConfirmed) {
+        alert('이미 확정되었거나 응답이 제출된 회차는 질문을 수정할 수 없습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.');
         renderManagerQuestions();
         return;
       }
@@ -1651,6 +1688,27 @@
       renderManagerQuestions();
     }
 
+    // 질문 확정: 이후 수정 불가, 기관이 이 질문에 답변을 시작할 수 있게 됨
+    async function confirmQuestions() {
+      if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
+      if (await roundHasResponses(currentRoundId)) {
+        alert('이미 응답이 제출된 회차는 질문을 확정할 수 없습니다.');
+        renderManagerQuestions();
+        return;
+      }
+      if (!currentUser.questions || currentUser.questions.length === 0) {
+        alert('먼저 질문을 최소 1개 이상 추가하세요.');
+        return;
+      }
+      if (!confirm('질문을 확정하시겠습니까? 확정 후에는 이 회차에서 질문을 수정할 수 없으며, 기관이 답변을 시작할 수 있게 됩니다.')) return;
+
+      currentUser.questionsConfirmed = true;
+      await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(currentRoundId).update({ questionsConfirmed: true });
+      renderManagerQuestions();
+      alert('질문이 확정되었습니다. 이제 기관이 답변할 수 있습니다.');
+    }
+
     // --- 엑셀 컬럼(항목) 설정: jspreadsheet 헤더 = 실제 컬럼명(목차). 나머지 설정은 이름 기준 메타데이터로 별도 관리 ---
     let columnConfigGrid = null;
     let columnMetaByName = {}; // { [컬럼명]: {type, mode, options, dependsOn, optionsMap, allowCustom, group} }
@@ -1669,16 +1727,28 @@
       const container = document.getElementById('columnConfigSpreadsheet');
       container.innerHTML = '';
 
-      columnsLocked = currentRoundId ? await roundHasResponses(currentRoundId) : false;
-      const banner = document.getElementById('columnLockBanner');
-      if (banner) banner.classList.toggle('hidden', !columnsLocked);
+      const hasResponses = currentRoundId ? await roundHasResponses(currentRoundId) : false;
+      const isConfirmed = !!currentUser.columnsConfirmed;
+      columnsLocked = hasResponses || isConfirmed;
+
+      const responseLockBanner = document.getElementById('columnLockBanner');
+      const confirmedBanner = document.getElementById('columnConfirmedBanner');
+      const draftBanner = document.getElementById('columnDraftBanner');
+      if (responseLockBanner) responseLockBanner.classList.toggle('hidden', !hasResponses);
+      if (confirmedBanner) confirmedBanner.classList.toggle('hidden', !(isConfirmed && !hasResponses));
+      if (draftBanner) draftBanner.classList.toggle('hidden', isConfirmed || hasResponses);
+
       const colBtn = document.getElementById('addColumnColBtn');
       const rowBtn = document.getElementById('addColumnRowBtn');
+      const clearBtn = document.getElementById('clearColumnsBtn');
       const saveBtn = document.getElementById('saveColumnConfigBtn');
+      const confirmBtn = document.getElementById('confirmColumnsBtn');
       const importLabel = document.getElementById('importSchemaLabel');
       if (colBtn) colBtn.classList.toggle('hidden', columnsLocked);
       if (rowBtn) rowBtn.classList.toggle('hidden', columnsLocked);
+      if (clearBtn) clearBtn.classList.toggle('hidden', columnsLocked);
       if (saveBtn) saveBtn.classList.toggle('hidden', columnsLocked);
+      if (confirmBtn) confirmBtn.classList.toggle('hidden', columnsLocked);
       if (importLabel) importLabel.classList.toggle('hidden', columnsLocked);
 
       columnMetaByName = {};
@@ -1897,12 +1967,48 @@
       if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
       if (!columnConfigGrid) return;
 
-      if (await roundHasResponses(currentRoundId)) {
-        alert('이미 응답이 제출된 회차는 컬럼 구성을 수정할 수 없습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.');
+      if (await roundHasResponses(currentRoundId) || currentUser.columnsConfirmed) {
+        alert('이미 확정되었거나 응답이 제출된 회차는 컬럼 구성을 수정할 수 없습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.');
         renderColumnConfigEditor();
         return;
       }
 
+      const cols = buildColumnsFromGrid();
+      if (cols === null) return; // buildColumnsFromGrid 내부에서 이미 alert 표시함
+
+      currentUser.columns = cols;
+      await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(currentRoundId).update({ columns: cols });
+      renderColumnConfigEditor();
+      alert('엑셀 취합 컬럼 서식이 임시 저장되었습니다. (아직 확정 전이라 기관 화면에는 표시되지 않습니다) 다 작성하셨으면 "취합서식 확정"을 눌러주세요.');
+    }
+
+    // 컬럼 확정: 이후 수정 불가, 기관이 이 서식으로 제출을 시작할 수 있게 됨
+    async function confirmColumns() {
+      if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
+      if (!columnConfigGrid) return;
+
+      if (await roundHasResponses(currentRoundId)) {
+        alert('이미 응답이 제출된 회차는 컬럼 구성을 확정할 수 없습니다.');
+        renderColumnConfigEditor();
+        return;
+      }
+
+      const cols = buildColumnsFromGrid();
+      if (cols === null) return;
+
+      if (!confirm('컬럼 서식을 확정하시겠습니까? 확정 후에는 이 회차에서 컬럼 구성을 수정할 수 없으며, 기관이 제출을 시작할 수 있게 됩니다.')) return;
+
+      currentUser.columns = cols;
+      currentUser.columnsConfirmed = true;
+      await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(currentRoundId).update({ columns: cols, columnsConfirmed: true });
+      renderColumnConfigEditor();
+      alert('컬럼 서식이 확정되었습니다. 이제 기관이 제출할 수 있습니다.');
+    }
+
+    // 현재 그리드 상태를 읽어 저장 가능한 컬럼 배열로 변환. 검증 실패 시 alert을 띄우고 null 반환
+    function buildColumnsFromGrid() {
       const colCount = columnConfigGrid.options.columns.length;
       const cols = [];
 
@@ -1915,28 +2021,23 @@
 
         if (meta.type === 'select') {
           if (meta.mode === 'dependent') {
-            if (!meta.dependsOn) { alert(`[${name}] 컬럼: 동적목록은 상위 컬럼명을 입력해야 합니다. 헤더에서 이 컬럼을 선택한 뒤 아래에서 입력해주세요.`); return; }
+            if (!meta.dependsOn) { alert(`[${name}] 컬럼: 동적목록은 상위 컬럼명을 입력해야 합니다. 헤더에서 이 컬럼을 선택한 뒤 아래에서 입력해주세요.`); return null; }
             const parentCol = cols.find(x => x.name === meta.dependsOn);
-            if (!parentCol) { alert(`[${name}] 컬럼: 상위 컬럼 [${meta.dependsOn}]을(를) 찾을 수 없습니다. 상위 컬럼이 이 컬럼보다 왼쪽에 있어야 합니다.`); return; }
-            if (parentCol.type !== 'select') { alert(`[${name}] 컬럼: 상위 컬럼 [${meta.dependsOn}]은(는) "목록선택" 형태여야 합니다.`); return; }
-            if (!meta.optionsMap || Object.keys(meta.optionsMap).length === 0) { alert(`[${name}] 컬럼: 하위목록을 입력하세요.`); return; }
+            if (!parentCol) { alert(`[${name}] 컬럼: 상위 컬럼 [${meta.dependsOn}]을(를) 찾을 수 없습니다. 상위 컬럼이 이 컬럼보다 왼쪽에 있어야 합니다.`); return null; }
+            if (parentCol.type !== 'select') { alert(`[${name}] 컬럼: 상위 컬럼 [${meta.dependsOn}]은(는) "목록선택" 형태여야 합니다.`); return null; }
+            if (!meta.optionsMap || Object.keys(meta.optionsMap).length === 0) { alert(`[${name}] 컬럼: 하위목록을 입력하세요.`); return null; }
             c.dependsOn = meta.dependsOn;
             c.optionsMap = meta.optionsMap;
           } else {
-            if (!meta.options || meta.options.length === 0) { alert(`[${name}] 컬럼은 목록선택 방식인데 선택목록이 비어 있습니다. 헤더에서 이 컬럼을 선택한 뒤 아래에서 입력해주세요.`); return; }
+            if (!meta.options || meta.options.length === 0) { alert(`[${name}] 컬럼은 목록선택 방식인데 선택목록이 비어 있습니다. 헤더에서 이 컬럼을 선택한 뒤 아래에서 입력해주세요.`); return null; }
             c.options = meta.options;
           }
         }
         cols.push(c);
       }
 
-      if (cols.length === 0) { alert('최소 1개의 컬럼명을 입력하세요.'); return; }
-
-      currentUser.columns = cols;
-      await db.collection('managers').doc(currentUser.id)
-        .collection('rounds').doc(currentRoundId).update({ columns: cols });
-      renderColumnConfigEditor();
-      alert('엑셀 취합 컬럼 서식이 변경되었습니다.');
+      if (cols.length === 0) { alert('최소 1개의 컬럼명을 입력하세요.'); return null; }
+      return cols;
     }
 
     // --- 자유 서식(템플릿) 디자인: 담당자가 원하는 칸에 라벨을 입력, 나머지 빈칸을 기관이 채움 ---
@@ -2026,7 +2127,7 @@
         currentUser.templateTitle = title;
         await db.collection('managers').doc(currentUser.id)
           .collection('rounds').doc(currentRoundId).update({ templateData: wrapTemplateRows(data), templateTitle: title });
-        alert('서식이 임시 저장되었습니다. (아직 확정 전이라 기관 화면에는 표시되지 않습니다) 다 작성하셨으면 "서식 확정"을 눌러주세요.');
+        alert('서식이 임시 저장되었습니다. (아직 확정 전이라 기관 화면에는 표시되지 않습니다) 다 작성하셨으면 "취합서식 확정"을 눌러주세요.');
       } catch (err) {
         console.error('[진단] 서식 임시저장 오류:', err);
         alert('서식 저장 중 오류가 발생했습니다: ' + err.message);
