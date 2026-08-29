@@ -392,11 +392,11 @@
         <div id="panelManageExcel" class="hidden">
           <div class="q-card">
             <h4 style="margin-top:0;">엑셀 컬럼(항목) 설정</h4>
-            <p class="grid-hint">
-              헤더는 혼동을 줄이기 위해 1, 2, 3 순서 번호로만 표시됩니다. <strong>1행의 셀에 실제 컬럼명을 입력</strong>하세요. 열(컬럼)과 행 모두 자유롭게 추가/삭제할 수 있습니다.<br/>
-              1행에 컬럼명을 입력한 뒤 그 칸을 클릭해 선택하면 아래에서 입력 방식(자유입력/목록선택), 상위 목차(그룹), 동적목록 등을 설정할 수 있습니다.<br/>
-              <strong>"서식 변경 저장"은 임시 저장이며 기관에게는 아직 보이지 않습니다. "취합서식 확정"을 눌러야 기관이 제출을 시작할 수 있습니다.</strong>
-            </p>
+            <ul class="grid-hint" style="margin:0 0 10px 0; padding-left:18px;">
+              <li>고정목록, 동적목록 등 입력제한기능 설정</li>
+              <li>기존 엑셀파일 불러오기 가능</li>
+              <li>행, 열 삭제, 추가 가능</li>
+            </ul>
             <div id="columnLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 컬럼 구성을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
             <div id="columnConfirmedBanner" class="status-banner ok hidden">✅ 확정된 서식입니다. 기관이 제출할 수 있습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
             <div id="columnDraftBanner" class="status-banner hidden" style="background:#fff7ed; color:#9a3412;">✏️ 아직 확정되지 않은 임시 서식입니다. 기관 화면에는 표시되지 않습니다.</div>
@@ -439,11 +439,11 @@
         <div id="panelManageTemplate" class="hidden">
           <div class="q-card">
             <h4 style="margin-top:0;">자유 서식(템플릿) 디자인</h4>
-            <p class="grid-hint">
-              원하는 칸에 라벨(제목/문구)을 직접 입력하세요. <strong>글자를 입력한 칸은 기관 화면에 고정 텍스트로 표시되고, 비워둔 칸만 기관이 입력할 수 있는 빈칸이 됩니다.</strong><br/>
-              예: "사업명"이라고 쓴 칸 바로 옆 빈칸에 기관이 실제 사업명을 입력하는 식입니다. 행/열은 자유롭게 추가/삭제할 수 있습니다.<br/>
-              <strong>"서식 저장"은 임시 저장이며, 기관에게는 아직 보이지 않습니다. 다 작성한 뒤 "취합서식 확정"을 눌러야 기관이 제출을 시작할 수 있습니다.</strong>
-            </p>
+            <ul class="grid-hint" style="margin:0 0 10px 0; padding-left:18px;">
+              <li>원하는 칸에 라벨(제목/문구)을 입력 → 그 칸은 기관 화면에 고정 텍스트로 표시, 비워둔 칸만 기관이 입력 가능</li>
+              <li>행, 열 삭제, 추가 가능</li>
+              <li>"서식 저장"은 임시 저장(기관에게 미표시), "취합서식 확정"을 눌러야 기관이 제출 시작 가능</li>
+            </ul>
             <div id="templateLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 서식을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
             <div id="templateConfirmedBanner" class="status-banner ok hidden">✅ 확정된 서식입니다. 기관이 제출할 수 있습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
             <div id="templateDraftBanner" class="status-banner hidden" style="background:#fff7ed; color:#9a3412;">✏️ 아직 확정되지 않은 임시 서식입니다. 기관 화면에는 표시되지 않습니다.</div>
