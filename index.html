@@ -19,6 +19,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
   <style>
     * { box-sizing: border-box; }
@@ -462,6 +463,8 @@
         <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap: wrap; align-items:center;">
           <button class="btn btn-excel btn-sm" onclick="exportToExcel()">📥 취합 응답 엑셀 다운로드 (.xlsx)</button>
           <button class="btn btn-secondary btn-sm" onclick="exportSchemaExcel()">📄 이 회차 서식(빈 양식) 다운로드</button>
+          <button class="btn btn-secondary btn-sm" onclick="downloadAttachmentsByType('image')">📷 사진 일괄 다운로드 (.zip)</button>
+          <button class="btn btn-secondary btn-sm" onclick="downloadAttachmentsByType('video')">🎥 동영상 일괄 다운로드 (.zip)</button>
           <span id="responseLiveHint" style="font-size:11px; color:#94a3b8;">🔄 실시간 반영 중 (새로고침 불필요)</span>
         </div>
         <div style="overflow-x: auto;">
@@ -1812,6 +1815,9 @@
           const myQuestions = activeSurveyInfo.questions || [];
           const answers = {};
           const formData = new FormData(formEl);
+          const safeAgency = (activeSurveyInfo.agencyName || 'agency').replace(/[^\w가-힣-]/g, '_');
+          let photoCounter = 0;
+          let videoCounter = 0;
 
           for (const q of myQuestions) {
             if (q.type === 'file') {
@@ -1821,13 +1827,19 @@
                 for (let i = 0; i < pendingList.length; i++) {
                   const pending = pendingList[i];
                   btn.innerText = `파일 업로드 중... (${i + 1}/${pendingList.length})`;
-                  const safeAgency = (activeSurveyInfo.agencyName || 'agency').replace(/[^\w가-힣-]/g, '_');
-                  const ext = (pending.name.split('.').pop() || 'dat').toLowerCase();
-                  const path = `managers/${activeSurveyInfo.managerId}/rounds/${activeSurveyInfo.roundId}/attachments/${Date.now()}_${safeAgency}_q${q.id}_${i}.${pending.type.startsWith('video/') ? 'webm' : ext}`;
+
+                  const isVideo = pending.type.startsWith('video/');
+                  const ext = isVideo ? 'webm' : ((pending.name.split('.').pop() || 'jpg').toLowerCase());
+                  const label = isVideo ? '동영상' : '사진';
+                  const seq = isVideo ? (++videoCounter) : (++photoCounter);
+                  const originalBase = pending.name.replace(/[\\/:*?"<>|]/g, '_'); // 파일명에 못 쓰는 문자만 정리, 확장자는 그대로 유지
+                  const displayName = `${safeAgency}_${label}_${String(seq).padStart(3, '0')}(${originalBase}).${ext}`;
+
+                  const path = `managers/${activeSurveyInfo.managerId}/rounds/${activeSurveyInfo.roundId}/attachments/${Date.now()}_${displayName}`;
                   const ref = storage.ref().child(path);
                   const snapshot = await ref.put(pending.blob);
                   const url = await snapshot.ref.getDownloadURL();
-                  uploaded.push({ url, isTimelapse: !!pending.isTimelapse, name: pending.name });
+                  uploaded.push({ url, isTimelapse: !!pending.isTimelapse, name: displayName, fileType: isVideo ? 'video' : 'image' });
                 }
                 answers[q.id] = JSON.stringify(uploaded);
                 btn.innerText = '제출 처리 중...';
@@ -2590,6 +2602,88 @@
       XLSX.writeFile(wb, `서식응답_${res.agencyName}_${(res.submittedAt || '').replace(/[:/\s]/g, '-')}.xlsx`);
     }
 
+    // 현재 조회 중인 회차의 모든 응답에서 사진 또는 동영상만 모아 zip 하나로 일괄 다운로드
+    async function downloadAttachmentsByType(fileType) {
+      if (!viewingRoundMeta) { alert('회차 정보를 불러오지 못했습니다.'); return; }
+      if (typeof JSZip === 'undefined') { alert('압축 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.'); return; }
+
+      const myQuestions = viewingRoundMeta.useSurvey ? (viewingRoundMeta.questions || []) : [];
+      const fileQuestions = myQuestions.filter(q => q.type === 'file');
+      if (fileQuestions.length === 0) { alert('파일첨부 문항이 없는 회차입니다.'); return; }
+
+      const items = [];
+      cachedResponseDocs.forEach(res => {
+        fileQuestions.forEach(q => {
+          const raw = res.answers && res.answers[q.id];
+          if (!raw) return;
+          try {
+            const parsed = JSON.parse(raw);
+            const list = Array.isArray(parsed) ? parsed : [parsed];
+            list.forEach(item => {
+              if (!item || !item.url) return;
+              // 예전에 제출된 응답에는 fileType이 없을 수 있어, 파일명/확장자로 추정하는 보조 판별도 함께 둠
+              const guessed = item.fileType
+                || (/\.webm$/i.test(item.name || '') ? 'video' : null)
+                || (/_동영상_/.test(item.name || '') ? 'video' : 'image');
+              if (guessed === fileType) items.push({ name: item.name || 'file', url: item.url });
+            });
+          } catch (err) { /* 파싱 실패 항목은 건너뜀 */ }
+        });
+      });
+
+      if (items.length === 0) {
+        alert(fileType === 'video' ? '다운로드할 동영상이 없습니다.' : '다운로드할 사진이 없습니다.');
+        return;
+      }
+
+      const zip = new JSZip();
+      let successCount = 0, failCount = 0;
+      const usedNames = {}; // 파일명이 겹칠 경우 대비
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        try {
+          const resp = await fetch(item.url);
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          const blob = await resp.blob();
+          let safeName = (item.name || `file_${i}`).replace(/[\\/:*?"<>|]/g, '_');
+          if (usedNames[safeName] !== undefined) {
+            usedNames[safeName]++;
+            const dot = safeName.lastIndexOf('.');
+            safeName = dot > -1 ? `${safeName.slice(0, dot)}_${usedNames[safeName]}${safeName.slice(dot)}` : `${safeName}_${usedNames[safeName]}`;
+          } else {
+            usedNames[safeName] = 0;
+          }
+          zip.file(safeName, blob);
+          successCount++;
+        } catch (err) {
+          console.error('첨부파일 다운로드 실패:', item.url, err);
+          failCount++;
+        }
+      }
+
+      if (successCount === 0) {
+        alert('파일을 하나도 받아오지 못했습니다. (Storage 접근 권한 또는 CORS 설정 문제일 수 있습니다)');
+        return;
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      const roundInfo = roundsList.find(r => r.id === viewingRoundId);
+      const label = roundInfo ? roundInfo.name : 'round';
+      a.download = `${fileType === 'video' ? '동영상' : '사진'}_일괄다운로드_${label}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      if (failCount > 0) {
+        alert(`${successCount}개는 압축했고, ${failCount}개는 다운로드에 실패했습니다.`);
+      }
+    }
+
     function exportToExcel() {
       if (cachedResponseDocs.length === 0) { alert('다운로드할 취합 데이터가 없습니다.'); return; }
       if (!viewingRoundMeta) { alert('회차 정보를 불러오지 못했습니다.'); return; }
@@ -2603,34 +2697,54 @@
         .concat(myQuestions.map(q => q.title))
         .concat(cols.map(c => c.name));
       const aoa = [header];
+      const hyperlinks = []; // { r, c, url } - aoa_to_sheet로 시트를 만든 뒤 별도로 붙여줄 하이퍼링크 목록
 
       cachedResponseDocs.forEach(res => {
-        const answerVals = myQuestions.map(q => {
+        // 각 질문 답변을 먼저 {text, url?} 형태로 만들어둠 (파일첨부는 파일명을 텍스트로, url은 링크로 연결)
+        const answerCells = myQuestions.map(q => {
           const raw = (res.answers && res.answers[q.id]) || '';
           if (q.type === 'file' && raw) {
             try {
               const parsed = JSON.parse(raw);
               const items = Array.isArray(parsed) ? parsed : [parsed];
-              const urls = items.filter(item => item && item.url).map(item => item.url);
-              return urls.length > 0 ? urls.join('\n') : raw;
-            } catch (err) { return raw; }
+              const valid = items.filter(item => item && item.url);
+              if (valid.length === 0) return { text: raw };
+              const text = valid.map(v => v.name || v.url).join('\n');
+              return { text, url: valid[0].url }; // 여러 개면 파일명은 전부 표시, 링크는 첫 번째 파일로 연결
+            } catch (err) { return { text: raw }; }
           }
-          return raw;
+          return { text: raw };
         });
+
+        function pushRow(extraCells) {
+          const rowIndex = aoa.length; // 지금 aoa 길이가 곧 이 행이 들어갈 인덱스
+          aoa.push([res.agencyName, res.submittedAt].concat(answerCells.map(c => c.text)).concat(extraCells));
+          answerCells.forEach((c, i) => {
+            if (c.url) hyperlinks.push({ r: rowIndex, c: 2 + i, url: c.url, text: c.text });
+          });
+        }
 
         if (useExcel && Array.isArray(res.rows) && res.rows.length > 0) {
           res.rows.forEach(rowObj => {
             const rVals = (rowObj && Array.isArray(rowObj.cells)) ? rowObj.cells : [];
             const paddedRow = cols.map((c, i) => (rVals[i] !== undefined ? rVals[i] : ''));
-            aoa.push([res.agencyName, res.submittedAt].concat(answerVals).concat(paddedRow));
+            pushRow(paddedRow);
           });
         } else {
           const emptyRow = cols.map(() => '');
-          aoa.push([res.agencyName, res.submittedAt].concat(answerVals).concat(emptyRow));
+          pushRow(emptyRow);
         }
       });
 
       const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+      // 파일첨부 칸에 실제 하이퍼링크 연결 (여러 파일이면 첫 번째 파일로 연결, 파일명은 전부 표시)
+      hyperlinks.forEach(h => {
+        const cellRef = XLSX.utils.encode_cell({ r: h.r, c: h.c });
+        if (!ws[cellRef]) ws[cellRef] = { t: 's', v: h.text };
+        ws[cellRef].l = { Target: h.url };
+      });
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '응답취합');
       const roundInfo = roundsList.find(r => r.id === viewingRoundId);
