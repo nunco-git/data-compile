@@ -378,7 +378,7 @@
               <label>객관식 옵션 (쉼표 ','로 구분)</label>
               <input type="text" id="newQOptions" placeholder="예: 완료, 진행중, 미착수" />
             </div>
-            <p id="fileTypeHint" class="hidden" style="font-size:11px; color:#94a3b8; margin-top:-8px;">사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다.</p>
+            <p id="fileTypeHint" class="hidden" style="font-size:11px; color:#94a3b8; margin-top:-8px;">여러 장/개를 한 번에 선택할 수 있습니다. 사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다.</p>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button type="button" class="btn btn-sm" id="addQuestionBtn" onclick="addQuestion()">질문 추가</button>
               <button type="button" class="btn btn-sm btn-excel" id="confirmQuestionsBtn" onclick="confirmQuestions()">🔒 취합서식 확정</button>
@@ -1560,8 +1560,8 @@
           inputHtml = q.options.map(opt => `<label style="display:block; margin-bottom:4px;"><input type="radio" name="q_${q.id}" value="${opt}" required /> ${opt}</label>`).join('');
         } else if (q.type === 'file') {
           inputHtml = `
-            <input type="file" name="q_${q.id}" accept="image/*,video/*" onchange="handleFileQuestionChange(event, ${q.id})" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; background:#fff;" />
-            <p style="font-size:11px; color:#94a3b8; margin:6px 0 0 0;">사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다.</p>
+            <input type="file" name="q_${q.id}" accept="image/*,video/*" multiple onchange="handleFileQuestionChange(event, ${q.id})" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; background:#fff;" />
+            <p style="font-size:11px; color:#94a3b8; margin:6px 0 0 0;">여러 장/개를 한 번에 선택할 수 있습니다. 사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다.</p>
             <p id="fileStatus_${q.id}" style="font-size:12px; margin-top:6px;"></p>
           `;
         }
@@ -1572,40 +1572,56 @@
 
     // 파일 선택 즉시 압축/타임랩스 처리를 미리 해두고, 결과 File 객체를 보관 (제출 시 업로드만 하면 되도록)
     async function handleFileQuestionChange(event, qId) {
-      const file = event.target.files[0];
+      const files = Array.from(event.target.files || []);
       const statusEl = document.getElementById(`fileStatus_${qId}`);
-      if (!file) { delete pendingFileAnswers[qId]; if (statusEl) statusEl.innerText = ''; return; }
+      if (files.length === 0) { delete pendingFileAnswers[qId]; if (statusEl) statusEl.innerText = ''; return; }
 
-      if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+      const invalid = files.find(f => !f.type.startsWith('image/') && !f.type.startsWith('video/'));
+      if (invalid) {
         alert('사진 또는 동영상 파일만 첨부할 수 있습니다.');
         event.target.value = '';
+        delete pendingFileAnswers[qId];
         return;
       }
 
-      if (statusEl) statusEl.innerText = '⏳ 처리 중...';
-      try {
-        let blob = file;
-        let meta = { isTimelapse: false };
-        if (file.type.startsWith('image/')) {
-          if (statusEl) statusEl.innerText = '⏳ 사진 압축 중...';
-          blob = await compressImageFile(file);
-        } else {
-          if (statusEl) statusEl.innerText = '⏳ 동영상 처리 중... (다소 시간이 걸릴 수 있습니다)';
-          const result = await processVideoFile(file);
-          blob = result.blob;
-          meta.isTimelapse = result.isTimelapse;
+      const processed = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const progressPrefix = files.length > 1 ? `(${i + 1}/${files.length}) ` : '';
+        try {
+          let blob = file;
+          let meta = { isTimelapse: false };
+          if (file.type.startsWith('image/')) {
+            if (statusEl) statusEl.innerText = `⏳ ${progressPrefix}사진 압축 중... (${file.name})`;
+            blob = await compressImageFile(file);
+          } else {
+            if (statusEl) statusEl.innerText = `⏳ ${progressPrefix}동영상 처리 중... (${file.name}, 다소 시간이 걸릴 수 있습니다)`;
+            const result = await processVideoFile(file);
+            blob = result.blob;
+            meta.isTimelapse = result.isTimelapse;
+          }
+          processed.push({ blob, name: file.name, type: file.type, ...meta });
+        } catch (err) {
+          console.error('파일 처리 오류:', err);
+          if (statusEl) statusEl.innerText = `❌ (${file.name}) 처리 중 오류: ` + err.message;
+          // 하나가 실패해도 나머지는 계속 처리
         }
-        pendingFileAnswers[qId] = { blob, name: file.name, type: file.type, ...meta };
-        const sizeKB = Math.round((blob.size || 0) / 1024);
-        if (statusEl) {
-          statusEl.innerText = meta.isTimelapse
-            ? `✅ 처리 완료 (타임랩스로 요약됨, 약 ${sizeKB}KB)`
-            : `✅ 처리 완료 (약 ${sizeKB}KB)`;
-        }
-      } catch (err) {
-        console.error('파일 처리 오류:', err);
-        if (statusEl) statusEl.innerText = '❌ 처리 중 오류가 발생했습니다: ' + err.message;
-        delete pendingFileAnswers[qId];
+      }
+
+      pendingFileAnswers[qId] = processed;
+
+      if (processed.length === 0) {
+        if (statusEl) statusEl.innerText = '❌ 처리된 파일이 없습니다.';
+        return;
+      }
+      if (statusEl) {
+        const totalKB = processed.reduce((sum, p) => sum + Math.round((p.blob.size || 0) / 1024), 0);
+        const timelapseCount = processed.filter(p => p.isTimelapse).length;
+        const failedCount = files.length - processed.length;
+        let msg = `✅ ${processed.length}개 처리 완료 (총 약 ${totalKB}KB)`;
+        if (timelapseCount > 0) msg += `, 타임랩스 ${timelapseCount}개`;
+        if (failedCount > 0) msg += `, 실패 ${failedCount}개`;
+        statusEl.innerText = msg;
       }
     }
 
@@ -1799,16 +1815,21 @@
 
           for (const q of myQuestions) {
             if (q.type === 'file') {
-              const pending = pendingFileAnswers[q.id];
-              if (pending) {
-                btn.innerText = '파일 업로드 중...';
-                const safeAgency = (activeSurveyInfo.agencyName || 'agency').replace(/[^\w가-힣-]/g, '_');
-                const ext = (pending.name.split('.').pop() || 'dat').toLowerCase();
-                const path = `managers/${activeSurveyInfo.managerId}/rounds/${activeSurveyInfo.roundId}/attachments/${Date.now()}_${safeAgency}_q${q.id}.${pending.type.startsWith('video/') ? 'webm' : ext}`;
-                const ref = storage.ref().child(path);
-                const snapshot = await ref.put(pending.blob);
-                const url = await snapshot.ref.getDownloadURL();
-                answers[q.id] = JSON.stringify({ url, isTimelapse: !!pending.isTimelapse, name: pending.name });
+              const pendingList = pendingFileAnswers[q.id];
+              if (pendingList && pendingList.length > 0) {
+                const uploaded = [];
+                for (let i = 0; i < pendingList.length; i++) {
+                  const pending = pendingList[i];
+                  btn.innerText = `파일 업로드 중... (${i + 1}/${pendingList.length})`;
+                  const safeAgency = (activeSurveyInfo.agencyName || 'agency').replace(/[^\w가-힣-]/g, '_');
+                  const ext = (pending.name.split('.').pop() || 'dat').toLowerCase();
+                  const path = `managers/${activeSurveyInfo.managerId}/rounds/${activeSurveyInfo.roundId}/attachments/${Date.now()}_${safeAgency}_q${q.id}_${i}.${pending.type.startsWith('video/') ? 'webm' : ext}`;
+                  const ref = storage.ref().child(path);
+                  const snapshot = await ref.put(pending.blob);
+                  const url = await snapshot.ref.getDownloadURL();
+                  uploaded.push({ url, isTimelapse: !!pending.isTimelapse, name: pending.name });
+                }
+                answers[q.id] = JSON.stringify(uploaded);
                 btn.innerText = '제출 처리 중...';
               } else {
                 answers[q.id] = '';
@@ -2499,10 +2520,14 @@
       if (q.type === 'file') {
         try {
           const parsed = JSON.parse(val);
-          if (parsed && parsed.url) {
-            const tag = parsed.isTimelapse ? ' (타임랩스)' : '';
-            return `<a href="${parsed.url}" target="_blank" rel="noopener">📎 ${parsed.name || '첨부파일'}${tag}</a>`;
-          }
+          const items = Array.isArray(parsed) ? parsed : [parsed]; // 이전 단일첨부 형식과도 호환
+          const links = items
+            .filter(item => item && item.url)
+            .map(item => {
+              const tag = item.isTimelapse ? ' (타임랩스)' : '';
+              return `<a href="${item.url}" target="_blank" rel="noopener">📎 ${item.name || '첨부파일'}${tag}</a>`;
+            });
+          if (links.length > 0) return links.join('<br/>');
         } catch (err) { /* 파싱 실패 시 원문 그대로 표시 */ }
       }
       return val;
@@ -2585,7 +2610,9 @@
           if (q.type === 'file' && raw) {
             try {
               const parsed = JSON.parse(raw);
-              return parsed && parsed.url ? parsed.url : raw;
+              const items = Array.isArray(parsed) ? parsed : [parsed];
+              const urls = items.filter(item => item && item.url).map(item => item.url);
+              return urls.length > 0 ? urls.join('\n') : raw;
             } catch (err) { return raw; }
           }
           return raw;
