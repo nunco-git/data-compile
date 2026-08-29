@@ -418,8 +418,21 @@
             </div>
             <p style="font-size:11px; color:#94a3b8; margin-bottom:10px;">엑셀 파일의 첫 번째 행(헤더)을 컬럼명으로 자동 등록합니다. 불러온 뒤 "서식 변경 저장" 또는 "취합서식 확정"을 눌러야 실제로 반영됩니다.</p>
             <div id="columnDetailPanel"></div>
-            <h4 style="margin:16px 0 8px 0; font-size:13px; color:#334155;">📋 실시간 미리보기</h4>
-            <div id="columnLivePreview" style="font-size:12px; color:#64748b;"></div>
+
+            <h4 style="margin:16px 0 8px 0; font-size:13px; color:#334155;">📋 실시간 요약</h4>
+            <div id="columnLivePreview" style="font-size:12px; color:#64748b; margin-bottom:16px;"></div>
+
+            <h4 style="margin:16px 0 6px 0; font-size:13px; color:#334155;">🔍 기관 화면 미리보기 (실제와 동일하게 동작합니다)</h4>
+            <p class="grid-hint">아래는 기관이 실제로 보게 될 화면과 똑같이 동작하는 미리보기입니다. 목록선택 컬럼은 드롭다운으로 뜨고, <strong>동적목록도 실제로 상위 값을 선택하면 하위 목록이 바뀌는지 여기서 바로 테스트</strong>해볼 수 있습니다. (여기서 입력한 값은 저장되지 않는 연습용입니다.)</p>
+            <div class="q-card" style="background:#eff6ff; border-color:#bfdbfe; font-size:12px; line-height:1.6;">
+              <strong>💡 동적목록이 헷갈리신다면 이렇게 이해하시면 쉽습니다</strong><br/>
+              동적목록은 "상위 컬럼에서 고른 값에 따라, 하위 컬럼의 선택지가 자동으로 바뀌는 기능"입니다.<br/>
+              예) "시/도" 컬럼(고정목록: 충청남도, 서울특별시)을 먼저 만들고, 그 오른쪽에 "시/군/구" 컬럼을 동적목록으로 만들면서 상위 컬럼명에 "시/도"를 입력하고, 하위목록에 <code>충청남도:부여군,공주시,천안시</code> / <code>서울특별시:강남구,종로구</code> 처럼 입력합니다.<br/>
+              그러면 기관이 "시/도"에서 "충청남도"를 고르는 순간, "시/군/구" 목록이 부여군/공주시/천안시로만 자동으로 바뀝니다. 아래 미리보기에서 실제로 눌러서 확인해보세요.
+            </div>
+            <div id="columnPreviewWrap" style="max-height:280px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin:10px 0 16px 0;">
+              <div id="columnPreviewSpreadsheet"></div>
+            </div>
           </div>
         </div>
 
@@ -1307,7 +1320,7 @@
             columnConfigGrid.setValueFromCoords(newColIdx, 0, h, true);
             columnMetaByName[h] = { type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false, group: '' };
           });
-          renderColumnLivePreview();
+          renderColumnLivePreview(); renderColumnPreview();
           alert('컬럼이 추가되었습니다. 내용을 확인하신 뒤 "서식 변경 저장"을 눌러야 실제로 반영됩니다.');
         } catch (err) {
           console.error(err);
@@ -2166,16 +2179,16 @@
           renderColumnDetailPanel();
         },
         onchange: function () {
-          renderColumnLivePreview();
+          renderColumnLivePreview(); renderColumnPreview();
         },
-        oninsertcolumn: function () { renderColumnLivePreview(); },
-        ondeletecolumn: function () { renderColumnLivePreview(); }
+        oninsertcolumn: function () { renderColumnLivePreview(); renderColumnPreview(); },
+        ondeletecolumn: function () { renderColumnLivePreview(); renderColumnPreview(); }
       });
 
       columnConfigGrid = Array.isArray(created) ? created[0] : created;
       selectedColumnIndex = 0;
       renderColumnDetailPanel();
-      renderColumnLivePreview();
+      renderColumnLivePreview(); renderColumnPreview();
     }
 
     function renderColumnDetailPanel() {
@@ -2266,7 +2279,7 @@
       columnMetaByName[title] = meta;
 
       if (field === 'type' || field === 'mode') renderColumnDetailPanel();
-      renderColumnLivePreview();
+      renderColumnLivePreview(); renderColumnPreview();
     }
 
     // 현재 그리드 상태(저장 전) 기준으로 등록될 컬럼 목록을 실시간으로 보여줌
@@ -2293,8 +2306,103 @@
       el.innerHTML = items.length ? items.join('') : '<span style="color:#94a3b8;">헤더에 컬럼명을 입력하면 여기 실시간으로 표시됩니다.</span>';
     }
 
+    // 지금 편집 중(아직 저장 전)인 컬럼 설정을 읽어서, 저장 가능한 컬럼 배열로 변환 (미리보기용 - alert 없이 조용히 건너뜀)
+    function buildColsSilently() {
+      if (!columnConfigGrid) return [];
+      const colCount = columnConfigGrid.options.columns.length;
+      const cols = [];
+      for (let i = 0; i < colCount; i++) {
+        const name = getColumnName(i);
+        if (!name) continue;
+        const meta = columnMetaByName[name] || { type: 'text', mode: 'flat', options: [], dependsOn: '', optionsMap: {}, allowCustom: false, group: '' };
+        cols.push({
+          name, type: meta.type, mode: meta.mode || 'flat',
+          options: meta.options || [], dependsOn: meta.dependsOn || '',
+          optionsMap: meta.optionsMap || {}, allowCustom: !!meta.allowCustom, group: meta.group || ''
+        });
+      }
+      return cols;
+    }
+
+    let columnPreviewGrid = null; // 기관 화면과 동일하게 동작하는 실시간 미리보기용 jspreadsheet 인스턴스
+
+    // 지금 작성 중인(아직 저장 전) 컬럼 설정으로, 기관이 실제로 보게 될 화면과 동일한 미리보기를 그림
+    function renderColumnPreview() {
+      const container = document.getElementById('columnPreviewSpreadsheet');
+      if (!container) return;
+
+      const cols = buildColsSilently();
+      container.innerHTML = '';
+      columnPreviewGrid = null;
+
+      if (cols.length === 0) {
+        container.innerHTML = '<p style="padding:10px; font-size:12px; color:#94a3b8;">1행에 컬럼명을 입력하면 여기에 미리보기가 나타납니다.</p>';
+        return;
+      }
+
+      const columnDefs = buildJspreadsheetColumns(cols);
+      const initialData = Array.from({ length: 2 }, () => cols.map(() => ''));
+      const hasGroups = cols.some(c => (c.group || '').trim() !== '');
+
+      const options = {
+        data: initialData,
+        columns: columnDefs,
+        minDimensions: [cols.length, 2],
+        allowInsertRow: true,
+        allowDeleteRow: true,
+        allowInsertColumn: false,
+        allowDeleteColumn: false,
+        allowRenameColumn: false,
+        columnSorting: false,
+        tableOverflow: true,
+        autoIncrement: false,
+        onchange: function (instance, cell, x, y) {
+          updateDependentPreviewColumns(cols, parseInt(x, 10), parseInt(y, 10));
+        },
+        oneditionstart: function (instance, cell, x, y) {
+          prepareDependentPreviewColumn(cols, parseInt(x, 10), parseInt(y, 10));
+        }
+      };
+      if (hasGroups) options.nestedHeaders = buildNestedHeaders(cols);
+
+      const created = jspreadsheet(container, options);
+      columnPreviewGrid = Array.isArray(created) ? created[0] : created;
+    }
+
+    // 미리보기 그리드 전용 동적목록 연동 (실제 기관 화면의 updateDependentGridColumns와 동일한 동작을 미리보기에서 재현)
+    function updateDependentPreviewColumns(cols, changedColIdx, rowIdx) {
+      if (!columnPreviewGrid || isNaN(changedColIdx) || isNaN(rowIdx)) return;
+      const changedCol = cols[changedColIdx];
+      if (!changedCol) return;
+
+      cols.forEach((col, idx) => {
+        if (col.dependsOn !== changedCol.name) return;
+        const parentVal = columnPreviewGrid.getValueFromCoords(changedColIdx, rowIdx);
+        const childOptions = (col.optionsMap && col.optionsMap[parentVal]) || [];
+
+        columnPreviewGrid.options.columns[idx].source = childOptions;
+        const currentChildVal = columnPreviewGrid.getValueFromCoords(idx, rowIdx);
+        if (currentChildVal && childOptions.indexOf(currentChildVal) === -1) {
+          columnPreviewGrid.setValueFromCoords(idx, rowIdx, '', true);
+        }
+        updateDependentPreviewColumns(cols, idx, rowIdx);
+      });
+    }
+
+    function prepareDependentPreviewColumn(cols, colIdx, rowIdx) {
+      if (!columnPreviewGrid || isNaN(colIdx) || isNaN(rowIdx)) return;
+      const col = cols[colIdx];
+      if (!col || col.mode !== 'dependent') return;
+
+      const parentIdx = cols.findIndex(c => c.name === col.dependsOn);
+      if (parentIdx === -1) return;
+      const parentVal = columnPreviewGrid.getValueFromCoords(parentIdx, rowIdx);
+      const childOptions = (col.optionsMap && col.optionsMap[parentVal]) || [];
+      columnPreviewGrid.options.columns[colIdx].source = childOptions;
+    }
+
     function addColumnCell() {
-      if (columnConfigGrid && !columnsLocked) { columnConfigGrid.insertColumn(); renderColumnLivePreview(); }
+      if (columnConfigGrid && !columnsLocked) { columnConfigGrid.insertColumn(); renderColumnLivePreview(); renderColumnPreview(); }
     }
 
     function addColumnRow() {
@@ -2335,15 +2443,15 @@
           selectedColumnIndex = parseInt(x1, 10);
           renderColumnDetailPanel();
         },
-        onchange: function () { renderColumnLivePreview(); },
-        oninsertcolumn: function () { renderColumnLivePreview(); },
-        ondeletecolumn: function () { renderColumnLivePreview(); }
+        onchange: function () { renderColumnLivePreview(); renderColumnPreview(); },
+        oninsertcolumn: function () { renderColumnLivePreview(); renderColumnPreview(); },
+        ondeletecolumn: function () { renderColumnLivePreview(); renderColumnPreview(); }
       });
 
       columnConfigGrid = Array.isArray(created) ? created[0] : created;
       selectedColumnIndex = 0;
       renderColumnDetailPanel();
-      renderColumnLivePreview();
+      renderColumnLivePreview(); renderColumnPreview();
     }
 
     async function saveColumnConfig() {
