@@ -2208,16 +2208,28 @@
         const grid = meta.optionsMapGrid;
         const rowsHtml = grid.map((row, rIdx) => {
           const cellsHtml = row.map((val, cIdx) => {
-            const headerStyle = rIdx === 0 ? 'font-weight:bold; background:#eff6ff;' : '';
-            return `<td style="border:1px solid #cbd5e1; padding:0;"><input type="text" value="${(val || '').replace(/"/g, '&quot;')}" oninput="updateOptionsMapCell(${rIdx}, ${cIdx}, this.value)" placeholder="${rIdx === 0 ? '상위값' : '하위값'}" style="width:100%; min-width:90px; border:none; outline:none; padding:6px; font-size:12px; ${headerStyle}" /></td>`;
+            const isHeader = rIdx === 0;
+            const headerStyle = isHeader ? 'font-weight:bold; background:#eff6ff;' : '';
+            const colDeleteBtn = isHeader
+              ? `<button type="button" onclick="removeOptionsMapColumn(${cIdx})" title="이 상위값 열 삭제" style="border:none; background:transparent; color:#ef4444; cursor:pointer; font-size:11px; padding:0 4px;">✕</button>`
+              : '';
+            return `<td style="border:1px solid #cbd5e1; padding:0;">
+              <div style="display:flex; align-items:center;">
+                <input type="text" value="${(val || '').replace(/"/g, '&quot;')}" oninput="updateOptionsMapCell(${rIdx}, ${cIdx}, this.value)" placeholder="${isHeader ? '상위값' : '하위값'}" style="flex:1; min-width:70px; border:none; outline:none; padding:6px; font-size:12px; ${headerStyle}" />
+                ${colDeleteBtn}
+              </div>
+            </td>`;
           }).join('');
-          return `<tr>${cellsHtml}</tr>`;
+          const rowDeleteBtn = rIdx > 0
+            ? `<td style="border:1px solid #cbd5e1; text-align:center; padding:0 4px;"><button type="button" onclick="removeOptionsMapRow(${rIdx})" title="이 행 삭제" style="border:none; background:transparent; color:#ef4444; cursor:pointer; font-size:12px;">🗑️</button></td>`
+            : `<td style="border:1px solid #cbd5e1; background:#eff6ff;"></td>`;
+          return `<tr>${cellsHtml}${rowDeleteBtn}</tr>`;
         }).join('');
 
         optionsMapTableHtml = `
           <div class="form-group" style="margin-bottom:8px;">
             <label>하위목록</label>
-            <p style="font-size:11px; color:#94a3b8; margin:0 0 6px 0;">1행에 상위 값을 적고, 그 아래 칸에 해당하는 하위 항목을 한 줄씩 적으세요.</p>
+            <p style="font-size:11px; color:#94a3b8; margin:0 0 6px 0;">1행에 상위 값을 적고, 그 아래 칸에 해당하는 하위 항목을 한 줄씩 적으세요. 헤더의 ✕는 열 삭제, 각 행의 🗑️는 그 행 삭제입니다.</p>
             <div style="overflow-x:auto; border:1px solid #cbd5e1; border-radius:6px;">
               <table style="border-collapse:collapse; width:100%;"><tbody>${rowsHtml}</tbody></table>
             </div>
@@ -2334,6 +2346,32 @@
       const colCount = meta.optionsMapGrid[0] ? meta.optionsMapGrid[0].length : 2;
       meta.optionsMapGrid.push(Array(colCount).fill(''));
       renderColumnDetailPanel();
+    }
+
+    function removeOptionsMapColumn(colIdx) {
+      if (!columnConfigGrid || selectedColumnIndex === null) return;
+      const title = getColumnName(selectedColumnIndex);
+      const meta = columnMetaByName[title];
+      if (!meta || !meta.optionsMapGrid) return;
+      if (meta.optionsMapGrid[0].length <= 1) { alert('최소 1개의 상위값 열은 있어야 합니다.'); return; }
+
+      meta.optionsMapGrid.forEach(row => row.splice(colIdx, 1));
+      meta.optionsMap = rebuildOptionsMapFromGrid(meta.optionsMapGrid);
+      renderColumnDetailPanel();
+      renderColumnLivePreview(); renderColumnPreview();
+    }
+
+    function removeOptionsMapRow(rowIdx) {
+      if (!columnConfigGrid || selectedColumnIndex === null || rowIdx === 0) return;
+      const title = getColumnName(selectedColumnIndex);
+      const meta = columnMetaByName[title];
+      if (!meta || !meta.optionsMapGrid) return;
+      if (meta.optionsMapGrid.length <= 2) { alert('최소 1개의 하위값 행은 있어야 합니다.'); return; }
+
+      meta.optionsMapGrid.splice(rowIdx, 1);
+      meta.optionsMap = rebuildOptionsMapFromGrid(meta.optionsMapGrid);
+      renderColumnDetailPanel();
+      renderColumnLivePreview(); renderColumnPreview();
     }
 
     function updateSelectedColumnMeta(field, value) {
