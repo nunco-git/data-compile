@@ -2697,54 +2697,34 @@
         .concat(myQuestions.map(q => q.title))
         .concat(cols.map(c => c.name));
       const aoa = [header];
-      const hyperlinks = []; // { r, c, url } - aoa_to_sheet로 시트를 만든 뒤 별도로 붙여줄 하이퍼링크 목록
 
       cachedResponseDocs.forEach(res => {
-        // 각 질문 답변을 먼저 {text, url?} 형태로 만들어둠 (파일첨부는 파일명을 텍스트로, url은 링크로 연결)
-        const answerCells = myQuestions.map(q => {
+        const answerVals = myQuestions.map(q => {
           const raw = (res.answers && res.answers[q.id]) || '';
           if (q.type === 'file' && raw) {
             try {
               const parsed = JSON.parse(raw);
               const items = Array.isArray(parsed) ? parsed : [parsed];
-              const valid = items.filter(item => item && item.url);
-              if (valid.length === 0) return { text: raw };
-              const text = valid.map(v => v.name || v.url).join('\n');
-              return { text, url: valid[0].url }; // 여러 개면 파일명은 전부 표시, 링크는 첫 번째 파일로 연결
-            } catch (err) { return { text: raw }; }
+              const names = items.filter(item => item && item.url).map(item => item.name || item.url);
+              return names.length > 0 ? names.join('\n') : raw; // 파일명만 텍스트로 표시 (zip 일괄 다운로드로 실제 파일은 받음)
+            } catch (err) { return raw; }
           }
-          return { text: raw };
+          return raw;
         });
-
-        function pushRow(extraCells) {
-          const rowIndex = aoa.length; // 지금 aoa 길이가 곧 이 행이 들어갈 인덱스
-          aoa.push([res.agencyName, res.submittedAt].concat(answerCells.map(c => c.text)).concat(extraCells));
-          answerCells.forEach((c, i) => {
-            if (c.url) hyperlinks.push({ r: rowIndex, c: 2 + i, url: c.url, text: c.text });
-          });
-        }
 
         if (useExcel && Array.isArray(res.rows) && res.rows.length > 0) {
           res.rows.forEach(rowObj => {
             const rVals = (rowObj && Array.isArray(rowObj.cells)) ? rowObj.cells : [];
             const paddedRow = cols.map((c, i) => (rVals[i] !== undefined ? rVals[i] : ''));
-            pushRow(paddedRow);
+            aoa.push([res.agencyName, res.submittedAt].concat(answerVals).concat(paddedRow));
           });
         } else {
           const emptyRow = cols.map(() => '');
-          pushRow(emptyRow);
+          aoa.push([res.agencyName, res.submittedAt].concat(answerVals).concat(emptyRow));
         }
       });
 
       const ws = XLSX.utils.aoa_to_sheet(aoa);
-
-      // 파일첨부 칸에 실제 하이퍼링크 연결 (여러 파일이면 첫 번째 파일로 연결, 파일명은 전부 표시)
-      hyperlinks.forEach(h => {
-        const cellRef = XLSX.utils.encode_cell({ r: h.r, c: h.c });
-        if (!ws[cellRef]) ws[cellRef] = { t: 's', v: h.text };
-        ws[cellRef].l = { Target: h.url };
-      });
-
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '응답취합');
       const roundInfo = roundsList.find(r => r.id === viewingRoundId);
