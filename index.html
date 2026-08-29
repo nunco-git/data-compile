@@ -379,7 +379,7 @@
               <label>객관식 옵션 (쉼표 ','로 구분)</label>
               <input type="text" id="newQOptions" placeholder="예: 완료, 진행중, 미착수" />
             </div>
-            <p id="fileTypeHint" class="hidden" style="font-size:11px; color:#94a3b8; margin-top:-8px;">여러 장/개를 한 번에 선택할 수 있습니다. 사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다. <strong>첨부된 파일은 20일간만 저장되며, 이후 자동 삭제됩니다.</strong></p>
+            <p id="fileTypeHint" class="hidden" style="font-size:11px; color:#94a3b8; margin-top:-8px;">여러 장/개를 한 번에 선택할 수 있습니다 (원본 파일은 개당 100MB까지, 초과 시 업로드 불가). 사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다. <strong>첨부된 파일은 20일간만 저장되며, 이후 자동 삭제됩니다.</strong></p>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button type="button" class="btn btn-sm" id="addQuestionBtn" onclick="addQuestion()">질문 추가</button>
               <button type="button" class="btn btn-sm btn-excel" id="confirmQuestionsBtn" onclick="confirmQuestions()">🔒 취합서식 확정</button>
@@ -1565,7 +1565,7 @@
         } else if (q.type === 'file') {
           inputHtml = `
             <input type="file" name="q_${q.id}" accept="image/*,video/*" multiple onchange="handleFileQuestionChange(event, ${q.id})" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; background:#fff;" />
-            <p style="font-size:11px; color:#94a3b8; margin:6px 0 0 0;">여러 장/개를 한 번에 선택할 수 있습니다. 사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다.<br/><strong style="color:#b91c1c;">⚠️ 첨부된 파일은 20일 후 자동 삭제됩니다. 원본 파일은 반드시 별도로 보관해주세요.</strong></p>
+            <p style="font-size:11px; color:#94a3b8; margin:6px 0 0 0;">여러 장/개를 한 번에 선택할 수 있습니다 (원본 파일은 개당 100MB까지, <strong>초과 시 업로드 불가</strong>). 사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다.<br/><strong style="color:#b91c1c;">⚠️ 첨부된 파일은 20일 후 자동 삭제됩니다. 원본 파일은 반드시 별도로 보관해주세요.</strong></p>
             <p id="fileStatus_${q.id}" style="font-size:12px; margin-top:6px;"></p>
           `;
         }
@@ -1575,6 +1575,9 @@
     }
 
     // 파일 선택 즉시 압축/타임랩스 처리를 미리 해두고, 결과 File 객체를 보관 (제출 시 업로드만 하면 되도록)
+    const MAX_RAW_FILE_MB = 100;    // 이보다 큰 원본은 브라우저에서 처리 자체가 무리라 미리 막음
+    const MAX_UPLOAD_MB = 50;       // Storage 보안 규칙과 동일한 업로드 용량 한도
+
     async function handleFileQuestionChange(event, qId) {
       const files = Array.from(event.target.files || []);
       const statusEl = document.getElementById(`fileStatus_${qId}`);
@@ -1583,6 +1586,14 @@
       const invalid = files.find(f => !f.type.startsWith('image/') && !f.type.startsWith('video/'));
       if (invalid) {
         alert('사진 또는 동영상 파일만 첨부할 수 있습니다.');
+        event.target.value = '';
+        delete pendingFileAnswers[qId];
+        return;
+      }
+
+      const tooLarge = files.filter(f => f.size > MAX_RAW_FILE_MB * 1024 * 1024);
+      if (tooLarge.length > 0) {
+        alert(`다음 파일은 용량이 너무 커서(${MAX_RAW_FILE_MB}MB 초과) 브라우저에서 처리할 수 없습니다:\n${tooLarge.map(f => `- ${f.name} (${Math.round(f.size / 1024 / 1024)}MB)`).join('\n')}\n\n용량을 줄인 뒤 다시 첨부해주세요.`);
         event.target.value = '';
         delete pendingFileAnswers[qId];
         return;
@@ -1604,6 +1615,12 @@
             blob = result.blob;
             meta.isTimelapse = result.isTimelapse;
           }
+
+          if (blob.size > MAX_UPLOAD_MB * 1024 * 1024) {
+            if (statusEl) statusEl.innerText = `❌ (${file.name}) 처리 후에도 용량이 너무 커서(${Math.round(blob.size / 1024 / 1024)}MB) 업로드할 수 없습니다. (한도 ${MAX_UPLOAD_MB}MB)`;
+            continue; // 이 파일은 건너뛰고 나머지 계속 처리
+          }
+
           processed.push({ blob, name: file.name, type: file.type, ...meta });
         } catch (err) {
           console.error('파일 처리 오류:', err);
