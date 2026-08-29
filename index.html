@@ -379,7 +379,7 @@
               <label>객관식 옵션 (쉼표 ','로 구분)</label>
               <input type="text" id="newQOptions" placeholder="예: 완료, 진행중, 미착수" />
             </div>
-            <p id="fileTypeHint" class="hidden" style="font-size:11px; color:#94a3b8; margin-top:-8px;">여러 장/개를 한 번에 선택할 수 있습니다. 사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다.</p>
+            <p id="fileTypeHint" class="hidden" style="font-size:11px; color:#94a3b8; margin-top:-8px;">여러 장/개를 한 번에 선택할 수 있습니다. 사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다. <strong>첨부된 파일은 20일간만 저장되며, 이후 자동 삭제됩니다.</strong></p>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button type="button" class="btn btn-sm" id="addQuestionBtn" onclick="addQuestion()">질문 추가</button>
               <button type="button" class="btn btn-sm btn-excel" id="confirmQuestionsBtn" onclick="confirmQuestions()">🔒 취합서식 확정</button>
@@ -460,6 +460,7 @@
           <select id="roundSelector" onchange="switchViewingRound(this.value)" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;"></select>
           <button class="btn btn-danger btn-sm" onclick="deleteRound(viewingRoundId)">🗑️ 이 회차 삭제</button>
         </div>
+        <div class="status-banner error" style="text-align:left;">⚠️ 첨부된 사진·동영상은 <strong>제출 후 20일이 지나면 자동 삭제</strong>됩니다. 그 안에 반드시 아래 "일괄 다운로드"로 받아두세요.</div>
         <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap: wrap; align-items:center;">
           <button class="btn btn-excel btn-sm" onclick="exportToExcel()">📥 취합 응답 엑셀 다운로드 (.xlsx)</button>
           <button class="btn btn-secondary btn-sm" onclick="exportSchemaExcel()">📄 이 회차 서식(빈 양식) 다운로드</button>
@@ -1564,7 +1565,7 @@
         } else if (q.type === 'file') {
           inputHtml = `
             <input type="file" name="q_${q.id}" accept="image/*,video/*" multiple onchange="handleFileQuestionChange(event, ${q.id})" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; background:#fff;" />
-            <p style="font-size:11px; color:#94a3b8; margin:6px 0 0 0;">여러 장/개를 한 번에 선택할 수 있습니다. 사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다.</p>
+            <p style="font-size:11px; color:#94a3b8; margin:6px 0 0 0;">여러 장/개를 한 번에 선택할 수 있습니다. 사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다.<br/><strong style="color:#b91c1c;">⚠️ 첨부된 파일은 20일 후 자동 삭제됩니다. 원본 파일은 반드시 별도로 보관해주세요.</strong></p>
             <p id="fileStatus_${q.id}" style="font-size:12px; margin-top:6px;"></p>
           `;
         }
@@ -2043,6 +2044,15 @@
         .collection('rounds').doc(currentRoundId).update({ confirmedAt: currentUser.confirmedAt });
     }
 
+    // 확정 전 제출기한이 설정되어 있는지 검사. 없으면 경고를 띄우고 false 반환
+    function checkDeadlineBeforeConfirm() {
+      if (!currentUser.deadline) {
+        alert('제출기한이 설정되어 있지 않습니다. 먼저 "🗂️ 취합 회차 관리"에서 제출기한을 입력하고 저장한 뒤 확정해주세요.');
+        return false;
+      }
+      return true;
+    }
+
     async function confirmQuestions() {
       if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
       if (await roundHasResponses(currentRoundId)) {
@@ -2054,6 +2064,7 @@
         alert('먼저 질문을 최소 1개 이상 추가하세요.');
         return;
       }
+      if (!checkDeadlineBeforeConfirm()) return;
       if (!confirm('질문을 확정하시겠습니까? 확정 후에는 이 회차에서 질문을 수정할 수 없으며, 기관이 답변을 시작할 수 있게 됩니다.')) return;
 
       currentUser.questionsConfirmed = true;
@@ -2352,6 +2363,7 @@
       const cols = buildColumnsFromGrid();
       if (cols === null) return;
 
+      if (!checkDeadlineBeforeConfirm()) return;
       if (!confirm('컬럼 서식을 확정하시겠습니까? 확정 후에는 이 회차에서 컬럼 구성을 수정할 수 없으며, 기관이 제출을 시작할 수 있게 됩니다.')) return;
 
       currentUser.columns = cols;
@@ -2506,6 +2518,7 @@
         const hasAnyContent = data.some(row => row.some(v => (v || '').toString().trim() !== ''));
         if (!hasAnyContent) { alert('서식에 라벨을 하나 이상 입력하세요.'); return; }
 
+        if (!checkDeadlineBeforeConfirm()) return;
         if (!confirm('서식을 확정하시겠습니까? 확정 후에는 이 회차에서 서식을 수정할 수 없으며, 기관이 이 서식으로 제출을 시작할 수 있게 됩니다.')) return;
 
         const title = (document.getElementById('templateTitleInput').value || '').trim();
