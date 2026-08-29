@@ -18,6 +18,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 
   <style>
     * { box-sizing: border-box; }
@@ -221,9 +222,16 @@
       <div id="roundPickerSection" class="hidden">
         <div class="header">
           <h1>어떤 설문에 참여하시겠어요?</h1>
-          <p>현재 진행 중인 설문이 여러 개 있습니다. 하나를 선택해주세요.</p>
+          <p>현재 진행 중인 설문 목록입니다. 하나를 선택해주세요.</p>
         </div>
-        <div id="roundPickerList"></div>
+        <div style="overflow-x:auto;">
+          <table class="data-grid">
+            <thead>
+              <tr><th>설문 제목</th><th>확정일자</th><th>제출기한</th><th>제출여부</th><th></th></tr>
+            </thead>
+            <tbody id="roundPickerList"></tbody>
+          </table>
+        </div>
         <button class="btn btn-secondary" style="margin-top:12px;" onclick="cancelRoundPicker()">취소</button>
       </div>
     </div>
@@ -291,6 +299,14 @@
           <select id="editingRoundSelector" onchange="switchEditingRound(this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></select>
         </div>
 
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>제출기한 (선택, 기관 목록 화면에 표시됩니다)</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="date" id="roundDeadlineInput" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
+            <button type="button" class="btn btn-secondary btn-sm" onclick="saveRoundDeadline()">저장</button>
+          </div>
+        </div>
+
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="btn btn-sm" onclick="startNewRound()">➕ 새 회차 추가</button>
           <button class="btn btn-sm btn-danger" id="closeRoundBtn" onclick="closeCurrentEditingRound()">🔒 이 회차 종료</button>
@@ -355,12 +371,14 @@
               <select id="newQType" onchange="toggleOptionInput()">
                 <option value="text">주관식 (단답/장문)</option>
                 <option value="radio">객관식 (단일 선택)</option>
+                <option value="file">파일첨부 (사진/동영상)</option>
               </select>
             </div>
             <div class="form-group hidden" id="optionGroup">
               <label>객관식 옵션 (쉼표 ','로 구분)</label>
               <input type="text" id="newQOptions" placeholder="예: 완료, 진행중, 미착수" />
             </div>
+            <p id="fileTypeHint" class="hidden" style="font-size:11px; color:#94a3b8; margin-top:-8px;">사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다.</p>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button type="button" class="btn btn-sm" id="addQuestionBtn" onclick="addQuestion()">질문 추가</button>
               <button type="button" class="btn btn-sm btn-excel" id="confirmQuestionsBtn" onclick="confirmQuestions()">🔒 취합서식 확정</button>
@@ -491,6 +509,7 @@
 
     let db = null;
     let auth = null;
+    let storage = null;
     let googleProvider = null;
 
     try {
@@ -500,6 +519,7 @@
       firebase.initializeApp(firebaseConfig);
       db = firebase.firestore();
       auth = firebase.auth();
+      storage = firebase.storage();
       googleProvider = new firebase.auth.GoogleAuthProvider();
     } catch (err) {
       document.getElementById('dbStatusBanner').classList.remove('hidden');
@@ -536,6 +556,143 @@
     }
     function unwrapTemplateRows(wrapped) {
       return (wrapped || []).map(r => (r && Array.isArray(r.cells)) ? r.cells : (Array.isArray(r) ? r : []));
+    }
+
+    // ============================================================
+    // 사진/동영상 첨부: 압축 및 타임랩스 처리 (외부 라이브러리 없이 브라우저 기본 기능만 사용)
+    // ============================================================
+
+    function loadImageFromFile(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => { resolve(img); URL.revokeObjectURL(url); };
+        img.onerror = reject;
+        img.src = url;
+      });
+    }
+
+    function canvasToBlob(canvas, quality) {
+      return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+    }
+
+    // 사진: 긴 변 기준 최대 1600px로 축소 + 화질을 단계적으로 낮춰 목표 용량(기본 500KB) 이하로 압축
+    async function compressImageFile(file, maxSizeKB = 500, maxDim = 1600) {
+      const img = await loadImageFromFile(file);
+      let width = img.naturalWidth, height = img.naturalHeight;
+      if (width > maxDim || height > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+
+      let quality = 0.9;
+      let blob = await canvasToBlob(canvas, quality);
+      while (blob && blob.size > maxSizeKB * 1024 && quality > 0.3) {
+        quality -= 0.1;
+        blob = await canvasToBlob(canvas, quality);
+      }
+      return blob;
+    }
+
+    // 동영상: 기준 시간(기본 60초)보다 길면 빠르게 재생하며 녹화해 짧은 타임랩스로, 짧으면 해상도만 낮춰 압축
+    async function processVideoFile(file, options = {}) {
+      const { timelapseThresholdSec = 60, targetDurationSec = 20, maxWidth = 960 } = options;
+
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.src = URL.createObjectURL(file);
+
+      await new Promise((resolve, reject) => {
+        video.onloadedmetadata = resolve;
+        video.onerror = () => reject(new Error('동영상 정보를 읽을 수 없습니다.'));
+      });
+
+      const duration = video.duration || 0;
+      const isTimelapse = duration > timelapseThresholdSec;
+      const playbackRate = isTimelapse ? Math.min(16, Math.max(2, duration / targetDurationSec)) : 1;
+
+      const srcW = video.videoWidth || maxWidth;
+      const srcH = video.videoHeight || maxWidth;
+      const scale = Math.min(1, maxWidth / srcW);
+      const width = Math.max(2, Math.round(srcW * scale));
+      const height = Math.max(2, Math.round(srcH * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d');
+
+      if (typeof canvas.captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
+        throw new Error('이 브라우저는 동영상 처리 기능(captureStream/MediaRecorder)을 지원하지 않습니다.');
+      }
+
+      const stream = canvas.captureStream(30);
+      let recorder;
+      try {
+        recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 1200000 });
+      } catch (e) {
+        recorder = new MediaRecorder(stream);
+      }
+      const chunks = [];
+      recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+      const recordingStopped = new Promise(resolve => { recorder.onstop = resolve; });
+
+      let rafId = null;
+      function drawLoop() {
+        if (!video.paused && !video.ended) {
+          ctx.drawImage(video, 0, 0, width, height);
+          rafId = requestAnimationFrame(drawLoop);
+        }
+      }
+
+      video.playbackRate = playbackRate;
+      recorder.start(250);
+
+      const played = new Promise((resolve, reject) => {
+        video.onended = resolve;
+        video.onerror = () => reject(new Error('동영상 재생 중 오류가 발생했습니다.'));
+      });
+
+      await video.play();
+      drawLoop();
+      await played;
+
+      if (rafId) cancelAnimationFrame(rafId);
+      recorder.stop();
+      await recordingStopped;
+      URL.revokeObjectURL(video.src);
+
+      return { blob: new Blob(chunks, { type: 'video/webm' }), isTimelapse, originalDurationSec: Math.round(duration) };
+    }
+
+    // 첨부파일을 압축/타임랩스 처리 후 Firebase Storage에 업로드하고 다운로드 URL을 반환
+    async function processAndUploadAttachment(file, storagePath, onStatus) {
+      if (!storage) throw new Error('Firebase Storage가 설정되어 있지 않습니다.');
+
+      let blob = file;
+      let meta = { originalName: file.name, isTimelapse: false };
+
+      if (file.type.startsWith('image/')) {
+        if (onStatus) onStatus('사진 압축 중...');
+        blob = await compressImageFile(file);
+      } else if (file.type.startsWith('video/')) {
+        if (onStatus) onStatus('동영상 처리 중... (길이에 따라 시간이 걸릴 수 있습니다)');
+        const result = await processVideoFile(file);
+        blob = result.blob;
+        meta.isTimelapse = result.isTimelapse;
+        meta.originalDurationSec = result.originalDurationSec;
+      }
+
+      if (onStatus) onStatus('업로드 중...');
+      const ref = storage.ref().child(storagePath);
+      const snapshot = await ref.put(blob);
+      const url = await snapshot.ref.getDownloadURL();
+
+      return { url, ...meta, sizeKB: Math.round((blob.size || 0) / 1024) };
     }
 
     // 연속된 컬럼들이 같은 group 값을 가지면 상위 목차(병합 헤더)로 묶어서 2단 헤더를 만든다
@@ -808,6 +965,8 @@
           currentUser.templateConfirmed = !!rd.templateConfirmed;
           currentUser.questionsConfirmed = !!rd.questionsConfirmed;
           currentUser.columnsConfirmed = !!rd.columnsConfirmed;
+          currentUser.deadline = rd.deadline || '';
+          currentUser.confirmedAt = rd.confirmedAt || null;
           currentRoundId = currentUser.activeRoundId;
           return;
         }
@@ -828,6 +987,8 @@
         templateConfirmed: false,
         questionsConfirmed: false,
         columnsConfirmed: false,
+        deadline: '',
+        confirmedAt: null,
         status: 'open',
         createdAt: Date.now(),
         closedAt: null
@@ -846,6 +1007,8 @@
       currentUser.templateConfirmed = roundData.templateConfirmed;
       currentUser.questionsConfirmed = roundData.questionsConfirmed;
       currentUser.columnsConfirmed = roundData.columnsConfirmed;
+      currentUser.deadline = roundData.deadline;
+      currentUser.confirmedAt = roundData.confirmedAt;
       currentRoundId = roundRef.id;
     }
 
@@ -867,16 +1030,29 @@
         `<option value="${r.id}" ${r.id === currentRoundId ? 'selected' : ''}>${r.name}</option>`
       ).join('');
 
+      const deadlineInput = document.getElementById('roundDeadlineInput');
+      if (deadlineInput) deadlineInput.value = currentUser.deadline || '';
+
       const listEl = document.getElementById('openRoundsList');
       if (openRounds.length === 0) {
         listEl.innerHTML = '<span style="color:#94a3b8;">진행 중인 회차가 없습니다.</span>';
       } else {
         listEl.innerHTML = openRounds.map(r => `
           <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #fde68a;">
-            <span>${r.id === currentRoundId ? '✏️ ' : ''}<strong>${r.name}</strong></span>
+            <span>${r.id === currentRoundId ? '✏️ ' : ''}<strong>${r.name}</strong>${r.deadline ? ` <span style="color:#94a3b8;">(기한: ${r.deadline})</span>` : ''}</span>
           </div>
         `).join('');
       }
+    }
+
+    async function saveRoundDeadline() {
+      if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
+      const deadline = document.getElementById('roundDeadlineInput').value;
+      currentUser.deadline = deadline;
+      await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(currentRoundId).update({ deadline });
+      await loadRoundsList();
+      alert('제출기한이 저장되었습니다.');
     }
 
     function renderRoundSelector() {
@@ -907,6 +1083,10 @@
       currentUser.templateData = unwrapTemplateRows(rd.templateData);
       currentUser.templateTitle = rd.templateTitle || '';
       currentUser.templateConfirmed = !!rd.templateConfirmed;
+      currentUser.questionsConfirmed = !!rd.questionsConfirmed;
+      currentUser.columnsConfirmed = !!rd.columnsConfirmed;
+      currentUser.deadline = rd.deadline || '';
+      currentUser.confirmedAt = rd.confirmedAt || null;
 
       renderRoundManagementPanel();
       renderModeSelection();
@@ -937,6 +1117,8 @@
         templateConfirmed: false,
         questionsConfirmed: false,
         columnsConfirmed: false,
+        deadline: '',
+        confirmedAt: null,
         status: 'open',
         createdAt: Date.now(),
         closedAt: null
@@ -957,6 +1139,8 @@
       currentUser.templateConfirmed = false;
       currentUser.questionsConfirmed = false;
       currentUser.columnsConfirmed = false;
+      currentUser.deadline = '';
+      currentUser.confirmedAt = null;
 
       alert(`"${name}" 회차를 새로 추가했습니다. 기존에 진행 중이던 다른 회차는 그대로 열려 있습니다. 기관은 기존 접속 코드로 들어와서 진행 중인 설문 목록 중 이 회차를 선택하면 됩니다.`);
 
@@ -1219,17 +1403,51 @@
         // 진행 중인 설문이 여러 개면 선택 화면으로 (제출 후 이 목록으로 바로 돌아올 수 있도록 세션 정보 보관)
         pendingAgencyAccess = { managerUid, agencyCode, agencyName };
         lastAccessSession = { managerUid, agencyCode, agencyName, openRounds };
-        showRoundPicker(openRounds);
+        await showRoundPicker(openRounds, agencyName);
       } finally {
         btn.disabled = false; btn.innerText = '작성/제출 시작하기';
       }
     }
 
-    function showRoundPicker(openRounds) {
+    // 특정 기관이 특정 회차에 이미 제출했는지 여부(비밀번호 등 민감정보 없이 제출 여부만 기록된 공개 마커로 확인)
+    async function fetchSubmissionMarks() {
+      try {
+        const snap = await db.collection('system').doc('submission_status').get();
+        return snap.exists ? snap.data() : {};
+      } catch (err) {
+        console.error('제출여부 조회 오류:', err);
+        return {};
+      }
+    }
+
+    function formatDeadline(deadline) {
+      return deadline ? deadline : '-';
+    }
+
+    function formatConfirmedAt(ts) {
+      if (!ts) return '-';
+      const d = new Date(ts);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    async function showRoundPicker(openRounds, agencyName) {
+      const marks = await fetchSubmissionMarks();
       const listEl = document.getElementById('roundPickerList');
-      listEl.innerHTML = openRounds.map(r => `
-        <button type="button" class="btn" style="margin-bottom:8px;" onclick="selectRoundToAnswer('${r.id}')">${r.name}</button>
-      `).join('');
+
+      listEl.innerHTML = openRounds.map(r => {
+        const markKey = `${r.id}_${agencyName}`;
+        const submitted = !!marks[markKey];
+        return `
+          <tr>
+            <td>${r.name}</td>
+            <td>${formatConfirmedAt(r.confirmedAt)}</td>
+            <td>${formatDeadline(r.deadline)}</td>
+            <td>${submitted ? '✅ 제출완료' : '⬜ 미제출'}</td>
+            <td><button type="button" class="btn btn-sm" onclick="selectRoundToAnswer('${r.id}')">${submitted ? '다시 제출' : '참여하기'}</button></td>
+          </tr>
+        `;
+      }).join('');
+
       document.getElementById('formSurveyAccess').classList.add('hidden');
       document.getElementById('roundPickerSection').classList.remove('hidden');
       window.__openRoundsCache = openRounds;
@@ -1310,7 +1528,7 @@
           agencyCode: lastAccessSession.agencyCode,
           agencyName: lastAccessSession.agencyName
         };
-        showRoundPicker(lastAccessSession.openRounds);
+        showRoundPicker(lastAccessSession.openRounds, lastAccessSession.agencyName);
       } else {
         pendingAgencyAccess = null;
         document.getElementById('roundPickerSection').classList.add('hidden');
@@ -1319,10 +1537,13 @@
     }
 
     // --- (A) 자체 설문 로직 ---
+    let pendingFileAnswers = {}; // { [questionId]: { blob이 아니라 File, 처리결과 등 } } - 제출 시점에 업로드
+
     function renderCustomSurvey() {
       const container = document.getElementById('surveyQuestionsContainer');
       container.innerHTML = '';
       const myQuestions = activeSurveyInfo.questions || [];
+      pendingFileAnswers = {};
 
       if (myQuestions.length === 0) {
         container.innerHTML = '<p style="text-align:center; color:#64748b;">등록된 설문 질문이 없습니다.</p>';
@@ -1337,10 +1558,55 @@
           inputHtml = `<input type="text" name="q_${q.id}" placeholder="답변을 입력하세요" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />`;
         } else if (q.type === 'radio') {
           inputHtml = q.options.map(opt => `<label style="display:block; margin-bottom:4px;"><input type="radio" name="q_${q.id}" value="${opt}" required /> ${opt}</label>`).join('');
+        } else if (q.type === 'file') {
+          inputHtml = `
+            <input type="file" name="q_${q.id}" accept="image/*,video/*" onchange="handleFileQuestionChange(event, ${q.id})" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; background:#fff;" />
+            <p style="font-size:11px; color:#94a3b8; margin:6px 0 0 0;">사진은 자동으로 용량을 줄이고, 동영상은 길면(60초 초과) 짧은 타임랩스로, 짧으면 용량만 줄여서 첨부됩니다.</p>
+            <p id="fileStatus_${q.id}" style="font-size:12px; margin-top:6px;"></p>
+          `;
         }
         div.innerHTML = `<h4 style="margin:0 0 8px 0;">${q.title}</h4>${inputHtml}`;
         container.appendChild(div);
       });
+    }
+
+    // 파일 선택 즉시 압축/타임랩스 처리를 미리 해두고, 결과 File 객체를 보관 (제출 시 업로드만 하면 되도록)
+    async function handleFileQuestionChange(event, qId) {
+      const file = event.target.files[0];
+      const statusEl = document.getElementById(`fileStatus_${qId}`);
+      if (!file) { delete pendingFileAnswers[qId]; if (statusEl) statusEl.innerText = ''; return; }
+
+      if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+        alert('사진 또는 동영상 파일만 첨부할 수 있습니다.');
+        event.target.value = '';
+        return;
+      }
+
+      if (statusEl) statusEl.innerText = '⏳ 처리 중...';
+      try {
+        let blob = file;
+        let meta = { isTimelapse: false };
+        if (file.type.startsWith('image/')) {
+          if (statusEl) statusEl.innerText = '⏳ 사진 압축 중...';
+          blob = await compressImageFile(file);
+        } else {
+          if (statusEl) statusEl.innerText = '⏳ 동영상 처리 중... (다소 시간이 걸릴 수 있습니다)';
+          const result = await processVideoFile(file);
+          blob = result.blob;
+          meta.isTimelapse = result.isTimelapse;
+        }
+        pendingFileAnswers[qId] = { blob, name: file.name, type: file.type, ...meta };
+        const sizeKB = Math.round((blob.size || 0) / 1024);
+        if (statusEl) {
+          statusEl.innerText = meta.isTimelapse
+            ? `✅ 처리 완료 (타임랩스로 요약됨, 약 ${sizeKB}KB)`
+            : `✅ 처리 완료 (약 ${sizeKB}KB)`;
+        }
+      } catch (err) {
+        console.error('파일 처리 오류:', err);
+        if (statusEl) statusEl.innerText = '❌ 처리 중 오류가 발생했습니다: ' + err.message;
+        delete pendingFileAnswers[qId];
+      }
     }
 
     // --- (B) 엑셀 자료 입력: jspreadsheet-ce로 실제 엑셀처럼 셀 선택/드래그/붙여넣기 지원 ---
@@ -1530,7 +1796,27 @@
           const myQuestions = activeSurveyInfo.questions || [];
           const answers = {};
           const formData = new FormData(formEl);
-          myQuestions.forEach(q => { answers[q.id] = formData.get(`q_${q.id}`) || ''; });
+
+          for (const q of myQuestions) {
+            if (q.type === 'file') {
+              const pending = pendingFileAnswers[q.id];
+              if (pending) {
+                btn.innerText = '파일 업로드 중...';
+                const safeAgency = (activeSurveyInfo.agencyName || 'agency').replace(/[^\w가-힣-]/g, '_');
+                const ext = (pending.name.split('.').pop() || 'dat').toLowerCase();
+                const path = `managers/${activeSurveyInfo.managerId}/rounds/${activeSurveyInfo.roundId}/attachments/${Date.now()}_${safeAgency}_q${q.id}.${pending.type.startsWith('video/') ? 'webm' : ext}`;
+                const ref = storage.ref().child(path);
+                const snapshot = await ref.put(pending.blob);
+                const url = await snapshot.ref.getDownloadURL();
+                answers[q.id] = JSON.stringify({ url, isTimelapse: !!pending.isTimelapse, name: pending.name });
+                btn.innerText = '제출 처리 중...';
+              } else {
+                answers[q.id] = '';
+              }
+            } else {
+              answers[q.id] = formData.get(`q_${q.id}`) || '';
+            }
+          }
           responseObj.answers = answers;
         }
 
@@ -1565,6 +1851,16 @@
         await db.collection('managers').doc(activeSurveyInfo.managerId)
           .collection('rounds').doc(activeSurveyInfo.roundId)
           .collection('responses').add(responseObj);
+
+        // 제출 여부만 기록하는 공개 마커 (실제 응답 내용은 포함하지 않음) - 설문 목록 화면에서 "제출완료" 표시에 사용
+        try {
+          const markKey = `${activeSurveyInfo.roundId}_${activeSurveyInfo.agencyName}`;
+          await db.collection('system').doc('submission_status').set(
+            { [markKey]: true }, { merge: true }
+          );
+        } catch (markErr) {
+          console.error('제출여부 마커 기록 오류(제출 자체는 정상 처리됨):', markErr);
+        }
 
         alert('자료가 성공적으로 제출되었습니다!');
         exitSurvey();
@@ -1652,7 +1948,7 @@
         div.style.justifyContent = 'space-between';
         div.style.alignItems = 'center';
 
-        const info = q.type === 'radio' ? `(객관식: ${(q.options || []).join(', ')})` : '(주관식)';
+        const info = q.type === 'radio' ? `(객관식: ${(q.options || []).join(', ')})` : (q.type === 'file' ? '(파일첨부)' : '(주관식)');
         div.innerHTML = `
           <div><strong>${idx + 1}. ${q.title}</strong> <span style="font-size:12px; color:#64748b;">${info}</span></div>
           ${questionsLocked ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteQuestion(${q.id})">삭제</button>`}
@@ -1664,6 +1960,7 @@
     function toggleOptionInput() {
       const type = document.getElementById('newQType').value;
       document.getElementById('optionGroup').classList.toggle('hidden', type !== 'radio');
+      document.getElementById('fileTypeHint').classList.toggle('hidden', type !== 'file');
     }
 
     async function addQuestion() {
@@ -1705,6 +2002,14 @@
     }
 
     // 질문 확정: 이후 수정 불가, 기관이 이 질문에 답변을 시작할 수 있게 됨
+    // 이 회차가 처음 확정되는 순간의 시각을 한 번만 기록 (여러 유형 중 어느 것이 먼저 확정되든 동일하게 적용)
+    async function markRoundConfirmedIfNeeded() {
+      if (currentUser.confirmedAt) return;
+      currentUser.confirmedAt = Date.now();
+      await db.collection('managers').doc(currentUser.id)
+        .collection('rounds').doc(currentRoundId).update({ confirmedAt: currentUser.confirmedAt });
+    }
+
     async function confirmQuestions() {
       if (!currentRoundId) { alert('먼저 "새 회차 시작"으로 회차를 만들어주세요.'); return; }
       if (await roundHasResponses(currentRoundId)) {
@@ -1721,6 +2026,7 @@
       currentUser.questionsConfirmed = true;
       await db.collection('managers').doc(currentUser.id)
         .collection('rounds').doc(currentRoundId).update({ questionsConfirmed: true });
+      await markRoundConfirmedIfNeeded();
       renderManagerQuestions();
       alert('질문이 확정되었습니다. 이제 기관이 답변할 수 있습니다.');
     }
@@ -2019,6 +2325,7 @@
       currentUser.columnsConfirmed = true;
       await db.collection('managers').doc(currentUser.id)
         .collection('rounds').doc(currentRoundId).update({ columns: cols, columnsConfirmed: true });
+      await markRoundConfirmedIfNeeded();
       renderColumnConfigEditor();
       alert('컬럼 서식이 확정되었습니다. 이제 기관이 제출할 수 있습니다.');
     }
@@ -2176,6 +2483,7 @@
           .collection('rounds').doc(currentRoundId).update({
             templateData: wrapTemplateRows(data), templateTitle: title, templateConfirmed: true
           });
+        await markRoundConfirmedIfNeeded();
         await renderTemplateEditor();
         alert('서식이 확정되었습니다. 이제 기관이 제출할 수 있습니다.');
       } catch (err) {
@@ -2184,6 +2492,21 @@
       }
     }
 
+
+    // 파일첨부 문항의 답변(JSON 문자열)이면 다운로드 링크로, 그 외에는 텍스트 그대로 표시
+    function renderAnswerCellValue(q, val) {
+      if (!val) return '-';
+      if (q.type === 'file') {
+        try {
+          const parsed = JSON.parse(val);
+          if (parsed && parsed.url) {
+            const tag = parsed.isTimelapse ? ' (타임랩스)' : '';
+            return `<a href="${parsed.url}" target="_blank" rel="noopener">📎 ${parsed.name || '첨부파일'}${tag}</a>`;
+          }
+        } catch (err) { /* 파싱 실패 시 원문 그대로 표시 */ }
+      }
+      return val;
+    }
 
     function renderManagerResponses() {
       if (!currentUser || !viewingRoundMeta) return;
@@ -2207,7 +2530,7 @@
       cachedResponseDocs.forEach((res, resIdx) => {
         const answerCells = myQuestions.map(q => {
           const val = res.answers ? res.answers[q.id] : undefined;
-          return `<td>${val || '-'}</td>`;
+          return `<td>${renderAnswerCellValue(q, val)}</td>`;
         }).join('');
         const templateCell = useTemplate
           ? `<td>${res.templateAnswers ? `<button class="btn btn-secondary btn-sm" onclick="exportTemplateResponse(${resIdx})">📥 다운로드</button>` : '-'}</td>`
@@ -2257,7 +2580,16 @@
       const aoa = [header];
 
       cachedResponseDocs.forEach(res => {
-        const answerVals = myQuestions.map(q => (res.answers && res.answers[q.id]) || '');
+        const answerVals = myQuestions.map(q => {
+          const raw = (res.answers && res.answers[q.id]) || '';
+          if (q.type === 'file' && raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              return parsed && parsed.url ? parsed.url : raw;
+            } catch (err) { return raw; }
+          }
+          return raw;
+        });
 
         if (useExcel && Array.isArray(res.rows) && res.rows.length > 0) {
           res.rows.forEach(rowObj => {
