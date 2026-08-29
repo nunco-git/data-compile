@@ -423,13 +423,7 @@
             <div id="columnLivePreview" style="font-size:12px; color:#64748b; margin-bottom:16px;"></div>
 
             <h4 style="margin:16px 0 6px 0; font-size:13px; color:#334155;">🔍 기관 화면 미리보기 (실제와 동일하게 동작합니다)</h4>
-            <p class="grid-hint">아래는 기관이 실제로 보게 될 화면과 똑같이 동작하는 미리보기입니다. 목록선택 컬럼은 드롭다운으로 뜨고, <strong>동적목록도 실제로 상위 값을 선택하면 하위 목록이 바뀌는지 여기서 바로 테스트</strong>해볼 수 있습니다. (여기서 입력한 값은 저장되지 않는 연습용입니다.)</p>
-            <div class="q-card" style="background:#eff6ff; border-color:#bfdbfe; font-size:12px; line-height:1.6;">
-              <strong>💡 동적목록이 헷갈리신다면 이렇게 이해하시면 쉽습니다</strong><br/>
-              동적목록은 "상위 컬럼에서 고른 값에 따라, 하위 컬럼의 선택지가 자동으로 바뀌는 기능"입니다.<br/>
-              예) "시/도" 컬럼(고정목록: 충청남도, 서울특별시)을 먼저 만들고, 그 오른쪽에 "시/군/구" 컬럼을 동적목록으로 만들면서 상위 컬럼명에 "시/도"를 입력하고, 하위목록에 <code>충청남도:부여군,공주시,천안시</code> / <code>서울특별시:강남구,종로구</code> 처럼 입력합니다.<br/>
-              그러면 기관이 "시/도"에서 "충청남도"를 고르는 순간, "시/군/구" 목록이 부여군/공주시/천안시로만 자동으로 바뀝니다. 아래 미리보기에서 실제로 눌러서 확인해보세요.
-            </div>
+            <p class="grid-hint">아래는 기관이 실제로 보게 될 화면과 똑같이 동작하는 미리보기입니다. 동적목록도 실제로 상위 값을 선택하면 하위 목록이 바뀌는지 여기서 바로 테스트해볼 수 있습니다. (여기 입력한 값은 저장되지 않는 연습용입니다.)</p>
             <div id="columnPreviewWrap" style="max-height:280px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin:10px 0 16px 0;">
               <div id="columnPreviewSpreadsheet"></div>
             </div>
@@ -2207,7 +2201,33 @@
 
       const isSelect = meta.type === 'select';
       const isDependent = isSelect && meta.mode === 'dependent';
-      const optionsMapText = Object.entries(meta.optionsMap || {}).map(([k, v]) => `${k}:${(v || []).join(',')}`).join(';');
+
+      let optionsMapTableHtml = '';
+      if (isDependent) {
+        if (!meta.optionsMapGrid) meta.optionsMapGrid = initOptionsMapGridFromMap(meta.optionsMap);
+        const grid = meta.optionsMapGrid;
+        const rowsHtml = grid.map((row, rIdx) => {
+          const cellsHtml = row.map((val, cIdx) => {
+            const headerStyle = rIdx === 0 ? 'font-weight:bold; background:#eff6ff;' : '';
+            return `<td style="border:1px solid #cbd5e1; padding:0;"><input type="text" value="${(val || '').replace(/"/g, '&quot;')}" oninput="updateOptionsMapCell(${rIdx}, ${cIdx}, this.value)" placeholder="${rIdx === 0 ? '상위값' : '하위값'}" style="width:100%; min-width:90px; border:none; outline:none; padding:6px; font-size:12px; ${headerStyle}" /></td>`;
+          }).join('');
+          return `<tr>${cellsHtml}</tr>`;
+        }).join('');
+
+        optionsMapTableHtml = `
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>하위목록</label>
+            <p style="font-size:11px; color:#94a3b8; margin:0 0 6px 0;">1행에 상위 값을 적고, 그 아래 칸에 해당하는 하위 항목을 한 줄씩 적으세요.</p>
+            <div style="overflow-x:auto; border:1px solid #cbd5e1; border-radius:6px;">
+              <table style="border-collapse:collapse; width:100%;"><tbody>${rowsHtml}</tbody></table>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:6px;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="addOptionsMapColumn()">+ 상위값 추가</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="addOptionsMapRow()">+ 하위값 추가</button>
+            </div>
+          </div>
+        `;
+      }
 
       panel.innerHTML = `
         <div class="q-card" style="background:#f8fafc;">
@@ -2241,10 +2261,7 @@
                 <label>상위 컬럼명</label>
                 <input type="text" value="${meta.dependsOn || ''}" placeholder="예: 시/도 (이 컬럼보다 왼쪽에 있어야 함)" oninput="updateSelectedColumnMeta('dependsOn', this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
               </div>
-              <div class="form-group" style="margin-bottom:8px;">
-                <label>하위목록 (부모값:하위1,하위2;부모값2:하위3)</label>
-                <textarea rows="2" oninput="updateSelectedColumnMeta('optionsMapRaw', this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px; width:100%; font-family:inherit;">${optionsMapText}</textarea>
-              </div>
+              ${optionsMapTableHtml}
             `}
             <label style="display:flex; align-items:center; gap:5px; font-size:12px; color:#334155;">
               <input type="checkbox" ${meta.allowCustom ? 'checked' : ''} onchange="updateSelectedColumnMeta('allowCustom', this.checked)" />
@@ -2255,6 +2272,70 @@
       `;
     }
 
+    // optionsMap 객체({부모값: [하위값...]})를 표(2차원 배열, 1행=상위값)로 변환
+    function initOptionsMapGridFromMap(optionsMap) {
+      const parents = Object.keys(optionsMap || {});
+      if (parents.length === 0) return [['', ''], ['', ''], ['', '']];
+      const maxChildren = Math.max(1, ...parents.map(p => (optionsMap[p] || []).length));
+      const grid = [parents.slice()];
+      for (let r = 0; r < maxChildren; r++) {
+        grid.push(parents.map(p => (optionsMap[p] && optionsMap[p][r]) || ''));
+      }
+      return grid;
+    }
+
+    // 표(2차원 배열)를 다시 optionsMap 객체로 변환 (빈 상위값/하위값은 건너뜀)
+    function rebuildOptionsMapFromGrid(grid) {
+      const map = {};
+      if (!grid || grid.length === 0) return map;
+      const headers = grid[0];
+      headers.forEach((parentVal, colIdx) => {
+        const pv = (parentVal || '').trim();
+        if (!pv) return;
+        const children = [];
+        for (let r = 1; r < grid.length; r++) {
+          const v = ((grid[r] && grid[r][colIdx]) || '').trim();
+          if (v) children.push(v);
+        }
+        if (children.length > 0) map[pv] = children;
+      });
+      return map;
+    }
+
+    function updateOptionsMapCell(rowIdx, colIdx, value) {
+      if (!columnConfigGrid || selectedColumnIndex === null) return;
+      const title = getColumnName(selectedColumnIndex);
+      if (!title) return;
+      const meta = columnMetaByName[title];
+      if (!meta || !meta.optionsMapGrid) return;
+
+      while (meta.optionsMapGrid.length <= rowIdx) {
+        meta.optionsMapGrid.push(meta.optionsMapGrid[0].map(() => ''));
+      }
+      meta.optionsMapGrid[rowIdx][colIdx] = value;
+      meta.optionsMap = rebuildOptionsMapFromGrid(meta.optionsMapGrid);
+      renderColumnLivePreview(); renderColumnPreview();
+    }
+
+    function addOptionsMapColumn() {
+      if (!columnConfigGrid || selectedColumnIndex === null) return;
+      const title = getColumnName(selectedColumnIndex);
+      const meta = columnMetaByName[title];
+      if (!meta || !meta.optionsMapGrid) return;
+      meta.optionsMapGrid.forEach(row => row.push(''));
+      renderColumnDetailPanel();
+    }
+
+    function addOptionsMapRow() {
+      if (!columnConfigGrid || selectedColumnIndex === null) return;
+      const title = getColumnName(selectedColumnIndex);
+      const meta = columnMetaByName[title];
+      if (!meta || !meta.optionsMapGrid) return;
+      const colCount = meta.optionsMapGrid[0] ? meta.optionsMapGrid[0].length : 2;
+      meta.optionsMapGrid.push(Array(colCount).fill(''));
+      renderColumnDetailPanel();
+    }
+
     function updateSelectedColumnMeta(field, value) {
       if (!columnConfigGrid || selectedColumnIndex === null) return;
       const title = getColumnName(selectedColumnIndex);
@@ -2263,16 +2344,6 @@
 
       if (field === 'optionsRaw') {
         meta.options = value.split(',').map(s => s.trim()).filter(s => s);
-      } else if (field === 'optionsMapRaw') {
-        const map = {};
-        value.split(';').forEach(g => {
-          const idx = g.indexOf(':');
-          if (idx === -1) return;
-          const k = g.slice(0, idx).trim();
-          const children = g.slice(idx + 1).split(',').map(s => s.trim()).filter(s => s);
-          if (k && children.length > 0) map[k] = children;
-        });
-        meta.optionsMap = map;
       } else {
         meta[field] = value;
       }
@@ -2327,7 +2398,18 @@
     let columnPreviewGrid = null; // 기관 화면과 동일하게 동작하는 실시간 미리보기용 jspreadsheet 인스턴스
 
     // 지금 작성 중인(아직 저장 전) 컬럼 설정으로, 기관이 실제로 보게 될 화면과 동일한 미리보기를 그림
+    let columnPreviewDebounceTimer = null;
+
+    // 실제 재생성은 살짝 지연시켜서 실행 - 셀 입력 중 매번 표 전체를 새로 만들지 않도록 함(반응속도 개선)
     function renderColumnPreview() {
+      if (columnPreviewDebounceTimer) clearTimeout(columnPreviewDebounceTimer);
+      columnPreviewDebounceTimer = setTimeout(() => {
+        columnPreviewDebounceTimer = null;
+        renderColumnPreviewNow();
+      }, 250);
+    }
+
+    function renderColumnPreviewNow() {
       const container = document.getElementById('columnPreviewSpreadsheet');
       if (!container) return;
 
