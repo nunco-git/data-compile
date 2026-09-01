@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>통합 기관 자료 취합 및 설문 시스템</title>
+  <title>스마트 자료 취합 시스템</title>
 
   <!-- SheetJS (엑셀 다운로드) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -39,6 +39,60 @@
     .container.container-wide { max-width: 1400px; }
 
     .header { text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 16px; margin-bottom: 20px; }
+    .header.header-hero {
+      background: linear-gradient(160deg, #fff7ed 0%, #ffedd5 100%);
+      border: 1px solid #fed7aa;
+      border-bottom: 1px solid #fed7aa;
+      border-radius: 14px;
+      padding: 28px 20px;
+      margin-bottom: 22px;
+      box-shadow: 0 1px 3px rgba(194,65,12,0.06);
+    }
+    .header.header-hero .hero-icon { font-size: 2.4rem; line-height: 1; margin-bottom: 8px; filter: drop-shadow(0 1px 1px rgba(194,65,12,0.15)); }
+    .header.header-hero h1 { color: #9a3412; font-size: 24px; font-weight: 800; margin: 0 0 10px 0; letter-spacing: -0.3px; }
+    .header.header-hero p { color: #78350f; opacity: 0.85; font-size: 13px; margin: 0; }
+    .header.header-hero .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 12.5px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 999px;
+      box-shadow: 0 1px 2px rgba(22,101,52,0.08);
+    }
+
+    .security-banner {
+      background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%);
+      border: 1px solid #bbf7d0;
+      border-radius: 14px;
+      padding: 16px 18px;
+      color: #166534;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.5;
+      margin-top: 20px;
+      box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04), 0 1px 2px rgba(16, 24, 40, 0.03);
+    }
+    .security-banner strong { font-size: 14.5px; display: block; margin-bottom: 10px; color: #15803d; letter-spacing: -0.2px; }
+    .security-features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    .security-features li {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255, 255, 255, 0.55);
+      border: 1px solid rgba(187, 247, 208, 0.7);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 12.5px;
+    }
+    .security-features .feat-icon {
+      flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+      background: #16a34a; color: white; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.25);
+    }
+    .security-features strong { display: inline; font-size: 12.5px; margin: 0; color: #14532d; }
+    .security-features .feat-desc { color: #15803d; font-weight: 700; }
     .header h1 { font-size: 22px; color: #0f172a; margin: 0 0 6px 0; }
     .header p { color: #64748b; font-size: 13px; margin: 0; }
 
@@ -160,9 +214,10 @@
 
     <!-- 1. 메인 로그인 / 회원가입 / 기관 접속 -->
     <div id="viewLogin" class="card">
-      <div class="header">
-        <h1>통합 기관 자료 취합 시스템</h1>
-        <p>담당자는 Google 계정으로 로그인하고, 기관은 접속 코드로 참여합니다.</p>
+      <div class="header header-hero">
+        <div class="hero-icon">📋</div>
+        <h1>스마트 자료 취합 시스템</h1>
+        <span class="hero-badge">📥 기관 자료 입력 시, 정리된 엑셀 자료 바로 다운로드 가능</span>
       </div>
 
       <div class="tabs" style="justify-content: center;">
@@ -218,6 +273,17 @@
         </div>
         <button type="submit" class="btn">작성/제출 시작하기</button>
       </form>
+
+      <div class="security-banner">
+        <strong>📋 스마트 자료 취합 시스템 안내</strong>
+        <ul class="security-features">
+          <li><span class="feat-icon">👤</span><span><strong>담당자</strong> <span class="feat-desc">: Google 계정으로 로그인, 취합문항 작성</span></span></li>
+          <li><span class="feat-icon">🏢</span><span><strong>기관</strong> <span class="feat-desc">: 접속 코드로 참여, 문항 작성 및 파일 제출</span></span></li>
+          <li><span class="feat-icon">✏️</span><span><strong>다양한 문항 유형</strong> <span class="feat-desc">: 단답형·객관식·목록형(고정목록/동적목록) 지원</span></span></li>
+          <li><span class="feat-icon">📊</span><span><strong>엑셀 서식 그대로 입력</strong> <span class="feat-desc">: 기존에 쓰던 엑셀 양식 그대로 붙여넣어 제출 가능</span></span></li>
+          <li><span class="feat-icon">📎</span><span><strong>사진·동영상·파일 첨부</strong> <span class="feat-desc">: 파일 형태로 제출 가능</span></span></li>
+        </ul>
+      </div>
 
       <!-- 진행 중인 설문이 여럿일 때 고르는 화면 -->
       <div id="roundPickerSection" class="hidden">
