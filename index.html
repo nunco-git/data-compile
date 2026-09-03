@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>스마트 자료 취합 시스템</title>
+  <title>통합 기관 자료 취합 및 설문 시스템</title>
 
   <!-- SheetJS (엑셀 다운로드) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -39,60 +39,6 @@
     .container.container-wide { max-width: 1400px; }
 
     .header { text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 16px; margin-bottom: 20px; }
-    .header.header-hero {
-      background: linear-gradient(160deg, #fff7ed 0%, #ffedd5 100%);
-      border: 1px solid #fed7aa;
-      border-bottom: 1px solid #fed7aa;
-      border-radius: 14px;
-      padding: 28px 20px;
-      margin-bottom: 22px;
-      box-shadow: 0 1px 3px rgba(194,65,12,0.06);
-    }
-    .header.header-hero .hero-icon { font-size: 2.4rem; line-height: 1; margin-bottom: 8px; filter: drop-shadow(0 1px 1px rgba(194,65,12,0.15)); }
-    .header.header-hero h1 { color: #9a3412; font-size: 24px; font-weight: 800; margin: 0 0 10px 0; letter-spacing: -0.3px; }
-    .header.header-hero p { color: #78350f; opacity: 0.85; font-size: 13px; margin: 0; }
-    .header.header-hero .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #dcfce7;
-      color: #166534;
-      font-size: 12.5px;
-      font-weight: 700;
-      padding: 6px 14px;
-      border-radius: 999px;
-      box-shadow: 0 1px 2px rgba(22,101,52,0.08);
-    }
-
-    .security-banner {
-      background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%);
-      border: 1px solid #bbf7d0;
-      border-radius: 14px;
-      padding: 16px 18px;
-      color: #166534;
-      font-size: 14px;
-      font-weight: 700;
-      line-height: 1.5;
-      margin-top: 20px;
-      box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04), 0 1px 2px rgba(16, 24, 40, 0.03);
-    }
-    .security-banner strong { font-size: 14.5px; display: block; margin-bottom: 10px; color: #15803d; letter-spacing: -0.2px; }
-    .security-features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-    .security-features li {
-      display: flex; align-items: center; gap: 10px;
-      background: rgba(255, 255, 255, 0.55);
-      border: 1px solid rgba(187, 247, 208, 0.7);
-      border-radius: 10px;
-      padding: 8px 12px;
-      font-size: 12.5px;
-    }
-    .security-features .feat-icon {
-      flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
-      background: #16a34a; color: white; display: flex; align-items: center; justify-content: center;
-      font-size: 12px; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.25);
-    }
-    .security-features strong { display: inline; font-size: 12.5px; margin: 0; color: #14532d; }
-    .security-features .feat-desc { color: #15803d; font-weight: 700; }
     .header h1 { font-size: 22px; color: #0f172a; margin: 0 0 6px 0; }
     .header p { color: #64748b; font-size: 13px; margin: 0; }
 
@@ -214,10 +160,9 @@
 
     <!-- 1. 메인 로그인 / 회원가입 / 기관 접속 -->
     <div id="viewLogin" class="card">
-      <div class="header header-hero">
-        <div class="hero-icon">📋</div>
-        <h1>스마트 자료 취합 시스템</h1>
-        <span class="hero-badge">📥 기관 자료 입력 시, 정리된 엑셀 자료 바로 다운로드 가능</span>
+      <div class="header">
+        <h1>통합 기관 자료 취합 시스템</h1>
+        <p>담당자는 Google 계정으로 로그인하고, 기관은 접속 코드로 참여합니다.</p>
       </div>
 
       <div class="tabs" style="justify-content: center;">
@@ -274,17 +219,6 @@
         <button type="submit" class="btn">작성/제출 시작하기</button>
       </form>
 
-      <div class="security-banner">
-        <strong>📋 스마트 자료 취합 시스템 안내</strong>
-        <ul class="security-features">
-          <li><span class="feat-icon">👤</span><span><strong>담당자</strong> <span class="feat-desc">: Google 계정으로 로그인, 취합문항 작성</span></span></li>
-          <li><span class="feat-icon">🏢</span><span><strong>기관</strong> <span class="feat-desc">: 접속 코드로 참여, 문항 작성 및 파일 제출</span></span></li>
-          <li><span class="feat-icon">✏️</span><span><strong>다양한 문항 유형</strong> <span class="feat-desc">: 단답형·객관식·목록형(고정목록/동적목록) 지원</span></span></li>
-          <li><span class="feat-icon">📊</span><span><strong>엑셀 서식 그대로 입력</strong> <span class="feat-desc">: 기존에 쓰던 엑셀 양식 그대로 붙여넣어 제출 가능</span></span></li>
-          <li><span class="feat-icon">📎</span><span><strong>사진·동영상·파일 첨부</strong> <span class="feat-desc">: 파일 형태로 제출 가능</span></span></li>
-        </ul>
-      </div>
-
       <!-- 진행 중인 설문이 여럿일 때 고르는 화면 -->
       <div id="roundPickerSection" class="hidden">
         <div class="header">
@@ -335,7 +269,11 @@
 
         <div id="templateFillSection" class="hidden">
           <div class="section-heading" id="templateFillTitle">📐 서식 작성</div>
-          <p class="grid-hint">회색으로 표시된 칸은 고정된 항목이며, 흰색 빈칸에만 내용을 입력할 수 있습니다. 필요하면 아래쪽에 행을 추가해서 더 입력할 수 있습니다.</p>
+          <p class="grid-hint">회색으로 표시된 칸은 고정된 항목이며, 흰색 빈칸에만 내용을 입력할 수 있습니다. 필요하면 아래쪽에 행을 추가해서 더 입력할 수 있습니다.<br/><strong style="color:#b91c1c;">⚠️ 표가 화면보다 넓을 수 있습니다. 오른쪽에 더 입력할 칸이 있을 수 있으니, 아래 버튼이나 표를 좌우로 스크롤해서 끝까지 확인하며 작성해주세요.</strong></p>
+          <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <button type="button" class="btn" style="width:auto; padding:10px 20px; font-size:15px;" onclick="scrollTemplateFill(-1)">◀ 왼쪽으로 스크롤</button>
+            <button type="button" class="btn" style="width:auto; padding:10px 20px; font-size:15px;" onclick="scrollTemplateFill(1)">오른쪽으로 스크롤 ▶</button>
+          </div>
           <div id="templateFillWrap" style="max-height:480px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
             <div id="templateFillSpreadsheet"></div>
           </div>
@@ -1781,6 +1719,13 @@
       }
     }
 
+    // 서식 표를 버튼으로 좌우 스크롤 (direction: -1=왼쪽, 1=오른쪽)
+    function scrollTemplateFill(direction) {
+      const wrap = document.getElementById('templateFillWrap');
+      if (!wrap) return;
+      wrap.scrollBy({ left: direction * 320, behavior: 'smooth' });
+    }
+
     function buildJspreadsheetColumns(cols) {
       return cols.map(col => {
         if (col.type === 'select') {
@@ -3008,18 +2953,47 @@
       }
     }
 
+    // 자유서식의 빈칸 위치에 이름을 붙임: 같은 행에서 왼쪽으로 가장 가까운 라벨, 없으면 같은 열에서 위쪽으로 가장 가까운 라벨 사용
+    function getTemplateColumnLabel(templateData, r, c) {
+      const row = templateData[r] || [];
+      for (let cc = c - 1; cc >= 0; cc--) {
+        const v = (row[cc] || '').toString().trim();
+        if (v !== '') return v;
+      }
+      for (let rr = r - 1; rr >= 0; rr--) {
+        const v = ((templateData[rr] && templateData[rr][c]) || '').toString().trim();
+        if (v !== '') return v;
+      }
+      return `빈칸(${r + 1}행,${c + 1}열)`;
+    }
+
     function exportToExcel() {
       if (cachedResponseDocs.length === 0) { alert('다운로드할 취합 데이터가 없습니다.'); return; }
       if (!viewingRoundMeta) { alert('회차 정보를 불러오지 못했습니다.'); return; }
 
       const useSurvey = !!viewingRoundMeta.useSurvey;
       const useExcel = !!viewingRoundMeta.useExcel;
+      const useTemplate = !!viewingRoundMeta.useTemplate;
       const myQuestions = useSurvey ? (viewingRoundMeta.questions || []) : [];
       const cols = useExcel ? (viewingRoundMeta.columns || []) : [];
 
+      // 자유서식은 칸 배치가 자유로워서, 빈칸(기관이 입력하는 칸)마다 근처 라벨을 컬럼명으로 삼아 표로 펼침
+      const templateData = useTemplate ? (viewingRoundMeta.templateData || []) : [];
+      const blankPositions = [];
+      if (useTemplate) {
+        templateData.forEach((row, r) => {
+          row.forEach((val, c) => {
+            if ((val || '').toString().trim() === '') {
+              blankPositions.push({ r, c, label: getTemplateColumnLabel(templateData, r, c) });
+            }
+          });
+        });
+      }
+
       const header = ['제출 기관명', '제출일시']
         .concat(myQuestions.map(q => q.title))
-        .concat(cols.map(c => c.name));
+        .concat(cols.map(c => c.name))
+        .concat(blankPositions.map(p => p.label));
       const aoa = [header];
 
       cachedResponseDocs.forEach(res => {
@@ -3036,15 +3010,21 @@
           return raw;
         });
 
+        const templateVals = blankPositions.map(p => {
+          const rowObj = res.templateAnswers && res.templateAnswers[p.r];
+          const cells = rowObj && Array.isArray(rowObj.cells) ? rowObj.cells : null;
+          return cells && cells[p.c] !== undefined ? cells[p.c] : '';
+        });
+
         if (useExcel && Array.isArray(res.rows) && res.rows.length > 0) {
           res.rows.forEach(rowObj => {
             const rVals = (rowObj && Array.isArray(rowObj.cells)) ? rowObj.cells : [];
             const paddedRow = cols.map((c, i) => (rVals[i] !== undefined ? rVals[i] : ''));
-            aoa.push([res.agencyName, res.submittedAt].concat(answerVals).concat(paddedRow));
+            aoa.push([res.agencyName, res.submittedAt].concat(answerVals).concat(paddedRow).concat(templateVals));
           });
         } else {
           const emptyRow = cols.map(() => '');
-          aoa.push([res.agencyName, res.submittedAt].concat(answerVals).concat(emptyRow));
+          aoa.push([res.agencyName, res.submittedAt].concat(answerVals).concat(emptyRow).concat(templateVals));
         }
       });
 
