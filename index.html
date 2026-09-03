@@ -582,20 +582,20 @@
 
     // 자유서식 "시트"(엑셀 워크북의 탭과 같은 개념) 관련 헬퍼
     function newTemplateSheet(name) {
-      return { name: name || '시트1', data: Array.from({ length: 6 }, () => Array(8).fill('')) };
+      return { name: name || '시트1', data: Array.from({ length: 6 }, () => Array(8).fill('')), colWidths: Array(8).fill(120) };
     }
     function wrapTemplateSheets(sheets) {
-      return (sheets || []).map(s => ({ name: s.name || '시트', data: wrapTemplateRows(s.data) }));
+      return (sheets || []).map(s => ({ name: s.name || '시트', data: wrapTemplateRows(s.data), colWidths: s.colWidths || [] }));
     }
     function unwrapTemplateSheets(wrapped) {
-      const arr = (wrapped || []).map(s => ({ name: s.name || '시트', data: unwrapTemplateRows(s.data) }));
+      const arr = (wrapped || []).map(s => ({ name: s.name || '시트', data: unwrapTemplateRows(s.data), colWidths: s.colWidths || [] }));
       return arr.length > 0 ? arr : [newTemplateSheet('시트1')];
     }
     // 구버전(시트 개념이 없던 단일 템플릿) 데이터를 읽어올 때 자동으로 "시트1"짜리 배열로 변환
     function migrateRoundToTemplateSheets(rd) {
       if (rd.templateSheets && rd.templateSheets.length > 0) return unwrapTemplateSheets(rd.templateSheets);
       const data = unwrapTemplateRows(rd.templateData);
-      return [{ name: rd.templateTitle || '시트1', data: (data && data.length) ? data : newTemplateSheet().data }];
+      return [{ name: rd.templateTitle || '시트1', data: (data && data.length) ? data : newTemplateSheet().data, colWidths: [] }];
     }
 
     // ============================================================
@@ -1740,7 +1740,8 @@
       container.innerHTML = '';
 
       const colCount = templateData[0] ? templateData[0].length : 1;
-      const columnDefs = Array.from({ length: colCount }, () => ({ type: 'text', width: 120 }));
+      const savedWidths = sheets[templateFillSheetIndex].colWidths || [];
+      const columnDefs = Array.from({ length: colCount }, (_, i) => ({ type: 'text', width: savedWidths[i] || 120 }));
       // 맨 오른쪽 실제 열이 잘리는 문제를 우회하기 위해, 입력 불가능한 여유 열을 하나 더 붙인다
       columnDefs.push({ type: 'text', title: '', width: 24, readOnly: true });
       const initialData = workingData.map(row => row.slice(0, colCount).concat(['']));
@@ -2748,10 +2749,21 @@
     let templateLocked = false;
     let currentTemplateSheetIndex = 0;
 
-    // 지금 화면의 jspreadsheet 내용을 currentUser.templateSheets[currentTemplateSheetIndex]에 반영
+    // 지금 화면의 jspreadsheet 내용(값 + 열 너비)을 currentUser.templateSheets[currentTemplateSheetIndex]에 반영
     function captureCurrentTemplateSheet() {
       if (!templateGrid || !currentUser.templateSheets || !currentUser.templateSheets[currentTemplateSheetIndex]) return;
       currentUser.templateSheets[currentTemplateSheetIndex].data = templateGrid.getData();
+      try {
+        const colCount = templateGrid.options.columns.length;
+        const widths = [];
+        for (let i = 0; i < colCount; i++) {
+          const w = templateGrid.getWidth ? templateGrid.getWidth(i) : (templateGrid.options.columns[i] && templateGrid.options.columns[i].width);
+          widths.push(w || 120);
+        }
+        currentUser.templateSheets[currentTemplateSheetIndex].colWidths = widths;
+      } catch (err) {
+        console.error('[진단] 열 너비 저장 오류(값 저장에는 영향 없음):', err);
+      }
     }
 
     function renderTemplateSheetTabs() {
@@ -2809,7 +2821,8 @@
       const saved = (sheet && sheet.data && sheet.data.length) ? sheet.data : Array.from({ length: 6 }, () => Array(8).fill(''));
 
       const colCount = saved[0] ? saved[0].length : 8;
-      const columnDefs = Array.from({ length: colCount }, () => ({ type: 'text', width: 120, readOnly: templateLocked }));
+      const savedWidths = sheet && sheet.colWidths ? sheet.colWidths : [];
+      const columnDefs = Array.from({ length: colCount }, (_, i) => ({ type: 'text', width: savedWidths[i] || 120, readOnly: templateLocked }));
 
       const created = jspreadsheet(container, {
         data: saved.map(row => row.slice()),
