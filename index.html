@@ -270,6 +270,7 @@
         <div id="templateFillSection" class="hidden">
           <div class="section-heading" id="templateFillTitle">📐 서식 작성</div>
           <p class="grid-hint">회색으로 표시된 칸은 고정된 항목이며, 흰색 빈칸에만 내용을 입력할 수 있습니다. 필요하면 아래쪽에 행을 추가해서 더 입력할 수 있습니다.<br/><strong style="color:#b91c1c;">⚠️ 표가 화면보다 넓을 수 있습니다. 오른쪽에 더 입력할 칸이 있을 수 있으니, 아래 버튼이나 표를 좌우로 스크롤해서 끝까지 확인하며 작성해주세요.</strong></p>
+          <div id="templateFillSheetTabs" style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px;"></div>
           <div style="display:flex; gap:8px; margin-bottom:8px;">
             <button type="button" class="btn" style="width:auto; padding:10px 20px; font-size:15px;" onclick="scrollTemplateFill(-1)">◀ 왼쪽으로 스크롤</button>
             <button type="button" class="btn" style="width:auto; padding:10px 20px; font-size:15px;" onclick="scrollTemplateFill(1)">오른쪽으로 스크롤 ▶</button>
@@ -451,6 +452,12 @@
               <input type="text" id="templateTitleInput" placeholder="예: 2026년 시설 안전점검 서식" />
             </div>
 
+            <div style="display:flex; gap:4px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
+              <div id="templateSheetTabs" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
+              <button type="button" id="addTemplateSheetBtn" class="btn btn-secondary btn-sm" onclick="addTemplateSheet()">+ 시트 추가</button>
+              <button type="button" id="removeTemplateSheetBtn" class="btn btn-danger btn-sm" onclick="removeTemplateSheet()">🗑️ 이 시트 삭제</button>
+            </div>
+
             <div id="templateSpreadsheetWrap" style="max-height:360px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
               <div id="templateSpreadsheet"></div>
             </div>
@@ -571,6 +578,24 @@
     }
     function unwrapTemplateRows(wrapped) {
       return (wrapped || []).map(r => (r && Array.isArray(r.cells)) ? r.cells : (Array.isArray(r) ? r : []));
+    }
+
+    // 자유서식 "시트"(엑셀 워크북의 탭과 같은 개념) 관련 헬퍼
+    function newTemplateSheet(name) {
+      return { name: name || '시트1', data: Array.from({ length: 6 }, () => Array(8).fill('')) };
+    }
+    function wrapTemplateSheets(sheets) {
+      return (sheets || []).map(s => ({ name: s.name || '시트', data: wrapTemplateRows(s.data) }));
+    }
+    function unwrapTemplateSheets(wrapped) {
+      const arr = (wrapped || []).map(s => ({ name: s.name || '시트', data: unwrapTemplateRows(s.data) }));
+      return arr.length > 0 ? arr : [newTemplateSheet('시트1')];
+    }
+    // 구버전(시트 개념이 없던 단일 템플릿) 데이터를 읽어올 때 자동으로 "시트1"짜리 배열로 변환
+    function migrateRoundToTemplateSheets(rd) {
+      if (rd.templateSheets && rd.templateSheets.length > 0) return unwrapTemplateSheets(rd.templateSheets);
+      const data = unwrapTemplateRows(rd.templateData);
+      return [{ name: rd.templateTitle || '시트1', data: (data && data.length) ? data : newTemplateSheet().data }];
     }
 
     // ============================================================
@@ -975,7 +1000,7 @@
           currentUser.useSurvey = !!rd.useSurvey;
           currentUser.useExcel = !!rd.useExcel;
           currentUser.useTemplate = !!rd.useTemplate;
-          currentUser.templateData = unwrapTemplateRows(rd.templateData);
+          currentUser.templateSheets = migrateRoundToTemplateSheets(rd);
           currentUser.templateTitle = rd.templateTitle || '';
           currentUser.templateConfirmed = !!rd.templateConfirmed;
           currentUser.questionsConfirmed = !!rd.questionsConfirmed;
@@ -997,7 +1022,7 @@
         useSurvey: currentUser.useSurvey !== false,
         useExcel: !!currentUser.useExcel,
         useTemplate: !!currentUser.useTemplate,
-        templateData: wrapTemplateRows(currentUser.templateData || []),
+        templateSheets: wrapTemplateSheets(currentUser.templateSheets || [newTemplateSheet('시트1')]),
         templateTitle: currentUser.templateTitle || '',
         templateConfirmed: false,
         questionsConfirmed: false,
@@ -1017,7 +1042,7 @@
       currentUser.useSurvey = roundData.useSurvey;
       currentUser.useExcel = roundData.useExcel;
       currentUser.useTemplate = roundData.useTemplate;
-      currentUser.templateData = unwrapTemplateRows(roundData.templateData);
+      currentUser.templateSheets = unwrapTemplateSheets(roundData.templateSheets);
       currentUser.templateTitle = roundData.templateTitle;
       currentUser.templateConfirmed = roundData.templateConfirmed;
       currentUser.questionsConfirmed = roundData.questionsConfirmed;
@@ -1095,8 +1120,9 @@
       currentUser.useSurvey = !!rd.useSurvey;
       currentUser.useExcel = !!rd.useExcel;
       currentUser.useTemplate = !!rd.useTemplate;
-      currentUser.templateData = unwrapTemplateRows(rd.templateData);
+      currentUser.templateSheets = migrateRoundToTemplateSheets(rd);
       currentUser.templateTitle = rd.templateTitle || '';
+      currentTemplateSheetIndex = 0;
       currentUser.templateConfirmed = !!rd.templateConfirmed;
       currentUser.questionsConfirmed = !!rd.questionsConfirmed;
       currentUser.columnsConfirmed = !!rd.columnsConfirmed;
@@ -1127,7 +1153,7 @@
         useSurvey: true,
         useExcel: false,
         useTemplate: false,
-        templateData: wrapTemplateRows([]),
+        templateSheets: wrapTemplateSheets([newTemplateSheet('시트1')]),
         templateTitle: '',
         templateConfirmed: false,
         questionsConfirmed: false,
@@ -1149,7 +1175,8 @@
       currentUser.useSurvey = newRoundData.useSurvey;
       currentUser.useExcel = newRoundData.useExcel;
       currentUser.useTemplate = newRoundData.useTemplate;
-      currentUser.templateData = [];
+      currentUser.templateSheets = [newTemplateSheet('시트1')];
+      currentTemplateSheetIndex = 0;
       currentUser.templateTitle = '';
       currentUser.templateConfirmed = false;
       currentUser.questionsConfirmed = false;
@@ -1190,7 +1217,8 @@
         currentUser.activeRoundId = null;
         currentUser.questions = [];
         currentUser.columns = cloneDefaultColumns();
-        currentUser.templateData = [];
+        currentUser.templateSheets = [newTemplateSheet('시트1')];
+        currentTemplateSheetIndex = 0;
         renderModeSelection();
         renderManagerQuestions();
         renderColumnConfigEditor();
@@ -1250,7 +1278,8 @@
         currentRoundId = null;
         currentUser.questions = [];
         currentUser.columns = cloneDefaultColumns();
-        currentUser.templateData = [];
+        currentUser.templateSheets = [newTemplateSheet('시트1')];
+        currentTemplateSheetIndex = 0;
       }
 
       await loadRoundsList();
@@ -1498,9 +1527,11 @@
         useTemplate: templateReady,
         questions: roundData.questions || [],
         columns: (roundData.columns && roundData.columns.length) ? roundData.columns : cloneDefaultColumns(),
-        templateData: unwrapTemplateRows(roundData.templateData),
+        templateSheets: migrateRoundToTemplateSheets(roundData),
         templateTitle: roundData.templateTitle || ''
       };
+      templateFillSheetIndex = 0;
+      templateFillSheetsData = [];
 
       if (!activeSurveyInfo.useSurvey && !activeSurveyInfo.useExcel && !activeSurveyInfo.useTemplate) {
         alert('현재 제출 가능한 항목이 없습니다. 담당자에게 문의해주세요.');
@@ -1528,6 +1559,8 @@
       activeSurveyInfo = null;
       gridInstance = null;
       templateFillGrid = null;
+      templateFillSheetIndex = 0;
+      templateFillSheetsData = [];
       const gc = document.getElementById('jspreadsheetContainer');
       if (gc) gc.innerHTML = '';
       const tc = document.getElementById('templateFillSpreadsheet');
@@ -1662,9 +1695,47 @@
     let templateFillGrid = null; // 자유 서식(템플릿) 채우기용 jspreadsheet 인스턴스
 
     // 담당자가 만든 서식을 그대로 렌더링하되, 라벨(원래 값이 있던 칸)은 편집 불가로 잠금
+    let templateFillSheetIndex = 0;
+    let templateFillSheetsData = []; // 기관이 입력 중인 각 시트의 데이터(탭 전환 시에도 보존)
+
+    // 지금 화면의 입력값을 templateFillSheetsData[templateFillSheetIndex]에 반영
+    function captureCurrentTemplateFillSheet() {
+      if (!templateFillGrid) return;
+      const colCount = (activeSurveyInfo.templateSheets[templateFillSheetIndex].data[0] || []).length;
+      templateFillSheetsData[templateFillSheetIndex] = templateFillGrid.getData().map(row => row.slice(0, colCount));
+    }
+
+    function renderTemplateFillTabs() {
+      const tabsEl = document.getElementById('templateFillSheetTabs');
+      if (!tabsEl) return;
+      const sheets = activeSurveyInfo.templateSheets || [];
+      if (sheets.length <= 1) { tabsEl.innerHTML = ''; return; }
+      tabsEl.innerHTML = sheets.map((s, i) => `
+        <button type="button" class="btn ${i === templateFillSheetIndex ? '' : 'btn-secondary'} btn-sm" onclick="switchTemplateFillSheet(${i})">${s.name || ('시트' + (i + 1))}</button>
+      `).join('');
+    }
+
+    function switchTemplateFillSheet(idx) {
+      if (idx === templateFillSheetIndex) return;
+      captureCurrentTemplateFillSheet();
+      templateFillSheetIndex = idx;
+      renderTemplateFill();
+    }
+
     function renderTemplateFill() {
-      const templateData = (activeSurveyInfo.templateData && activeSurveyInfo.templateData.length)
-        ? activeSurveyInfo.templateData : [['']];
+      const sheets = activeSurveyInfo.templateSheets && activeSurveyInfo.templateSheets.length
+        ? activeSurveyInfo.templateSheets : [{ name: '시트1', data: [['']] }];
+      if (templateFillSheetsData.length === 0) {
+        templateFillSheetsData = sheets.map(s => (s.data && s.data.length) ? s.data.map(row => row.slice()) : [['']]);
+      }
+      if (templateFillSheetIndex >= sheets.length) templateFillSheetIndex = 0;
+
+      const templateData = sheets[templateFillSheetIndex].data && sheets[templateFillSheetIndex].data.length
+        ? sheets[templateFillSheetIndex].data : [['']];
+      const workingData = templateFillSheetsData[templateFillSheetIndex] || templateData;
+
+      renderTemplateFillTabs();
+
       const container = document.getElementById('templateFillSpreadsheet');
       container.innerHTML = '';
 
@@ -1672,7 +1743,7 @@
       const columnDefs = Array.from({ length: colCount }, () => ({ type: 'text', width: 120 }));
       // 맨 오른쪽 실제 열이 잘리는 문제를 우회하기 위해, 입력 불가능한 여유 열을 하나 더 붙인다
       columnDefs.push({ type: 'text', title: '', width: 24, readOnly: true });
-      const initialData = templateData.map(row => row.slice().concat(['']));
+      const initialData = workingData.map(row => row.slice(0, colCount).concat(['']));
 
       const created = jspreadsheet(container, {
         data: initialData,
@@ -1902,19 +1973,27 @@
         }
 
         if (activeSurveyInfo.useTemplate && templateFillGrid) {
-          const realTemplateColCount = (activeSurveyInfo.templateData && activeSurveyInfo.templateData[0])
-            ? activeSurveyInfo.templateData[0].length : 0;
-          const filledData = templateFillGrid.getData();
-          const templateRows = filledData.map(row =>
-            ({ cells: row.slice(0, realTemplateColCount).map(v => (v === null || v === undefined ? '' : String(v).trim())) })
-          );
-          responseObj.templateAnswers = templateRows;
+          captureCurrentTemplateFillSheet(); // 지금 보고 있는 시트의 최신 입력값 반영
+
+          const sheetsAnswers = activeSurveyInfo.templateSheets.map((sheet, sIdx) => {
+            const colCount = (sheet.data && sheet.data[0]) ? sheet.data[0].length : 0;
+            const filledData = templateFillSheetsData[sIdx] || sheet.data || [];
+            const rows = filledData.map(row =>
+              ({ cells: row.slice(0, colCount).map(v => (v === null || v === undefined ? '' : String(v).trim())) })
+            );
+            return { name: sheet.name || `시트${sIdx + 1}`, rows };
+          });
+
+          responseObj.templateAnswersSheets = sheetsAnswers;
+          // 구버전(시트 개념 없던 시절) 호환: 첫 번째 시트를 templateAnswers로도 함께 저장
+          responseObj.templateAnswers = sheetsAnswers[0] ? sheetsAnswers[0].rows : [];
         }
 
         const hasAnswers = responseObj.answers && Object.keys(responseObj.answers).length > 0
           && Object.values(responseObj.answers).some(v => v !== '');
         const hasRows = responseObj.rows && responseObj.rows.length > 0;
-        const hasTemplateAnswers = responseObj.templateAnswers && responseObj.templateAnswers.some(r => r.cells.some(v => v !== ''));
+        const hasTemplateAnswers = responseObj.templateAnswersSheets &&
+          responseObj.templateAnswersSheets.some(s => s.rows.some(r => r.cells.some(v => v !== '')));
         if (!hasAnswers && !hasRows && !hasTemplateAnswers) { alert('입력된 내용이 없습니다.'); return; }
 
         await db.collection('managers').doc(activeSurveyInfo.managerId)
@@ -2664,14 +2743,40 @@
       return cols;
     }
 
-    // --- 자유 서식(템플릿) 디자인: 담당자가 원하는 칸에 라벨을 입력, 나머지 빈칸을 기관이 채움 ---
+    // --- 자유 서식(템플릿) 디자인: 담당자가 원하는 칸에 라벨을 입력, 나머지 빈칸을 기관이 채움. 시트(탭)를 여러 개 만들 수 있음 ---
     let templateGrid = null;
     let templateLocked = false;
+    let currentTemplateSheetIndex = 0;
+
+    // 지금 화면의 jspreadsheet 내용을 currentUser.templateSheets[currentTemplateSheetIndex]에 반영
+    function captureCurrentTemplateSheet() {
+      if (!templateGrid || !currentUser.templateSheets || !currentUser.templateSheets[currentTemplateSheetIndex]) return;
+      currentUser.templateSheets[currentTemplateSheetIndex].data = templateGrid.getData();
+    }
+
+    function renderTemplateSheetTabs() {
+      const tabsEl = document.getElementById('templateSheetTabs');
+      if (!tabsEl) return;
+      const sheets = currentUser.templateSheets || [];
+      tabsEl.innerHTML = sheets.map((s, i) => `
+        <button type="button" class="btn ${i === currentTemplateSheetIndex ? '' : 'btn-secondary'} btn-sm" onclick="switchTemplateSheet(${i})">${s.name || ('시트' + (i + 1))}</button>
+      `).join('');
+      const removeBtn = document.getElementById('removeTemplateSheetBtn');
+      if (removeBtn) removeBtn.classList.toggle('hidden', templateLocked || sheets.length <= 1);
+      const addBtn = document.getElementById('addTemplateSheetBtn');
+      if (addBtn) addBtn.classList.toggle('hidden', templateLocked);
+    }
 
     async function renderTemplateEditor() {
       const container = document.getElementById('templateSpreadsheet');
       if (!container) return;
       container.innerHTML = '';
+
+      if (!currentUser.templateSheets || currentUser.templateSheets.length === 0) {
+        currentUser.templateSheets = [newTemplateSheet('시트1')];
+        currentTemplateSheetIndex = 0;
+      }
+      if (currentTemplateSheetIndex >= currentUser.templateSheets.length) currentTemplateSheetIndex = 0;
 
       const hasResponses = currentRoundId ? await roundHasResponses(currentRoundId) : false;
       const isConfirmed = !!currentUser.templateConfirmed;
@@ -2698,9 +2803,10 @@
         titleInput.readOnly = templateLocked;
       }
 
-      const saved = (currentUser.templateData && currentUser.templateData.length)
-        ? currentUser.templateData
-        : Array.from({ length: 6 }, () => Array(8).fill(''));
+      renderTemplateSheetTabs();
+
+      const sheet = currentUser.templateSheets[currentTemplateSheetIndex];
+      const saved = (sheet && sheet.data && sheet.data.length) ? sheet.data : Array.from({ length: 6 }, () => Array(8).fill(''));
 
       const colCount = saved[0] ? saved[0].length : 8;
       const columnDefs = Array.from({ length: colCount }, () => ({ type: 'text', width: 120, readOnly: templateLocked }));
@@ -2723,6 +2829,33 @@
       templateGrid = Array.isArray(created) ? created[0] : created;
     }
 
+    async function switchTemplateSheet(idx) {
+      if (idx === currentTemplateSheetIndex) return;
+      captureCurrentTemplateSheet();
+      currentTemplateSheetIndex = idx;
+      await renderTemplateEditor();
+    }
+
+    async function addTemplateSheet() {
+      if (templateLocked) return;
+      captureCurrentTemplateSheet();
+      const name = prompt('새 시트의 이름을 입력하세요 (예: 시설현황, 예산내역 등):', `시트${currentUser.templateSheets.length + 1}`);
+      if (!name) return;
+      currentUser.templateSheets.push(newTemplateSheet(name));
+      currentTemplateSheetIndex = currentUser.templateSheets.length - 1;
+      await renderTemplateEditor();
+    }
+
+    async function removeTemplateSheet() {
+      if (templateLocked) return;
+      if (currentUser.templateSheets.length <= 1) { alert('최소 1개의 시트는 있어야 합니다.'); return; }
+      const sheetName = currentUser.templateSheets[currentTemplateSheetIndex].name;
+      if (!confirm(`"${sheetName}" 시트를 삭제하시겠습니까? (아직 "임시 저장"/"취합서식 확정"을 누르기 전까지는 실제 저장되지 않습니다)`)) return;
+      currentUser.templateSheets.splice(currentTemplateSheetIndex, 1);
+      currentTemplateSheetIndex = Math.max(0, currentTemplateSheetIndex - 1);
+      await renderTemplateEditor();
+    }
+
     function addTemplateRow() {
       if (templateGrid && !templateLocked) templateGrid.insertRow();
     }
@@ -2742,15 +2875,14 @@
           return;
         }
 
-        const data = templateGrid.getData();
-        const hasAnyContent = data.some(row => row.some(v => (v || '').toString().trim() !== ''));
+        captureCurrentTemplateSheet();
+        const hasAnyContent = currentUser.templateSheets.some(s => s.data.some(row => row.some(v => (v || '').toString().trim() !== '')));
         if (!hasAnyContent) { alert('서식에 라벨을 하나 이상 입력하세요.'); return; }
 
         const title = (document.getElementById('templateTitleInput').value || '').trim();
-        currentUser.templateData = data;
         currentUser.templateTitle = title;
         await db.collection('managers').doc(currentUser.id)
-          .collection('rounds').doc(currentRoundId).update({ templateData: wrapTemplateRows(data), templateTitle: title });
+          .collection('rounds').doc(currentRoundId).update({ templateSheets: wrapTemplateSheets(currentUser.templateSheets), templateTitle: title });
         alert('서식이 임시 저장되었습니다. (아직 확정 전이라 기관 화면에는 표시되지 않습니다) 다 작성하셨으면 "취합서식 확정"을 눌러주세요.');
       } catch (err) {
         console.error('[진단] 서식 임시저장 오류:', err);
@@ -2770,20 +2902,19 @@
           return;
         }
 
-        const data = templateGrid.getData();
-        const hasAnyContent = data.some(row => row.some(v => (v || '').toString().trim() !== ''));
+        captureCurrentTemplateSheet();
+        const hasAnyContent = currentUser.templateSheets.some(s => s.data.some(row => row.some(v => (v || '').toString().trim() !== '')));
         if (!hasAnyContent) { alert('서식에 라벨을 하나 이상 입력하세요.'); return; }
 
         if (!checkDeadlineBeforeConfirm()) return;
         if (!confirm('서식을 확정하시겠습니까? 확정 후에는 이 회차에서 서식을 수정할 수 없으며, 기관이 이 서식으로 제출을 시작할 수 있게 됩니다.')) return;
 
         const title = (document.getElementById('templateTitleInput').value || '').trim();
-        currentUser.templateData = data;
         currentUser.templateTitle = title;
         currentUser.templateConfirmed = true;
         await db.collection('managers').doc(currentUser.id)
           .collection('rounds').doc(currentRoundId).update({
-            templateData: wrapTemplateRows(data), templateTitle: title, templateConfirmed: true
+            templateSheets: wrapTemplateSheets(currentUser.templateSheets), templateTitle: title, templateConfirmed: true
           });
         await markRoundConfirmedIfNeeded();
         await renderTemplateEditor();
@@ -2839,7 +2970,7 @@
           return `<td>${renderAnswerCellValue(q, val)}</td>`;
         }).join('');
         const templateCell = useTemplate
-          ? `<td>${res.templateAnswers ? `<button class="btn btn-secondary btn-sm" onclick="exportTemplateResponse(${resIdx})">📥 다운로드</button>` : '-'}</td>`
+          ? `<td>${(res.templateAnswersSheets || res.templateAnswers) ? `<button class="btn btn-secondary btn-sm" onclick="exportTemplateResponse(${resIdx})">📥 다운로드</button>` : '-'}</td>`
           : '';
 
         if (useExcel && Array.isArray(res.rows) && res.rows.length > 0) {
@@ -2862,12 +2993,17 @@
     // 개별 응답의 자유 서식(템플릿) 답변을, 원래 레이아웃 그대로 엑셀로 다운로드
     function exportTemplateResponse(resIdx) {
       const res = cachedResponseDocs[resIdx];
-      if (!res || !res.templateAnswers) { alert('다운로드할 서식 응답이 없습니다.'); return; }
+      const sheetsAnswers = res && (res.templateAnswersSheets || (res.templateAnswers ? [{ name: '서식응답', rows: res.templateAnswers }] : null));
+      if (!res || !sheetsAnswers || sheetsAnswers.length === 0) { alert('다운로드할 서식 응답이 없습니다.'); return; }
 
-      const aoa = res.templateAnswers.map(r => r.cells || []);
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, '서식응답');
+      sheetsAnswers.forEach((sheet, i) => {
+        const aoa = (sheet.rows || []).map(r => r.cells || []);
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        // 엑셀 시트명 제약(31자 이내, 특수문자 불가)에 맞춰 안전하게 정리
+        let sheetName = (sheet.name || `시트${i + 1}`).replace(/[\\/:*?"<>|[\]]/g, '_').slice(0, 31) || `시트${i + 1}`;
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      });
       XLSX.writeFile(wb, `서식응답_${res.agencyName}_${(res.submittedAt || '').replace(/[:/\s]/g, '-')}.xlsx`);
     }
 
@@ -2977,18 +3113,19 @@
       const myQuestions = useSurvey ? (viewingRoundMeta.questions || []) : [];
       const cols = useExcel ? (viewingRoundMeta.columns || []) : [];
 
-      // 자유서식은 칸 배치가 자유로워서, 빈칸(기관이 입력하는 칸)마다 근처 라벨을 컬럼명으로 삼아 표로 펼침
-      const templateData = useTemplate ? (viewingRoundMeta.templateData || []) : [];
-      const blankPositions = [];
-      if (useTemplate) {
-        templateData.forEach((row, r) => {
+      // 자유서식은 칸 배치가 자유로워서, (시트별로) 빈칸마다 근처 라벨을 컬럼명으로 삼아 표로 펼침
+      const templateSheets = useTemplate ? migrateRoundToTemplateSheets(viewingRoundMeta) : [];
+      const blankPositions = []; // { sheetIdx, r, c, label }
+      templateSheets.forEach((sheet, sIdx) => {
+        const sheetPrefix = templateSheets.length > 1 ? `[${sheet.name}] ` : '';
+        (sheet.data || []).forEach((row, r) => {
           row.forEach((val, c) => {
             if ((val || '').toString().trim() === '') {
-              blankPositions.push({ r, c, label: getTemplateColumnLabel(templateData, r, c) });
+              blankPositions.push({ sheetIdx: sIdx, r, c, label: sheetPrefix + getTemplateColumnLabel(sheet.data, r, c) });
             }
           });
         });
-      }
+      });
 
       const header = ['제출 기관명', '제출일시']
         .concat(myQuestions.map(q => q.title))
@@ -3010,8 +3147,11 @@
           return raw;
         });
 
+        // 응답의 시트별 데이터 확보 (구버전 단일 templateAnswers도 시트1로 호환)
+        const resSheets = res.templateAnswersSheets || (res.templateAnswers ? [{ rows: res.templateAnswers }] : []);
         const templateVals = blankPositions.map(p => {
-          const rowObj = res.templateAnswers && res.templateAnswers[p.r];
+          const sheetAns = resSheets[p.sheetIdx];
+          const rowObj = sheetAns && sheetAns.rows && sheetAns.rows[p.r];
           const cells = rowObj && Array.isArray(rowObj.cells) ? rowObj.cells : null;
           return cells && cells[p.c] !== undefined ? cells[p.c] : '';
         });
