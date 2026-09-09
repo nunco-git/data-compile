@@ -300,7 +300,7 @@
                 <label>제출 기관명 직접 입력</label>
                 <input type="text" id="accessAgencyName" placeholder="예: 부여읍 행정복지센터" />
               </div>
-              <button type="button" class="btn" id="surveySubmitBtn" onclick="startSurveyAccessWithAgency()">작성/제출 시작하기</button>
+              <button type="button" class="btn" id="startSurveyAccessBtn" onclick="startSurveyAccessWithAgency()">작성/제출 시작하기</button>
             </div>
           </form>
 
@@ -328,14 +328,15 @@
             <div class="login-summary-title"><span class="title-icon-sm">📋</span>스마트 자료취합 시스템이란?</div>
             <div class="login-summary-highlight">
               <span class="highlight-icon">⚡</span>
-              <div><strong>간편취합</strong><span class="highlight-desc">단순통계·엑셀자료 등 간편 입력만으로 자동취합·정리</span></div>
+              <div><strong>간편취합</strong><span class="highlight-desc">기관·시설에서 자료(사진 포함) 취합 시 간편하게 취합 가능</span></div>
             </div>
             <ul class="login-summary-list">
-              <li><span class="feat-icon">✓</span><span><strong>증빙자료 제출</strong> — <span class="feat-desc">공사·행사·보조사업 관련 사진 증빙을 업체가 직접 제출</span></span></li>
-              <li><span class="feat-icon">✓</span><span><strong>자동 압축</strong> — <span class="feat-desc">제출된 사진은 500KB 이하로 자동 압축</span></span></li>
-              <li><span class="feat-icon">✓</span><span><strong>로그인 없이 제출</strong> — <span class="feat-desc">업체는 사업별로 발급된 링크·접속코드만으로 바로 제출 가능</span></span></li>
-              <li><span class="feat-icon">✓</span><span><strong>2단계 관리 구조</strong> — <span class="feat-desc">사업담당자는 본인 사업만 조회·다운로드, 총괄관리자는 계정 권한만 관리</span></span></li>
-              <li><span class="feat-icon">✓</span><span><strong>실시간 저장</strong> — <span class="feat-desc">Firebase 기반으로 제출 즉시 실시간 반영</span></span></li>
+              <li><span class="feat-icon">✓</span><span><strong>개인정보 미포함 자료 전용</strong> — <span class="feat-desc">개인정보가 미포함된 자료 취합 시에만 활용 가능</span></span></li>
+              <li><span class="feat-icon">✓</span><span><strong>엑셀 붙여넣기 취합</strong> — <span class="feat-desc">지정된 엑셀 서식을 붙여넣기(Ctrl+V)해서 취합 가능</span></span></li>
+              <li><span class="feat-icon">✓</span><span><strong>기관 정보 사전 설정</strong> — <span class="feat-desc">취합해야 할 기관 등 정보는 사전 설정 가능</span></span></li>
+              <li><span class="feat-icon">✓</span><span><strong>접속코드·비밀번호 방식</strong> — <span class="feat-desc">접속코드와 비밀번호 입력 방식으로 지속 취합 가능</span></span></li>
+              <li><span class="feat-icon">✓</span><span><strong>일괄 다운로드</strong> — <span class="feat-desc">취합결과를 엑셀로 정리하여 일괄 다운로드 가능</span></span></li>
+              <li><span class="feat-icon">✓</span><span><strong>미취합 기관 실시간 확인</strong> — <span class="feat-desc">실시간으로 미취합 기관을 확인 가능</span></span></li>
             </ul>
           </div>
         </div>
@@ -362,29 +363,59 @@
         </div>
 
         <div id="excelGridSection" class="hidden">
-          <div class="section-heading">📊 엑셀 자료 입력</div>
-          <p class="grid-hint">실제 엑셀처럼 셀을 클릭/드래그해서 선택하고, 화살표 키로 이동하며, 엑셀에서 복사한 범위를 그대로 붙여넣기(Ctrl+V)할 수 있습니다.</p>
-          <div id="jspreadsheetWrap" style="max-height:480px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
-            <div id="jspreadsheetContainer"></div>
+          <div class="section-heading">📁 서식 파일 다운로드 후 작성</div>
+          <p class="grid-hint">① 아래 버튼으로 담당자가 등록한 서식 파일을 다운로드하세요. ② 엑셀에서 작성한 뒤, 같은 파일을 그대로 업로드하세요.</p>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+            <button type="button" class="btn btn-secondary" style="width:auto; padding:10px 20px;" onclick="downloadFileUploadTemplate()">📥 서식 파일 다운로드</button>
+            <label class="btn btn-excel" style="width:auto; padding:10px 20px; margin:0; display:inline-flex; align-items:center; cursor:pointer;">
+              📤 작성한 파일 업로드
+              <input type="file" id="fileUploadAgencyInput" accept=".xlsx,.xls" onchange="handleAgencyFileUpload(event)" style="display:none;" />
+            </label>
           </div>
-          <div style="margin-bottom:16px;">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="addSurveyGridRow()">+ 행 추가</button>
-          </div>
+          <div id="fileUploadAgencyStatus" class="status-banner" style="text-align:left; background:#f1f5f9; color:#475569;">아직 업로드된 파일이 없습니다.</div>
         </div>
 
         <div id="templateFillSection" class="hidden">
           <div class="section-heading" id="templateFillTitle">📐 서식 작성</div>
-          <p class="grid-hint">회색으로 표시된 칸은 고정된 항목이며, 흰색 빈칸에만 내용을 입력할 수 있습니다. 필요하면 아래쪽에 행을 추가해서 더 입력할 수 있습니다.<br/><strong style="color:#b91c1c;">⚠️ 표가 화면보다 넓을 수 있습니다. 오른쪽에 더 입력할 칸이 있을 수 있으니, 아래 버튼이나 표를 좌우로 스크롤해서 끝까지 확인하며 작성해주세요.</strong></p>
-          <div id="templateFillSheetTabs" style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px;"></div>
-          <div style="display:flex; gap:8px; margin-bottom:8px;">
-            <button type="button" class="btn" style="width:auto; padding:10px 20px; font-size:15px;" onclick="scrollTemplateFill(-1)">◀ 왼쪽으로 스크롤</button>
-            <button type="button" class="btn" style="width:auto; padding:10px 20px; font-size:15px;" onclick="scrollTemplateFill(1)">오른쪽으로 스크롤 ▶</button>
+
+          <div class="mode-select-container" style="margin:14px 0;">
+            <div class="mode-card" id="fillModeCardGrid" onclick="setTemplateFillMode('grid')">
+              <span class="mode-check" id="fillModeCheckGrid">✔ 선택됨</span>
+              <h3>🖊️ 화면에서 직접 입력</h3>
+              <p>표에 직접 클릭/타이핑하거나 엑셀에서 복사한 내용을 붙여넣어(Ctrl+V) 작성합니다.</p>
+            </div>
+            <div class="mode-card" id="fillModeCardUpload" onclick="setTemplateFillMode('upload')">
+              <span class="mode-check hidden" id="fillModeCheckUpload">✔ 선택됨</span>
+              <h3>📄 엑셀 파일로 제출</h3>
+              <p>서식을 엑셀 파일로 받아 편하게 작성한 뒤, 그 파일을 그대로 업로드합니다. 서식이 복잡할 때 편리합니다.</p>
+            </div>
           </div>
-          <div id="templateFillWrap" style="max-height:480px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
-            <div id="templateFillSpreadsheet"></div>
+
+          <div id="templateFillGridArea">
+            <p class="grid-hint">회색으로 표시된 칸은 고정된 항목이며, 흰색 빈칸에만 내용을 입력할 수 있습니다. 필요하면 아래쪽에 행을 추가해서 더 입력할 수 있습니다.<br/><strong style="color:#b91c1c;">⚠️ 표가 화면보다 넓을 수 있습니다. 오른쪽에 더 입력할 칸이 있을 수 있으니, 아래 버튼이나 표를 좌우로 스크롤해서 끝까지 확인하며 작성해주세요.</strong></p>
+            <div id="templateFillSheetTabs" style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px;"></div>
+            <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+              <button type="button" class="btn" style="width:auto; padding:10px 20px; font-size:15px;" onclick="scrollTemplateFill(-1)">◀ 왼쪽으로 스크롤</button>
+              <button type="button" class="btn" style="width:auto; padding:10px 20px; font-size:15px;" onclick="scrollTemplateFill(1)">오른쪽으로 스크롤 ▶</button>
+            </div>
+            <div id="templateFillWrap" style="max-height:480px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
+              <div id="templateFillSpreadsheet"></div>
+            </div>
+            <div style="margin-bottom:16px;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="addTemplateFillRow()">+ 행 추가</button>
+            </div>
           </div>
-          <div style="margin-bottom:16px;">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="addTemplateFillRow()">+ 행 추가</button>
+
+          <div id="templateFillUploadArea" class="hidden">
+            <p class="grid-hint">① 아래 버튼으로 서식을 엑셀 파일로 받아서 작성하세요. ② 다 작성했으면 그 파일을 그대로 업로드하세요. 화면에 표를 직접 입력할 필요는 없습니다.</p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+              <button type="button" class="btn btn-secondary" style="width:auto; padding:10px 20px;" onclick="downloadTemplateBlankExcel()">📥 서식 다운로드(빈 양식)</button>
+              <label class="btn btn-excel" style="width:auto; padding:10px 20px; margin:0; display:inline-flex; align-items:center; cursor:pointer;">
+                📤 작성한 엑셀 업로드
+                <input type="file" id="templateFillUploadInput" accept=".xlsx,.xls" onchange="handleTemplateFillUpload(event)" style="display:none;" />
+              </label>
+            </div>
+            <div id="templateFillUploadStatus" class="status-banner" style="text-align:left; background:#f1f5f9; color:#475569;">아직 업로드된 파일이 없습니다.</div>
           </div>
         </div>
 
@@ -405,36 +436,46 @@
           여러 설문을 <strong>동시에</strong> 진행할 수 있습니다. 새 회차를 추가해도 기존에 진행 중인 회차는 닫히지 않습니다. 기관은 아래쪽 "🔗 기관 접속 정보"의 접속 코드로 동일하게 들어오며, 진행 중인 설문이 여러 개면 어떤 설문에 참여할지 목록에서 고르게 됩니다. 설문이 끝나면 "이 회차 종료"를 눌러 마감하세요.
         </p>
 
-        <div class="form-group" style="margin-bottom:10px;">
-          <label>지금 편집할 회차</label>
-          <select id="editingRoundSelector" onchange="switchEditingRound(this.value)" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></select>
-        </div>
+        <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
+          <div style="flex:1 1 0; min-width:220px;">
+            <div class="form-group" style="margin-bottom:10px;">
+              <label>지금 편집할 회차</label>
+              <select id="editingRoundSelector" onchange="switchEditingRound(this.value)" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></select>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-sm" onclick="startNewRound()">➕ 새 회차 추가</button>
+              <button class="btn btn-sm btn-danger" id="closeRoundBtn" onclick="closeCurrentEditingRound()">🔒 이 회차 종료</button>
+            </div>
+          </div>
 
-        <div class="form-group" style="margin-bottom:10px;">
-          <label>제출기한 (선택, 기관 목록 화면에 표시됩니다)</label>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <input type="date" id="roundDeadlineInput" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
-            <button type="button" class="btn btn-secondary btn-sm" onclick="saveRoundDeadline()">저장</button>
+          <div style="flex:1 1 0; min-width:220px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label>제출기한 (선택, 기관 목록 화면에 표시됩니다)</label>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input type="date" id="roundDeadlineInput" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px; flex:1;" />
+                <button type="button" class="btn btn-secondary btn-sm" onclick="saveRoundDeadline()">저장</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:1 1 0; min-width:220px;">
+            <h4 style="margin:0 0 6px 0; font-size:13px; color:#78350f;">진행 중인 회차 목록</h4>
+            <div id="openRoundsList" style="font-size:12px; max-height:150px; overflow-y:auto;"></div>
           </div>
         </div>
-
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn btn-sm" onclick="startNewRound()">➕ 새 회차 추가</button>
-          <button class="btn btn-sm btn-danger" id="closeRoundBtn" onclick="closeCurrentEditingRound()">🔒 이 회차 종료</button>
-        </div>
-
-        <h4 style="margin:16px 0 6px 0; font-size:13px; color:#78350f;">진행 중인 회차 목록</h4>
-        <div id="openRoundsList" style="font-size:12px;"></div>
       </div>
 
-      <div class="q-card" style="background:#eff6ff; border-color:#bfdbfe; margin-bottom: 20px;">
-        <h4 style="color:#1e40af; margin-top:0;">🔗 기관 접속 정보</h4>
-        <p style="font-size:12px; color:#334155; margin:4px 0;">접속 코드: <strong id="displayOwnAgencyCode"></strong></p>
-        <p style="font-size:12px; color:#64748b; margin-bottom:8px;">기관 제출자가 접속할 때 입력해야 하는 제출 전용 비밀번호를 설정하세요.</p>
-        <div class="form-group" style="margin-bottom:8px;">
-          <input type="text" id="surveyPasswordInput" placeholder="예: pass1234" />
+      <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:stretch; margin-bottom:20px;">
+        <div class="q-card" style="background:#eff6ff; border-color:#bfdbfe; margin-bottom:0; flex:1 1 0; min-width:220px;">
+          <h4 style="color:#1e40af; margin-top:0;">🔗 기관 접속 정보</h4>
+          <p style="font-size:12px; color:#334155; margin:4px 0;">접속 코드: <strong id="displayOwnAgencyCode"></strong></p>
+          <p style="font-size:12px; color:#64748b; margin-bottom:8px;">기관 제출자가 접속할 때 입력해야 하는 제출 전용 비밀번호를 설정하세요.</p>
+          <div class="form-group" style="margin-bottom:8px;">
+            <input type="text" id="surveyPasswordInput" placeholder="예: pass1234" />
+          </div>
+          <button class="btn btn-sm btn-excel" onclick="saveSurveyPassword()">제출 비밀번호 저장</button>
         </div>
-        <button class="btn btn-sm btn-excel" onclick="saveSurveyPassword()">제출 비밀번호 저장</button>
+        <div id="agencyListManageSlot" style="flex:2 1 0; min-width:320px; display:flex;"></div>
       </div>
 
       <div class="q-card">
@@ -448,8 +489,8 @@
           </div>
           <div class="mode-card" id="modeCardExcel" onclick="toggleUseMode('excel')">
             <span class="mode-check hidden" id="checkExcel">✔ 사용중</span>
-            <h3>📊 엑셀 시트 방식</h3>
-            <p>담당자가 컬럼(항목)을 지정하고, 기관에서 엑셀을 복사·붙여넣기(Ctrl+V)하여 제출합니다.</p>
+            <h3>📁 파일 업로드 방식</h3>
+            <p>담당자가 원하는 형식의 엑셀 파일을 그대로 업로드해 배포하면, 기관은 그 파일을 받아 작성한 뒤 다시 업로드해서 제출합니다.</p>
           </div>
           <div class="mode-card" id="modeCardTemplate" onclick="toggleUseMode('template')">
             <span class="mode-check hidden" id="checkTemplate">✔ 사용중</span>
@@ -501,41 +542,29 @@
 
         <div id="panelManageExcel" class="hidden">
           <div class="q-card">
-            <h4 style="margin-top:0;">엑셀 컬럼(항목) 설정</h4>
+            <h4 style="margin-top:0;">📁 파일 업로드 방식 — 서식 파일 등록</h4>
             <ul class="grid-hint" style="margin:0 0 10px 0; padding-left:18px;">
-              <li>고정목록, 동적목록 등 입력제한기능 설정</li>
-              <li>기존 엑셀파일 불러오기 가능</li>
-              <li>행, 열 삭제, 추가 가능</li>
+              <li>원하는 형식으로 만든 엑셀 파일을 그대로 업로드하세요 (여러 시트도 가능합니다)</li>
+              <li>기관은 이 파일을 그대로 다운로드해서 작성한 뒤, 같은 파일을 업로드해서 제출합니다</li>
+              <li>업로드 후 각 시트의 "헤더 행 / 입력행 첫 행 / 끝열"을 지정해야 취합 시 행 단위로 정리됩니다</li>
             </ul>
-            <div id="columnLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 컬럼 구성을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
+            <div id="columnLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 서식을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
             <div id="columnConfirmedBanner" class="status-banner ok hidden">✅ 확정된 서식입니다. 기관이 제출할 수 있습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
             <div id="columnDraftBanner" class="status-banner hidden" style="background:#fff7ed; color:#9a3412;">✏️ 아직 확정되지 않은 임시 서식입니다. 기관 화면에는 표시되지 않습니다.</div>
 
-            <div id="columnConfigSpreadsheetWrap" style="max-height:280px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
-              <div id="columnConfigSpreadsheet"></div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+              <label id="fileUploadManagerLabel" class="btn btn-excel btn-sm" style="width:auto; margin:0; display:inline-flex; align-items:center; cursor:pointer;">
+                📤 서식 파일 업로드/교체
+                <input type="file" id="fileUploadManagerInput" accept=".xlsx,.xls" onchange="handleManagerFileUploadTemplate(event)" style="display:none;" />
+              </label>
+              <span id="fileUploadManagerStatus" style="font-size:13px; color:#334155;">등록된 서식 파일이 없습니다.</span>
             </div>
 
-            <div style="display:flex; gap:8px; margin: 10px 0 12px 0; flex-wrap:wrap; align-items:center;">
-              <button type="button" id="addColumnColBtn" class="btn btn-secondary btn-sm" onclick="addColumnCell()">+ 컬럼 추가 (열)</button>
-              <button type="button" id="addColumnRowBtn" class="btn btn-secondary btn-sm" onclick="addColumnRow()">+ 행 추가</button>
-              <button type="button" id="clearColumnsBtn" class="btn btn-sm btn-danger" onclick="clearAllColumns()">🗑️ 전체 지우기</button>
+            <div id="fileUploadSheetsSettings"></div>
+
+            <div style="display:flex; gap:8px; margin: 14px 0 12px 0; flex-wrap:wrap; align-items:center;">
               <button type="button" id="saveColumnConfigBtn" class="btn btn-sm btn-secondary" onclick="saveColumnConfig()">임시 저장</button>
               <button type="button" id="confirmColumnsBtn" class="btn btn-sm btn-excel" onclick="confirmColumns()">🔒 취합서식 확정</button>
-              <label id="importSchemaLabel" class="btn btn-secondary btn-sm" style="margin:0; display:inline-flex; align-items:center;">
-                📂 엑셀 서식 불러오기
-                <input type="file" id="importSchemaInput" accept=".xlsx,.xls" onchange="handleImportSchemaFile(event)" style="display:none;" />
-              </label>
-            </div>
-            <p style="font-size:11px; color:#94a3b8; margin-bottom:10px;">엑셀 파일의 첫 번째 행(헤더)을 컬럼명으로 자동 등록합니다. 불러온 뒤 "서식 변경 저장" 또는 "취합서식 확정"을 눌러야 실제로 반영됩니다.</p>
-            <div id="columnDetailPanel"></div>
-
-            <h4 style="margin:16px 0 8px 0; font-size:13px; color:#334155;">📋 실시간 요약</h4>
-            <div id="columnLivePreview" style="font-size:12px; color:#64748b; margin-bottom:16px;"></div>
-
-            <h4 style="margin:16px 0 6px 0; font-size:13px; color:#334155;">🔍 기관 화면 미리보기 (실제와 동일하게 동작합니다)</h4>
-            <p class="grid-hint">아래는 기관이 실제로 보게 될 화면과 똑같이 동작하는 미리보기입니다. 동적목록도 실제로 상위 값을 선택하면 하위 목록이 바뀌는지 여기서 바로 테스트해볼 수 있습니다. (여기 입력한 값은 저장되지 않는 연습용입니다.)</p>
-            <div id="columnPreviewWrap" style="max-height:280px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin:10px 0 16px 0;">
-              <div id="columnPreviewSpreadsheet"></div>
             </div>
           </div>
         </div>
@@ -924,15 +953,17 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
   // ---------- 1. 관리 패널 UI (관리 탭 상단) ----------
   function ensureManagePanel() {
     if (document.getElementById('agencyListManagePanel')) return;
-    var anchor = document.getElementById('openRoundsList');
-    if (!anchor) return;
-    var roundCard = anchor.closest ? anchor.closest('.q-card') : anchor.parentNode;
-    if (!roundCard || !roundCard.parentNode) return;
+    var slot = document.getElementById('agencyListManageSlot');
+    var fallbackAnchor = document.getElementById('openRoundsList');
+    var fallbackCard = fallbackAnchor && (fallbackAnchor.closest ? fallbackAnchor.closest('.q-card') : fallbackAnchor.parentNode);
+    if (!slot && (!fallbackCard || !fallbackCard.parentNode)) return;
 
     var panel = document.createElement('div');
     panel.id = 'agencyListManagePanel';
     panel.className = 'q-card';
-    panel.style.cssText = 'background:#f0fdf4; border-color:#bbf7d0; margin-bottom:20px;';
+    panel.style.cssText = slot
+      ? 'background:#f0fdf4; border-color:#bbf7d0; margin-bottom:0; flex:1 1 0; width:100%;'
+      : 'background:#f0fdf4; border-color:#bbf7d0; margin-bottom:20px;';
     panel.innerHTML =
       '<h4 style="color:#166534; margin-top:0;">🏷️ 제출 기관 명단 관리</h4>' +
       '<p style="font-size:12px; color:#166534; margin:4px 0 10px 0;">' +
@@ -957,7 +988,11 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       '</div>' +
       '<button type="button" class="btn btn-sm btn-excel" id="saveAgencyListBtn" onclick="saveAgencyList()">💾 이 명단 저장</button>';
 
-    roundCard.parentNode.insertBefore(panel, roundCard.nextSibling);
+    if (slot) {
+      slot.appendChild(panel);
+    } else {
+      fallbackCard.parentNode.insertBefore(panel, fallbackCard.nextSibling);
+    }
   }
 
   function renderAgencyListSelects() {
@@ -1272,7 +1307,7 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       return;
     }
 
-    var btn = document.getElementById('surveySubmitBtn');
+    var btn = document.getElementById('startSurveyAccessBtn');
     btn.disabled = true;
     btn.textContent = '확인 중...';
     try {
@@ -1307,6 +1342,891 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       btn.disabled = false;
       btn.textContent = '작성/제출 시작하기';
     }
+  };
+})();
+</script>
+
+
+<!-- ================================================================
+     [추가 기능] 취합 결과 화면: 실시간 "미취합 기관" 확인 패널
+     (제출 기관 필터에서 특정 명단을 선택했을 때, 그 명단 중 아직
+      제출하지 않은 기관을 실시간으로 보여줌)
+     ================================================================ -->
+<script>
+(function () {
+  'use strict';
+
+  var ALL_FILTER_VALUE = '__all__';
+
+  function ensureMissingPanel() {
+    if (document.getElementById('missingAgenciesPanel')) return;
+    var table = document.getElementById('responseTable');
+    if (!table || !table.parentNode || !table.parentNode.parentNode) return;
+    var outerWrap = table.parentNode; // <div style="overflow-x:auto">...</div>
+    var panel = document.createElement('div');
+    panel.id = 'missingAgenciesPanel';
+    panel.style.marginBottom = '12px';
+    outerWrap.parentNode.insertBefore(panel, outerWrap);
+  }
+
+  function computeMissing() {
+    var filterSel = document.getElementById('agencyListFilterSelect');
+    if (!filterSel || !filterSel.value || filterSel.value === ALL_FILTER_VALUE) return null;
+    var lists = (currentUser && currentUser.agencyLists) || [];
+    var list = lists.find(function (l) { return l.id === filterSel.value; });
+    if (!list) return null;
+
+    var submitted = {};
+    (cachedResponseDocs || []).forEach(function (d) {
+      var n = (d.agencyName || '').trim();
+      if (n) submitted[n] = true;
+    });
+    var agencies = (list.agencies || []).map(function (a) { return a.trim(); }).filter(function (a) { return a; });
+    var missing = agencies.filter(function (a) { return !submitted[a]; });
+    return { listName: list.name, total: agencies.length, missing: missing };
+  }
+
+  function esc(s) {
+    return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function renderMissingAgenciesPanel() {
+    ensureMissingPanel();
+    var panel = document.getElementById('missingAgenciesPanel');
+    if (!panel) return;
+    var result = computeMissing();
+
+    if (!result) {
+      panel.innerHTML =
+        '<div class="status-banner" style="text-align:left; background:#f1f5f9; color:#475569;">' +
+        '📋 특정 기관 명단을 선택하면 아직 제출하지 않은 기관을 실시간으로 확인할 수 있습니다.</div>';
+      return;
+    }
+
+    if (result.missing.length === 0) {
+      panel.innerHTML =
+        '<div class="status-banner ok" style="text-align:left;">✅ "' + esc(result.listName) +
+        '" 명단(' + result.total + '개 기관)이 모두 제출을 완료했습니다.</div>';
+      return;
+    }
+
+    var chips = result.missing.map(function (name) {
+      return '<span style="background:#fff; border:1px solid #fecaca; color:#b91c1c; border-radius:999px; padding:3px 10px; font-size:12px;">' +
+        esc(name) + '</span>';
+    }).join('');
+
+    panel.innerHTML =
+      '<div class="status-banner error" style="text-align:left;">' +
+      '⏳ <strong>"' + esc(result.listName) + '" 미취합 기관 (' + result.missing.length + ' / ' + result.total + '곳)</strong>' +
+      '<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:6px;">' + chips + '</div>' +
+      '</div>';
+  }
+
+  // 응답이 실시간으로 갱신될 때마다(subscribeResponses의 onSnapshot이 renderManagerResponses를
+  // 호출) 미취합 패널도 함께 갱신되도록 한 번 더 감싼다.
+  var _origRenderManagerResponses = renderManagerResponses;
+  window.renderManagerResponses = function () {
+    _origRenderManagerResponses.apply(this, arguments);
+    renderMissingAgenciesPanel();
+  };
+})();
+</script>
+
+
+<!-- ================================================================
+     [추가 기능] 자유 서식(템플릿) 방식: 빈 양식 엑셀 다운로드 + 작성한
+     엑셀 파일 업로드로 화면 입력 대신 채우기 (기존 직접 입력 방식은 유지)
+     ================================================================ -->
+<script>
+(function () {
+  'use strict';
+
+  function sanitizeSheetName(name, idx) {
+    var s = (name || ('시트' + (idx + 1))).replace(/[\\/:*?"<>|[\]]/g, '_').slice(0, 31);
+    return s || ('시트' + (idx + 1));
+  }
+
+  // ---------- 빈 양식 다운로드 ----------
+  window.downloadTemplateBlankExcel = function () {
+    if (!activeSurveyInfo || !activeSurveyInfo.useTemplate) {
+      alert('자유 서식 정보를 불러오지 못했습니다.');
+      return;
+    }
+    var sheets = activeSurveyInfo.templateSheets || [];
+    if (sheets.length === 0) {
+      alert('다운로드할 서식이 없습니다.');
+      return;
+    }
+    var wb = XLSX.utils.book_new();
+    sheets.forEach(function (sheet, idx) {
+      var data = (sheet.data && sheet.data.length) ? sheet.data : [['']];
+      var ws = XLSX.utils.aoa_to_sheet(data.map(function (row) { return row.slice(); }));
+      XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName(sheet.name, idx));
+    });
+    var titleLabel = (activeSurveyInfo.templateTitle || '서식').replace(/[\\/:*?"<>|]/g, '_');
+    XLSX.writeFile(wb, titleLabel + '_빈양식.xlsx');
+  };
+
+  // ---------- 작성한 엑셀 업로드 → 화면 데이터로 반영 ----------
+  window.handleTemplateFillUpload = function (event) {
+    var file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!activeSurveyInfo || !activeSurveyInfo.useTemplate) {
+      alert('자유 서식 정보를 불러오지 못했습니다.');
+      event.target.value = '';
+      return;
+    }
+
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        var data = new Uint8Array(e.target.result);
+        var wb = XLSX.read(data, { type: 'array' });
+        var sheetsMeta = activeSurveyInfo.templateSheets || [];
+
+        // 현재 화면에 보이는 시트의 입력 내용을 먼저 templateFillSheetsData에 반영해둔다
+        // (업로드로 덮어쓰기 전, 혹시 모를 다른 시트 값 유실 방지)
+        if (typeof captureCurrentTemplateFillSheet === 'function') captureCurrentTemplateFillSheet();
+        if (templateFillSheetsData.length === 0) {
+          templateFillSheetsData = sheetsMeta.map(function (s) {
+            return (s.data && s.data.length) ? s.data.map(function (r) { return r.slice(); }) : [['']];
+          });
+        }
+
+        var totalRowsLoaded = 0;
+        var matchedSheetCount = 0;
+
+        sheetsMeta.forEach(function (sheetMeta, idx) {
+          // 이름이 같은 시트를 우선 찾고, 없으면 같은 순서(인덱스)의 시트를 사용
+          var wsName = wb.SheetNames.indexOf(sheetMeta.name) !== -1
+            ? sheetMeta.name
+            : wb.SheetNames[idx];
+          if (!wsName) return;
+          var ws = wb.Sheets[wsName];
+          if (!ws) return;
+
+          var uploadedRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          if (!uploadedRows || uploadedRows.length === 0) return;
+
+          var templateRows = (sheetMeta.data && sheetMeta.data.length) ? sheetMeta.data : [['']];
+          var colCount = templateRows[0] ? templateRows[0].length : 1;
+
+          var normalizedRows = uploadedRows.map(function (row, r) {
+            var out = [];
+            for (var c = 0; c < colCount; c++) {
+              var uploadedVal = row[c] === undefined || row[c] === null ? '' : String(row[c]).trim();
+              var templateVal = (templateRows[r] && templateRows[r][c] !== undefined) ? String(templateRows[r][c] || '').trim() : '';
+              // 서식에 원래 있던 라벨(고정 텍스트) 칸은 업로드 파일 내용과 무관하게 그대로 유지
+              out.push(templateVal !== '' ? templateVal : uploadedVal);
+            }
+            return out;
+          });
+
+          templateFillSheetsData[idx] = normalizedRows;
+          matchedSheetCount++;
+          totalRowsLoaded += normalizedRows.length;
+        });
+
+        if (matchedSheetCount === 0) {
+          alert('업로드한 파일에서 서식과 일치하는 시트를 찾지 못했습니다. "서식 다운로드(빈 양식)"로 받은 파일 구조를 그대로 사용해주세요.');
+          return;
+        }
+
+        renderTemplateFill();
+        alert('엑셀 파일에서 ' + matchedSheetCount + '개 시트, 총 ' + totalRowsLoaded + '행을 불러왔습니다.\n표 내용을 확인한 뒤 "제출하기"를 눌러주세요.');
+      } catch (err) {
+        console.error(err);
+        alert('엑셀 파일을 읽는 중 오류가 발생했습니다: ' + err.message);
+      } finally {
+        event.target.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+})();
+</script>
+
+
+<!-- ================================================================
+     [추가 기능] 자유 서식 작성 방식: "화면에서 직접 입력" / "엑셀 파일로
+     제출(업로드 전용, 화면 표를 안 봐도 됨)" 중 선택
+     ================================================================ -->
+<script>
+(function () {
+  'use strict';
+
+  var currentFillMode = 'grid';
+
+  function refreshGridKeepingVisibility() {
+    // jspreadsheet는 컨테이너가 화면에 보이는 상태에서 만들어져야 폭 계산이 정확하다.
+    // 업로드 모드(표가 숨겨진 상태)에서도 내부 데이터는 항상 최신으로 유지해야 하므로,
+    // 아주 짧게 보이게 했다가(동일 동기 실행 흐름 안에서) 다시 숨긴다 - 화면 깜빡임 없음.
+    var area = document.getElementById('templateFillGridArea');
+    var wasHidden = area && area.classList.contains('hidden');
+    if (wasHidden) area.classList.remove('hidden');
+    renderTemplateFill();
+    if (wasHidden) area.classList.add('hidden');
+  }
+
+  window.setTemplateFillMode = function (mode) {
+    currentFillMode = mode;
+    var gridArea = document.getElementById('templateFillGridArea');
+    var uploadArea = document.getElementById('templateFillUploadArea');
+    var cardGrid = document.getElementById('fillModeCardGrid');
+    var cardUpload = document.getElementById('fillModeCardUpload');
+    var checkGrid = document.getElementById('fillModeCheckGrid');
+    var checkUpload = document.getElementById('fillModeCheckUpload');
+
+    if (mode === 'upload') {
+      // 표에 직접 입력해둔 내용이 있다면 잃어버리지 않도록 먼저 저장해둔다
+      if (typeof captureCurrentTemplateFillSheet === 'function') captureCurrentTemplateFillSheet();
+      if (gridArea) gridArea.classList.add('hidden');
+      if (uploadArea) uploadArea.classList.remove('hidden');
+      if (cardGrid) cardGrid.classList.remove('selected');
+      if (cardUpload) cardUpload.classList.add('selected');
+      if (checkGrid) checkGrid.classList.add('hidden');
+      if (checkUpload) checkUpload.classList.remove('hidden');
+    } else {
+      if (gridArea) gridArea.classList.remove('hidden');
+      if (uploadArea) uploadArea.classList.add('hidden');
+      if (cardGrid) cardGrid.classList.add('selected');
+      if (cardUpload) cardUpload.classList.remove('selected');
+      if (checkGrid) checkGrid.classList.remove('hidden');
+      if (checkUpload) checkUpload.classList.add('hidden');
+    }
+  };
+
+  // 매번 서식 작성 화면에 새로 들어갈 때는 항상 "직접 입력" 모드로 초기화
+  var _origEnterSurveyForRound = enterSurveyForRound;
+  window.enterSurveyForRound = function () {
+    _origEnterSurveyForRound.apply(this, arguments);
+    var statusEl = document.getElementById('templateFillUploadStatus');
+    if (statusEl) statusEl.textContent = '아직 업로드된 파일이 없습니다.';
+    if (activeSurveyInfo && activeSurveyInfo.useTemplate) setTemplateFillMode('grid');
+  };
+
+  // 업로드 처리: 표를 보여주지 않고도(업로드 모드에서도) 내부 데이터가 정확히 반영되도록 재정의
+  window.handleTemplateFillUpload = function (event) {
+    var file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!activeSurveyInfo || !activeSurveyInfo.useTemplate) {
+      alert('자유 서식 정보를 불러오지 못했습니다.');
+      event.target.value = '';
+      return;
+    }
+    var statusEl = document.getElementById('templateFillUploadStatus');
+
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        var data = new Uint8Array(e.target.result);
+        var wb = XLSX.read(data, { type: 'array' });
+        var sheetsMeta = activeSurveyInfo.templateSheets || [];
+
+        if (templateFillSheetsData.length === 0) {
+          templateFillSheetsData = sheetsMeta.map(function (s) {
+            return (s.data && s.data.length) ? s.data.map(function (r) { return r.slice(); }) : [['']];
+          });
+        }
+
+        var totalRowsLoaded = 0;
+        var matchedSheetCount = 0;
+
+        sheetsMeta.forEach(function (sheetMeta, idx) {
+          var wsName = wb.SheetNames.indexOf(sheetMeta.name) !== -1
+            ? sheetMeta.name
+            : wb.SheetNames[idx];
+          if (!wsName) return;
+          var ws = wb.Sheets[wsName];
+          if (!ws) return;
+
+          var uploadedRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          if (!uploadedRows || uploadedRows.length === 0) return;
+
+          var templateRows = (sheetMeta.data && sheetMeta.data.length) ? sheetMeta.data : [['']];
+          var colCount = templateRows[0] ? templateRows[0].length : 1;
+
+          var normalizedRows = uploadedRows.map(function (row, r) {
+            var out = [];
+            for (var c = 0; c < colCount; c++) {
+              var uploadedVal = row[c] === undefined || row[c] === null ? '' : String(row[c]).trim();
+              var templateVal = (templateRows[r] && templateRows[r][c] !== undefined) ? String(templateRows[r][c] || '').trim() : '';
+              out.push(templateVal !== '' ? templateVal : uploadedVal);
+            }
+            return out;
+          });
+
+          templateFillSheetsData[idx] = normalizedRows;
+          matchedSheetCount++;
+          totalRowsLoaded += normalizedRows.length;
+        });
+
+        if (matchedSheetCount === 0) {
+          if (statusEl) {
+            statusEl.className = 'status-banner error';
+            statusEl.textContent = '❌ 업로드한 파일에서 서식과 일치하는 시트를 찾지 못했습니다. "서식 다운로드(빈 양식)"로 받은 파일 구조를 그대로 사용해주세요.';
+          }
+          return;
+        }
+
+        // 화면 표(숨겨져 있어도)의 내부 데이터를 최신 업로드 내용으로 갱신
+        refreshGridKeepingVisibility();
+
+        if (statusEl) {
+          statusEl.className = 'status-banner ok';
+          statusEl.textContent = '✅ "' + file.name + '" 업로드 완료 — ' + matchedSheetCount + '개 시트, 총 ' + totalRowsLoaded + '행을 불러왔습니다. 이제 "제출하기"를 눌러주세요.';
+        }
+      } catch (err) {
+        console.error(err);
+        if (statusEl) {
+          statusEl.className = 'status-banner error';
+          statusEl.textContent = '❌ 엑셀 파일을 읽는 중 오류가 발생했습니다: ' + err.message;
+        }
+      } finally {
+        event.target.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+})();
+</script>
+
+
+<!-- ================================================================
+     [기능 교체] "엑셀 시트 방식(컬럼 구성)"을 삭제하고 "파일 업로드 방식"으로
+     대체: 담당자가 원하는 형식의 엑셀 파일을 업로드해 배포하면, 기관은 그
+     파일을 받아 작성한 뒤 다시 업로드해서 제출한다.
+     ================================================================ -->
+<script>
+(function () {
+  'use strict';
+
+  var fileUploadSheetsData = []; // 기관 화면에서 업로드된 파일의 시트별 행 데이터
+
+  function sanitizeFileName(name) {
+    return (name || 'file').replace(/[\\/:*?"<>|]/g, '_');
+  }
+
+  // ================= 담당자: 서식 파일 등록 =================
+
+  window.handleManagerFileUploadTemplate = async function (event) {
+    var file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!currentRoundId) {
+      alert('먼저 편집할 회차를 선택해주세요.');
+      event.target.value = '';
+      return;
+    }
+    var statusEl = document.getElementById('fileUploadManagerStatus');
+    if (statusEl) statusEl.textContent = '업로드 중...';
+    try {
+      var buf = await file.arrayBuffer();
+      var wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+      var sheetNames = wb.SheetNames || [];
+      if (sheetNames.length === 0) {
+        alert('엑셀 파일에서 시트를 찾을 수 없습니다.');
+        return;
+      }
+
+      var storagePath = 'managers/' + currentUser.id + '/rounds/' + currentRoundId +
+        '/fileUploadTemplate/' + Date.now() + '_' + sanitizeFileName(file.name);
+      var ref = storage.ref().child(storagePath);
+      var snap = await ref.put(file);
+      var url = await snap.ref.getDownloadURL();
+
+      var prevMeta = currentUser.fileUploadSheetsMeta || [];
+      var newMeta = sheetNames.map(function (name) {
+        var existing = prevMeta.find(function (m) { return m.name === name; });
+        return existing || { name: name, headerRow: null, dataStartRow: null, endCol: null };
+      });
+
+      currentUser.fileUploadUrl = url;
+      currentUser.fileUploadName = file.name;
+      currentUser.fileUploadSheetsMeta = newMeta;
+
+      renderColumnConfigEditor();
+      alert('서식 파일이 업로드되었습니다. 시트별 설정을 지정한 뒤 "임시 저장" 또는 "취합서식 확정"을 눌러주세요.');
+    } catch (err) {
+      console.error(err);
+      alert('업로드 중 오류가 발생했습니다: ' + err.message);
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  function renderFileUploadSheetsSettings() {
+    var container = document.getElementById('fileUploadSheetsSettings');
+    if (!container) return;
+    var meta = currentUser.fileUploadSheetsMeta || [];
+    var locked = columnsLockedForFileUpload;
+    if (meta.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+    container.innerHTML = '<h4 style="margin:10px 0 8px 0; font-size:13px; color:#334155;">시트별 취합 설정</h4>' +
+      '<p style="font-size:11px; color:#94a3b8; margin:0 0 8px 0;">각 시트마다 헤더 행 번호 / 입력행 첫 행 번호 / 끝열 번호를 지정해야 취합 시 행 단위로 정리됩니다. 모두 입력해야 "취합서식 확정"이 가능합니다.</p>' +
+      meta.map(function (m, idx) {
+        return '<div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:8px; padding:8px; border:1px solid #e2e8f0; border-radius:6px;">' +
+          '<strong style="font-size:12px; min-width:100px;">📄 ' + m.name + '</strong>' +
+          '<label style="font-size:12px; display:flex; align-items:center; gap:4px;">헤더 행' +
+          '<input type="number" min="1" value="' + (m.headerRow || '') + '" ' + (locked ? 'disabled' : '') +
+          ' style="width:56px; padding:4px; border:1px solid #cbd5e1; border-radius:4px;" ' +
+          'onchange="updateFileUploadSheetMeta(' + idx + ',\'headerRow\',this.value)"></label>' +
+          '<label style="font-size:12px; display:flex; align-items:center; gap:4px;">입력행 첫 행' +
+          '<input type="number" min="1" value="' + (m.dataStartRow || '') + '" ' + (locked ? 'disabled' : '') +
+          ' style="width:56px; padding:4px; border:1px solid #cbd5e1; border-radius:4px;" ' +
+          'onchange="updateFileUploadSheetMeta(' + idx + ',\'dataStartRow\',this.value)"></label>' +
+          '<label style="font-size:12px; display:flex; align-items:center; gap:4px;">끝열 번호' +
+          '<input type="number" min="1" value="' + (m.endCol || '') + '" ' + (locked ? 'disabled' : '') +
+          ' style="width:56px; padding:4px; border:1px solid #cbd5e1; border-radius:4px;" ' +
+          'onchange="updateFileUploadSheetMeta(' + idx + ',\'endCol\',this.value)"></label>' +
+          '</div>';
+      }).join('');
+  }
+
+  window.updateFileUploadSheetMeta = function (idx, field, value) {
+    if (!currentUser.fileUploadSheetsMeta || !currentUser.fileUploadSheetsMeta[idx]) return;
+    currentUser.fileUploadSheetsMeta[idx][field] = value ? parseInt(value, 10) : null;
+  };
+
+  var columnsLockedForFileUpload = false;
+
+  window.renderColumnConfigEditor = async function () {
+    var hasResponses = currentRoundId ? await roundHasResponses(currentRoundId) : false;
+    var confirmed = !!currentUser.columnsConfirmed;
+    columnsLockedForFileUpload = hasResponses || confirmed;
+
+    var lockBanner = document.getElementById('columnLockBanner');
+    var confirmedBanner = document.getElementById('columnConfirmedBanner');
+    var draftBanner = document.getElementById('columnDraftBanner');
+    if (lockBanner) lockBanner.classList.toggle('hidden', !hasResponses);
+    if (confirmedBanner) confirmedBanner.classList.toggle('hidden', !(confirmed && !hasResponses));
+    if (draftBanner) draftBanner.classList.toggle('hidden', confirmed || hasResponses);
+
+    var saveBtn = document.getElementById('saveColumnConfigBtn');
+    var confirmBtn = document.getElementById('confirmColumnsBtn');
+    var uploadLabel = document.getElementById('fileUploadManagerLabel');
+    if (saveBtn) saveBtn.classList.toggle('hidden', columnsLockedForFileUpload);
+    if (confirmBtn) confirmBtn.classList.toggle('hidden', columnsLockedForFileUpload);
+    if (uploadLabel) uploadLabel.classList.toggle('hidden', columnsLockedForFileUpload);
+
+    var statusEl = document.getElementById('fileUploadManagerStatus');
+    if (statusEl) {
+      if (currentUser.fileUploadName) {
+        statusEl.innerHTML = '현재 등록된 파일: <strong>' + currentUser.fileUploadName + '</strong>' +
+          (currentUser.fileUploadUrl ? ' — <a href="' + currentUser.fileUploadUrl + '" target="_blank" rel="noopener">다운로드해서 확인</a>' : '');
+      } else {
+        statusEl.textContent = '등록된 서식 파일이 없습니다.';
+      }
+    }
+
+    renderFileUploadSheetsSettings();
+  };
+
+  window.saveColumnConfig = async function () {
+    if (!currentRoundId) { alert('먼저 편집할 회차를 선택해주세요.'); return; }
+    if (await roundHasResponses(currentRoundId) || currentUser.columnsConfirmed) {
+      alert('이미 응답이 제출되었거나 확정된 서식은 수정할 수 없습니다.');
+      renderColumnConfigEditor();
+      return;
+    }
+    if (!currentUser.fileUploadUrl) {
+      alert('먼저 서식 파일을 업로드해주세요.');
+      return;
+    }
+    await db.collection('managers').doc(currentUser.id).collection('rounds').doc(currentRoundId).update({
+      fileUploadUrl: currentUser.fileUploadUrl,
+      fileUploadName: currentUser.fileUploadName,
+      fileUploadSheetsMeta: currentUser.fileUploadSheetsMeta || []
+    });
+    alert('임시 저장되었습니다.');
+  };
+
+  window.confirmColumns = async function () {
+    if (!currentRoundId) { alert('먼저 편집할 회차를 선택해주세요.'); return; }
+    if (await roundHasResponses(currentRoundId)) {
+      alert('이미 응답이 제출된 회차는 확정할 수 없습니다.');
+      renderColumnConfigEditor();
+      return;
+    }
+    if (!currentUser.fileUploadUrl) {
+      alert('먼저 서식 파일을 업로드해주세요.');
+      return;
+    }
+    var meta = currentUser.fileUploadSheetsMeta || [];
+    var allConfigured = meta.length > 0 && meta.every(function (m) { return m.headerRow && m.dataStartRow && m.endCol; });
+    if (!allConfigured) {
+      alert('모든 시트에 헤더 행 번호, 입력행 첫 행 번호, 끝열 번호를 지정해야 확정할 수 있습니다.');
+      return;
+    }
+    if (!checkDeadlineBeforeConfirm()) return;
+    if (!confirm('이 서식으로 확정하시겠습니까? 확정 후에는 새 회차를 시작해야 수정할 수 있습니다.')) return;
+
+    currentUser.columnsConfirmed = true;
+    await db.collection('managers').doc(currentUser.id).collection('rounds').doc(currentRoundId).update({
+      fileUploadUrl: currentUser.fileUploadUrl,
+      fileUploadName: currentUser.fileUploadName,
+      fileUploadSheetsMeta: meta,
+      columnsConfirmed: true
+    });
+    await markRoundConfirmedIfNeeded();
+    renderColumnConfigEditor();
+    alert('서식이 확정되었습니다.');
+  };
+
+  // 회차를 바꿀 때마다 파일 업로드 방식 관련 필드를 라운드 문서에서 다시 읽어온다
+  async function syncFileUploadFieldsFromRound() {
+    if (!currentUser) return;
+    if (!currentRoundId) {
+      currentUser.fileUploadUrl = null;
+      currentUser.fileUploadName = null;
+      currentUser.fileUploadSheetsMeta = [];
+      return;
+    }
+    var snap = await db.collection('managers').doc(currentUser.id).collection('rounds').doc(currentRoundId).get();
+    var data = snap.exists ? snap.data() : {};
+    currentUser.fileUploadUrl = data.fileUploadUrl || null;
+    currentUser.fileUploadName = data.fileUploadName || null;
+    currentUser.fileUploadSheetsMeta = data.fileUploadSheetsMeta || [];
+  }
+
+  ['ensureActiveRound', 'switchEditingRound', 'startNewRound', 'closeCurrentEditingRound', 'deleteRound'].forEach(function (fnName) {
+    var orig = window[fnName];
+    if (typeof orig !== 'function') return;
+    window[fnName] = async function () {
+      var result = await orig.apply(this, arguments);
+      await syncFileUploadFieldsFromRound();
+      renderColumnConfigEditor();
+      return result;
+    };
+  });
+
+  // ================= 기관: 서식 파일 다운로드 / 업로드 =================
+
+  window.renderSurveyGrid = function () {
+    // (기존 jspreadsheet 그리드 렌더링을 대체) 파일 업로드 방식은 화면에
+    // 표를 그리지 않고 다운로드/업로드 버튼만 사용한다.
+    fileUploadSheetsData = [];
+    var statusEl = document.getElementById('fileUploadAgencyStatus');
+    if (statusEl) {
+      statusEl.className = 'status-banner';
+      statusEl.style.background = '#f1f5f9';
+      statusEl.style.color = '#475569';
+      statusEl.textContent = '아직 업로드된 파일이 없습니다.';
+    }
+  };
+
+  window.downloadFileUploadTemplate = async function () {
+    if (!activeSurveyInfo || !activeSurveyInfo.fileUploadUrl) {
+      alert('등록된 서식 파일이 없습니다. 담당자에게 문의해주세요.');
+      return;
+    }
+    try {
+      var res = await fetch(activeSurveyInfo.fileUploadUrl);
+      if (!res.ok) throw new Error('다운로드 실패: ' + res.status);
+      var blob = await res.blob();
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = activeSurveyInfo.fileUploadName || 'template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert('서식 파일을 다운로드하는 중 오류가 발생했습니다: ' + err.message);
+    }
+  };
+
+  window.handleAgencyFileUpload = function (event) {
+    var file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!activeSurveyInfo || !activeSurveyInfo.fileUploadSheetsMeta) {
+      alert('서식 정보를 불러오지 못했습니다.');
+      event.target.value = '';
+      return;
+    }
+    var statusEl = document.getElementById('fileUploadAgencyStatus');
+
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        var sheetsMeta = activeSurveyInfo.fileUploadSheetsMeta || [];
+        var result = [];
+        var totalRows = 0;
+
+        sheetsMeta.forEach(function (m, idx) {
+          var wsName = wb.SheetNames.indexOf(m.name) !== -1 ? m.name : wb.SheetNames[idx];
+          if (!wsName) return;
+          var ws = wb.Sheets[wsName];
+          if (!ws) return;
+          var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          var cellsRows = rows.map(function (row) {
+            return { cells: row.map(function (v) { return v === undefined || v === null ? '' : String(v).trim(); }) };
+          });
+          result.push({ name: m.name, rows: cellsRows });
+          totalRows += cellsRows.length;
+        });
+
+        if (result.length === 0) {
+          if (statusEl) {
+            statusEl.className = 'status-banner error';
+            statusEl.textContent = '❌ 업로드한 파일에서 서식과 일치하는 시트를 찾지 못했습니다. "서식 파일 다운로드"로 받은 파일을 그대로 사용해주세요.';
+          }
+          return;
+        }
+
+        fileUploadSheetsData = result;
+        if (statusEl) {
+          statusEl.className = 'status-banner ok';
+          statusEl.textContent = '✅ "' + file.name + '" 업로드 완료 — ' + result.length + '개 시트, 총 ' + totalRows + '행. 이제 "제출하기"를 눌러주세요.';
+        }
+      } catch (err) {
+        console.error(err);
+        if (statusEl) {
+          statusEl.className = 'status-banner error';
+          statusEl.textContent = '❌ 엑셀 파일을 읽는 중 오류가 발생했습니다: ' + err.message;
+        }
+      } finally {
+        event.target.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // enterSurveyForRound가 activeSurveyInfo를 새로 만들 때 fileUploadUrl 등도 함께 담기도록 보강
+  var _origEnterSurveyForRound2 = enterSurveyForRound;
+  window.enterSurveyForRound = function (managerUid, agencyCode, agencyName, round) {
+    _origEnterSurveyForRound2.apply(this, arguments);
+    if (activeSurveyInfo) {
+      activeSurveyInfo.fileUploadUrl = round.fileUploadUrl || null;
+      activeSurveyInfo.fileUploadName = round.fileUploadName || null;
+      activeSurveyInfo.fileUploadSheetsMeta = round.fileUploadSheetsMeta || [];
+    }
+    fileUploadSheetsData = [];
+    var statusEl = document.getElementById('fileUploadAgencyStatus');
+    if (statusEl) statusEl.textContent = '아직 업로드된 파일이 없습니다.';
+  };
+
+  // ================= 제출 처리 (전체 재구현) =================
+
+  window.submitCombined = async function (e) {
+    e.preventDefault();
+    if (!db) { alert('시스템 초기화에 실패했습니다.'); return; }
+    var formEl = e.target;
+    var submitBtn = document.getElementById('surveySubmitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '제출 처리 중...';
+    try {
+      var docData = {
+        agencyName: activeSurveyInfo.agencyName,
+        submittedAt: new Date().toLocaleString('ko'),
+        submittedAtTs: Date.now()
+      };
+
+      if (activeSurveyInfo.useSurvey) {
+        var questions = activeSurveyInfo.questions || [];
+        var answers = {};
+        var formData = new FormData(formEl);
+        var safeAgency = (activeSurveyInfo.agencyName || 'agency').replace(/[^\w가-힣-]/g, '_');
+        var fileSeq = 0;
+        for (var qi = 0; qi < questions.length; qi++) {
+          var q = questions[qi];
+          if (q.type === 'file') {
+            var files = pendingFileAnswers[q.id];
+            if (files && files.length > 0) {
+              var uploaded = [];
+              for (var fi = 0; fi < files.length; fi++) {
+                var fentry = files[fi];
+                submitBtn.textContent = '사진 업로드 중 (' + (fi + 1) + '/' + files.length + ')...';
+                var ext = (fentry.name.split('.').pop() || 'jpg').toLowerCase();
+                var seq = ++fileSeq;
+                var safeName = fentry.name.replace(/[\\/:*?"<>|]/g, '_');
+                var storedName = safeAgency + '_' + 'photo' + '_' + String(seq).padStart(3, '0') + '_' + safeName + '.' + ext;
+                var path = 'managers/' + activeSurveyInfo.managerId + '/rounds/' + activeSurveyInfo.roundId +
+                  '/attachments/' + Date.now() + '_' + storedName;
+                var ref = storage.ref().child(path);
+                var snap = await ref.put(fentry.blob);
+                var url = await snap.ref.getDownloadURL();
+                uploaded.push({ url: url, name: storedName, fileType: 'image/' });
+              }
+              answers[q.id] = JSON.stringify(uploaded);
+              submitBtn.textContent = '제출 처리 중...';
+            } else {
+              answers[q.id] = '';
+            }
+          } else {
+            answers[q.id] = formData.get('q_' + q.id) || '';
+          }
+        }
+        docData.answers = answers;
+      }
+
+      if (activeSurveyInfo.useTemplate && templateFillGrid) {
+        captureCurrentTemplateFillSheet();
+        var templateAnswersSheets = activeSurveyInfo.templateSheets.map(function (sheet, idx) {
+          var colCount = sheet.data && sheet.data[0] ? sheet.data[0].length : 0;
+          var rows = templateFillSheetsData[idx] || sheet.data || [];
+          var cellRows = rows.map(function (row) {
+            return { cells: row.slice(0, colCount).map(function (v) { return v === null || v === undefined ? '' : String(v).trim(); }) };
+          });
+          return { name: sheet.name || ('시트' + (idx + 1)), rows: cellRows };
+        });
+        docData.templateAnswersSheets = templateAnswersSheets;
+        docData.templateAnswers = templateAnswersSheets[0] ? templateAnswersSheets[0].rows : [];
+      }
+
+      if (activeSurveyInfo.useExcel && fileUploadSheetsData.length > 0) {
+        docData.fileUploadSheets = fileUploadSheetsData;
+      }
+
+      var hasAnswers = docData.answers && Object.keys(docData.answers).length > 0 &&
+        Object.values(docData.answers).some(function (v) { return v !== ''; });
+      var hasTemplate = docData.templateAnswersSheets && docData.templateAnswersSheets.some(function (s) {
+        return s.rows.some(function (r) { return r.cells.some(function (v) { return v !== ''; }); });
+      });
+      var hasFileUpload = docData.fileUploadSheets && docData.fileUploadSheets.some(function (s) {
+        return s.rows.some(function (r) { return r.cells.some(function (v) { return v !== ''; }); });
+      });
+
+      if (activeSurveyInfo.useExcel && !hasFileUpload) {
+        alert('작성한 엑셀 파일을 업로드해주세요.');
+        return;
+      }
+      if (!hasAnswers && !hasTemplate && !hasFileUpload) {
+        alert('입력된 내용이 없습니다.');
+        return;
+      }
+
+      await db.collection('managers').doc(activeSurveyInfo.managerId).collection('rounds')
+        .doc(activeSurveyInfo.roundId).collection('responses').add(docData);
+
+      try {
+        var markKey = activeSurveyInfo.roundId + '_' + activeSurveyInfo.agencyName;
+        await db.collection('system').doc('submission_status').set({ [markKey]: true }, { merge: true });
+      } catch (markErr) {
+        console.error('제출여부 마커 기록 오류(제출 자체는 정상 처리됨):', markErr);
+      }
+
+      alert('자료가 성공적으로 제출되었습니다!');
+      exitSurvey();
+    } catch (err) {
+      console.error(err);
+      alert('제출 중 오류가 발생했습니다: ' + err.message);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '제출하기';
+    }
+  };
+
+  // ================= 담당자: 응답 보기 - 파일 업로드 결과 다운로드 =================
+
+  function getCurrentFilteredDocsForFileUpload() {
+    var filterSel = document.getElementById('agencyListFilterSelect');
+    if (!filterSel || !filterSel.value || filterSel.value === '__all__') return cachedResponseDocs;
+    var lists = (currentUser && currentUser.agencyLists) || [];
+    var list = lists.find(function (l) { return l.id === filterSel.value; });
+    if (!list) return cachedResponseDocs;
+    var allowed = {};
+    (list.agencies || []).forEach(function (a) { allowed[a.trim()] = true; });
+    return cachedResponseDocs.filter(function (d) { return allowed[(d.agencyName || '').trim()]; });
+  }
+
+  function downloadFileUploadResponseDoc(doc) {
+    if (!doc.fileUploadSheets || doc.fileUploadSheets.length === 0) return;
+    var wb = XLSX.utils.book_new();
+    doc.fileUploadSheets.forEach(function (sheet, idx) {
+      var aoa = (sheet.rows || []).map(function (r) { return r.cells || []; });
+      var ws = XLSX.utils.aoa_to_sheet(aoa);
+      var name = (sheet.name || ('시트' + (idx + 1))).replace(/[\\/:*?"<>|[\]]/g, '_').slice(0, 31) || ('시트' + (idx + 1));
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    });
+    XLSX.writeFile(wb, '제출파일_' + doc.agencyName + '_' + (doc.submittedAt || '').replace(/[:/\s]/g, '_') + '.xlsx');
+  }
+
+  var _origRenderManagerResponsesForFileUpload = renderManagerResponses;
+  window.renderManagerResponses = function () {
+    _origRenderManagerResponsesForFileUpload.apply(this, arguments);
+    if (!viewingRoundMeta || !viewingRoundMeta.useExcel) return;
+    var header = document.getElementById('responseTableHeader');
+    var body = document.getElementById('responseTableBody');
+    if (!header || !body) return;
+    var th = document.createElement('th');
+    th.textContent = '파일 업로드 결과';
+    header.appendChild(th);
+    var docs = getCurrentFilteredDocsForFileUpload();
+    var rows = body.querySelectorAll('tr');
+    docs.forEach(function (doc, i) {
+      var tr = rows[i];
+      if (!tr) return;
+      var td = document.createElement('td');
+      if (doc.fileUploadSheets && doc.fileUploadSheets.length) {
+        var link = document.createElement('a');
+        link.href = 'javascript:void(0)';
+        link.textContent = '📥 결과 다운로드';
+        link.onclick = function () { downloadFileUploadResponseDoc(doc); };
+        td.appendChild(link);
+      } else {
+        td.textContent = '-';
+      }
+      tr.appendChild(td);
+    });
+  };
+
+  // ================= 담당자: 전체 취합 다운로드에 파일 업로드 방식 반영 =================
+
+  var _origExportToExcelForFileUpload = exportToExcel;
+  window.exportToExcel = function () {
+    if (!viewingRoundMeta || !viewingRoundMeta.useExcel) {
+      return _origExportToExcelForFileUpload.apply(this, arguments);
+    }
+    var meta = viewingRoundMeta.fileUploadSheetsMeta || [];
+    var allConfigured = meta.length > 0 && meta.every(function (m) { return m.headerRow && m.dataStartRow && m.endCol; });
+    if (!allConfigured) {
+      return _origExportToExcelForFileUpload.apply(this, arguments);
+    }
+    var docs = getCurrentFilteredDocsForFileUpload();
+    if (docs.length === 0) {
+      alert('취합된 응답이 없습니다.');
+      return;
+    }
+
+    var headerInfo = meta.map(function (m) {
+      return { name: m.name, headerRow: m.headerRow, dataStartRow: m.dataStartRow, endCol: m.endCol };
+    });
+    var multiSheet = headerInfo.length > 1;
+    var outRows = [['제출 기관명', '제출일시'].concat(multiSheet ? ['시트'] : []).concat(
+      Array.from({ length: headerInfo[0].endCol }, function (_, i) { return '열' + (i + 1); })
+    )];
+
+    docs.forEach(function (doc) {
+      var sheets = doc.fileUploadSheets || [];
+      headerInfo.forEach(function (info) {
+        var sheet = sheets.find(function (s) { return s.name === info.name; });
+        var rows = (sheet && sheet.rows) || [];
+        for (var r = info.dataStartRow - 1; r < rows.length; r++) {
+          var cells = (rows[r] && rows[r].cells) || [];
+          var rowVals = [];
+          var hasVal = false;
+          for (var c = 0; c < info.endCol; c++) {
+            var v = cells[c] !== undefined ? cells[c] : '';
+            if (String(v).trim() !== '') hasVal = true;
+            rowVals.push(v);
+          }
+          if (!hasVal) continue;
+          outRows.push([doc.agencyName, doc.submittedAt].concat(multiSheet ? [info.name] : []).concat(rowVals));
+        }
+      });
+    });
+
+    var ws = XLSX.utils.aoa_to_sheet(outRows);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '응답취합');
+    var roundMeta = roundsList.find(function (r) { return r.id === viewingRoundId; });
+    var fileLabel = roundMeta ? roundMeta.name : (currentUser.agencyCode || currentUser.id);
+    XLSX.writeFile(wb, '취합결과_' + fileLabel + '.xlsx');
   };
 })();
 </script>
