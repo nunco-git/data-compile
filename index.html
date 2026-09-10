@@ -430,38 +430,36 @@
         <button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
       </div>
 
-      <div class="q-card" style="background:#fff7ed; border-color:#fdba74; margin-bottom: 20px;">
-        <h4 style="margin-top:0; color:#9a3412;">📋 진행 중인 회차 목록</h4>
-        <div id="openRoundsList" style="font-size:13.2px;"></div>
-      </div>
+      <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:stretch; margin-bottom:20px;">
+        <div class="q-card" style="background:#fefce8; border-color:#fde68a; margin-bottom:0; flex:1 1 0; min-width:280px;">
+          <h4 style="color:#92400e; margin-top:0;">🗂️ 취합 회차 관리</h4>
+          <ul style="font-size:13.2px; color:#78350f; margin:4px 0 10px 0; padding-left:18px;">
+            <li>여러 설문을 <strong>동시에</strong> 진행 가능 (새 회차를 추가해도 기존 회차는 안 닫힘)</li>
+            <li>기관은 "🔗 기관 접속 정보"의 접속 코드로 동일하게 접속, 진행 중인 설문이 여러 개면 목록에서 선택</li>
+            <li>설문이 끝나면 "이 회차 종료"로 마감</li>
+          </ul>
 
-      <div class="q-card" style="background:#fefce8; border-color:#fde68a; margin-bottom: 20px;">
-        <h4 style="color:#92400e; margin-top:0;">🗂️ 취합 회차 관리</h4>
-        <p style="font-size:13.2px; color:#78350f; margin:4px 0 10px 0;">
-          여러 설문을 <strong>동시에</strong> 진행할 수 있습니다. 새 회차를 추가해도 기존에 진행 중인 회차는 닫히지 않습니다. 기관은 아래쪽 "🔗 기관 접속 정보"의 접속 코드로 동일하게 들어오며, 진행 중인 설문이 여러 개면 어떤 설문에 참여할지 목록에서 고르게 됩니다. 설문이 끝나면 "이 회차 종료"를 눌러 마감하세요.
-        </p>
-
-        <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
-          <div style="flex:1 1 0; min-width:220px;">
-            <div class="form-group" style="margin-bottom:10px;">
-              <label>지금 편집할 회차</label>
-              <select id="editingRoundSelector" onchange="switchEditingRound(this.value)" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></select>
-            </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button class="btn btn-sm" onclick="startNewRound()">➕ 새 회차 추가</button>
-              <button class="btn btn-sm btn-danger" id="closeRoundBtn" onclick="closeCurrentEditingRound()">🔒 이 회차 종료</button>
-            </div>
+          <div class="form-group" style="margin-bottom:10px;">
+            <label>지금 편집할 회차</label>
+            <select id="editingRoundSelector" onchange="switchEditingRound(this.value)" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></select>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+            <button class="btn btn-sm" onclick="startNewRound()">➕ 새 회차 추가</button>
+            <button class="btn btn-sm btn-danger" id="closeRoundBtn" onclick="closeCurrentEditingRound()">🔒 이 회차 종료</button>
           </div>
 
-          <div style="flex:1 1 0; min-width:220px;">
-            <div class="form-group" style="margin-bottom:0;">
-              <label>제출기한 (선택, 기관 목록 화면에 표시됩니다)</label>
-              <div style="display:flex; gap:8px; align-items:center;">
-                <input type="date" id="roundDeadlineInput" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px; flex:1;" />
-                <button type="button" class="btn btn-secondary btn-sm" onclick="saveRoundDeadline()">저장</button>
-              </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>제출기한 (선택, 기관 목록 화면에 표시됩니다)</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="date" id="roundDeadlineInput" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px; flex:1;" />
+              <button type="button" class="btn btn-secondary btn-sm" onclick="saveRoundDeadline()">저장</button>
             </div>
           </div>
+        </div>
+
+        <div class="q-card" style="background:#fff7ed; border-color:#fdba74; margin-bottom:0; flex:1 1 0; min-width:280px;">
+          <h4 style="margin-top:0; color:#9a3412;">📋 진행 중인 회차 목록</h4>
+          <div id="openRoundsList" style="font-size:13.2px;"></div>
         </div>
       </div>
 
@@ -966,10 +964,12 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       : 'background:#f0fdf4; border-color:#bbf7d0; margin-bottom:20px;';
     panel.innerHTML =
       '<h4 style="color:#166534; margin-top:0;">🏷️ 제출 기관 명단 관리</h4>' +
-      '<p style="font-size:13.2px; color:#166534; margin:4px 0 10px 0;">' +
-      '특정 기관들만 모아 여러 개의 명단으로 저장해두고, "응답 취합" 화면에서 원하는 명단으로 필터링해서 볼 수 있습니다.</p>' +
+      '<ul style="font-size:13.2px; color:#166534; margin:4px 0 10px 0; padding-left:18px;">' +
+      '<li>기관들을 여러 개의 명단으로 저장·관리</li>' +
+      '<li>"응답 취합" 화면에서 원하는 명단으로 필터링해서 조회</li>' +
+      '</ul>' +
       '<div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">' +
-      '<div style="flex:1 1 0; min-width:220px; display:flex; flex-direction:column; gap:10px;">' +
+      '<div style="flex:1 1 0; min-width:200px; display:flex; flex-direction:column; gap:10px;">' +
       '<div class="form-group" style="margin-bottom:0;">' +
       '<label>명단 선택</label>' +
       '<select id="agencyListSelect" onchange="loadAgencyListToEditor(this.value)" ' +
@@ -979,20 +979,20 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       '<button type="button" class="btn btn-secondary btn-sm" onclick="createNewAgencyList()">➕ 새 명단 만들기</button>' +
       '<button type="button" class="btn btn-danger btn-sm" onclick="deleteAgencyList()">🗑️ 이 명단 삭제</button>' +
       '</div>' +
-      '<div class="form-group" style="margin-bottom:0;">' +
+      '</div>' +
+      '<div style="flex:1 1 0; min-width:280px; display:flex; flex-direction:column;">' +
+      '<div class="form-group" style="margin-bottom:8px;">' +
       '<label>명단 이름</label>' +
       '<input type="text" id="agencyListNameInput" placeholder="예: 서울 지역 요양시설" ' +
       'style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />' +
       '</div>' +
-      '<button type="button" class="btn btn-sm btn-excel" id="saveAgencyListBtn" onclick="saveAgencyList()" style="margin-top:auto;">💾 이 명단 저장</button>' +
-      '</div>' +
-      '<div style="flex:1 1 0; min-width:260px;">' +
-      '<div class="form-group" style="margin-bottom:0; height:100%; display:flex; flex-direction:column;">' +
+      '<div class="form-group" style="margin-bottom:0; flex:1; display:flex; flex-direction:column;">' +
       '<label>소속 기관명 (한 줄에 하나씩 입력)</label>' +
-      '<textarea id="agencyListNamesTextarea" rows="10" placeholder="예:\n행복한노인요양원\n사랑의집요양원" ' +
-      'style="width:100%; flex:1; min-height:180px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; resize:vertical;"></textarea>' +
+      '<textarea id="agencyListNamesTextarea" rows="8" placeholder="예:\n행복한노인요양원\n사랑의집요양원" ' +
+      'style="width:100%; flex:1; min-height:150px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; resize:vertical;"></textarea>' +
       '<p style="font-size:12.1px; color:#94a3b8; margin:4px 0 0 0;">기관에서 제출할 때 입력하는 "기관명(제출 시 표시되는 이름)"과 정확히 같은 문자열이어야 필터링이 적용됩니다.</p>' +
       '</div>' +
+      '<button type="button" class="btn btn-sm btn-excel" id="saveAgencyListBtn" onclick="saveAgencyList()" style="margin-top:10px;">💾 이 명단 저장</button>' +
       '</div>' +
       '</div>';
 
