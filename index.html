@@ -430,6 +430,11 @@
         <button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
       </div>
 
+      <div class="q-card" style="background:#fff7ed; border-color:#fdba74; margin-bottom: 20px;">
+        <h4 style="margin-top:0; color:#9a3412;">📋 진행 중인 회차 목록</h4>
+        <div id="openRoundsList" style="font-size:13.2px;"></div>
+      </div>
+
       <div class="q-card" style="background:#fefce8; border-color:#fde68a; margin-bottom: 20px;">
         <h4 style="color:#92400e; margin-top:0;">🗂️ 취합 회차 관리</h4>
         <p style="font-size:13.2px; color:#78350f; margin:4px 0 10px 0;">
@@ -456,11 +461,6 @@
                 <button type="button" class="btn btn-secondary btn-sm" onclick="saveRoundDeadline()">저장</button>
               </div>
             </div>
-          </div>
-
-          <div style="flex:1 1 0; min-width:220px;">
-            <h4 style="margin:0 0 6px 0; font-size:14.3px; color:#78350f;">진행 중인 회차 목록</h4>
-            <div id="openRoundsList" style="font-size:13.2px; max-height:150px; overflow-y:auto;"></div>
           </div>
         </div>
       </div>
@@ -968,27 +968,33 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       '<h4 style="color:#166534; margin-top:0;">🏷️ 제출 기관 명단 관리</h4>' +
       '<p style="font-size:13.2px; color:#166534; margin:4px 0 10px 0;">' +
       '특정 기관들만 모아 여러 개의 명단으로 저장해두고, "응답 취합" 화면에서 원하는 명단으로 필터링해서 볼 수 있습니다.</p>' +
-      '<div class="form-group" style="margin-bottom:8px;">' +
+      '<div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">' +
+      '<div style="flex:1 1 0; min-width:220px; display:flex; flex-direction:column; gap:10px;">' +
+      '<div class="form-group" style="margin-bottom:0;">' +
       '<label>명단 선택</label>' +
-      '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">' +
       '<select id="agencyListSelect" onchange="loadAgencyListToEditor(this.value)" ' +
-      'style="padding:8px; border:1px solid #cbd5e1; border-radius:6px; min-width:200px;"></select>' +
+      'style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></select>' +
+      '</div>' +
+      '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
       '<button type="button" class="btn btn-secondary btn-sm" onclick="createNewAgencyList()">➕ 새 명단 만들기</button>' +
       '<button type="button" class="btn btn-danger btn-sm" onclick="deleteAgencyList()">🗑️ 이 명단 삭제</button>' +
-      '</div></div>' +
-      '<div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">' +
-      '<div class="form-group" style="margin-bottom:8px; flex:1 1 0; min-width:180px;">' +
+      '</div>' +
+      '<div class="form-group" style="margin-bottom:0;">' +
       '<label>명단 이름</label>' +
       '<input type="text" id="agencyListNameInput" placeholder="예: 서울 지역 요양시설" ' +
-      'style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" /></div>' +
-      '<div class="form-group" style="margin-bottom:8px; flex:2 1 0; min-width:260px;">' +
+      'style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />' +
+      '</div>' +
+      '<button type="button" class="btn btn-sm btn-excel" id="saveAgencyListBtn" onclick="saveAgencyList()" style="margin-top:auto;">💾 이 명단 저장</button>' +
+      '</div>' +
+      '<div style="flex:1 1 0; min-width:260px;">' +
+      '<div class="form-group" style="margin-bottom:0; height:100%; display:flex; flex-direction:column;">' +
       '<label>소속 기관명 (한 줄에 하나씩 입력)</label>' +
-      '<textarea id="agencyListNamesTextarea" rows="6" placeholder="예:\n행복한노인요양원\n사랑의집요양원" ' +
-      'style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; resize:vertical;"></textarea>' +
+      '<textarea id="agencyListNamesTextarea" rows="10" placeholder="예:\n행복한노인요양원\n사랑의집요양원" ' +
+      'style="width:100%; flex:1; min-height:180px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; resize:vertical;"></textarea>' +
       '<p style="font-size:12.1px; color:#94a3b8; margin:4px 0 0 0;">기관에서 제출할 때 입력하는 "기관명(제출 시 표시되는 이름)"과 정확히 같은 문자열이어야 필터링이 적용됩니다.</p>' +
       '</div>' +
       '</div>' +
-      '<button type="button" class="btn btn-sm btn-excel" id="saveAgencyListBtn" onclick="saveAgencyList()">💾 이 명단 저장</button>';
+      '</div>';
 
     if (slot) {
       slot.appendChild(panel);
@@ -2229,6 +2235,99 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
     var roundMeta = roundsList.find(function (r) { return r.id === viewingRoundId; });
     var fileLabel = roundMeta ? roundMeta.name : (currentUser.agencyCode || currentUser.id);
     XLSX.writeFile(wb, '취합결과_' + fileLabel + '.xlsx');
+  };
+})();
+</script>
+
+
+<!-- ================================================================
+     [추가 기능] "진행 중인 회차 목록"에 회차별 응답 현황(대상 기관 수 /
+     응답 수 / 미응답 수)을 실시간으로 표시
+     ================================================================ -->
+<script>
+(function () {
+  'use strict';
+
+  var roundListResponseUnsubs = {};
+
+  function teardownRoundListListeners() {
+    Object.keys(roundListResponseUnsubs).forEach(function (k) {
+      try { roundListResponseUnsubs[k](); } catch (e) {}
+    });
+    roundListResponseUnsubs = {};
+  }
+
+  function getAllTargetAgencies() {
+    var set = {};
+    (currentUser.agencyLists || []).forEach(function (list) {
+      (list.agencies || []).forEach(function (a) {
+        var t = (a || '').trim();
+        if (t) set[t] = true;
+      });
+    });
+    return Object.keys(set);
+  }
+
+  function esc(s) {
+    return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function renderOpenRoundsListWithStats(openRounds) {
+    var container = document.getElementById('openRoundsList');
+    if (!container) return;
+    teardownRoundListListeners();
+
+    if (openRounds.length === 0) {
+      container.innerHTML = '<span style="color:#94a3b8;">진행 중인 회차가 없습니다.</span>';
+      return;
+    }
+
+    var target = getAllTargetAgencies();
+
+    container.innerHTML = openRounds.map(function (r) {
+      return '<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #fde68a; flex-wrap:wrap; gap:6px;">' +
+        '<span>' + (r.id === currentRoundId ? '✏️ ' : '') + '<strong>' + esc(r.name) + '</strong>' +
+        (r.deadline ? ' <span style="color:#94a3b8;">(기한: ' + esc(r.deadline) + ')</span>' : '') +
+        '</span>' +
+        '<span id="roundListStats_' + r.id + '" style="font-size:12.1px; color:#64748b;">불러오는 중...</span>' +
+        '</div>';
+    }).join('');
+
+    openRounds.forEach(function (r) {
+      var ref = db.collection('managers').doc(currentUser.id).collection('rounds').doc(r.id).collection('responses');
+      var unsub = ref.onSnapshot(function (snap) {
+        var respondedSet = {};
+        snap.docs.forEach(function (d) {
+          var n = ((d.data() || {}).agencyName || '').trim();
+          if (n) respondedSet[n] = true;
+        });
+        var statEl = document.getElementById('roundListStats_' + r.id);
+        if (!statEl) return;
+        if (target.length === 0) {
+          statEl.textContent = '응답 ' + snap.size + '건 (대상 기관 명단 미등록)';
+        } else {
+          var respondedCount = target.filter(function (a) { return respondedSet[a]; }).length;
+          var notResponded = target.length - respondedCount;
+          statEl.innerHTML = '<strong style="color:#0f172a;">' + target.length + '</strong>개 기관 중 ' +
+            '<strong style="color:#16a34a;">' + respondedCount + '</strong>개 응답 · ' +
+            '<strong style="color:#dc2626;">' + notResponded + '</strong>개 미응답';
+        }
+      }, function (err) { console.error('회차 응답 구독 오류:', err); });
+      roundListResponseUnsubs[r.id] = unsub;
+    });
+  }
+
+  var _origRenderRoundManagementPanel = renderRoundManagementPanel;
+  window.renderRoundManagementPanel = function () {
+    _origRenderRoundManagementPanel.apply(this, arguments);
+    var openRounds = (roundsList || []).filter(function (r) { return r.status === 'open'; });
+    renderOpenRoundsListWithStats(openRounds);
+  };
+
+  var _origLogoutForRoundStats = logout;
+  window.logout = function () {
+    teardownRoundListListeners();
+    _origLogoutForRoundStats.apply(this, arguments);
   };
 })();
 </script>
