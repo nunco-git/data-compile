@@ -439,21 +439,22 @@
             <li>설문이 끝나면 "이 회차 종료"로 마감</li>
           </ul>
 
-          <div class="form-group" style="margin-bottom:10px;">
-            <label>지금 편집할 회차</label>
-            <select id="editingRoundSelector" onchange="switchEditingRound(this.value)" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></select>
+          <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; margin-bottom:10px;">
+            <div class="form-group" style="margin-bottom:0; flex:1 1 0; min-width:160px;">
+              <label>지금 편집할 회차</label>
+              <select id="editingRoundSelector" onchange="switchEditingRound(this.value)" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></select>
+            </div>
+            <div class="form-group" style="margin-bottom:0; flex:1 1 0; min-width:160px;">
+              <label>제출기한 (선택)</label>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input type="date" id="roundDeadlineInput" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px; flex:1;" />
+                <button type="button" class="btn btn-secondary btn-sm" onclick="saveRoundDeadline()">저장</button>
+              </div>
+            </div>
           </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-sm" onclick="startNewRound()">➕ 새 회차 추가</button>
             <button class="btn btn-sm btn-danger" id="closeRoundBtn" onclick="closeCurrentEditingRound()">🔒 이 회차 종료</button>
-          </div>
-
-          <div class="form-group" style="margin-bottom:0;">
-            <label>제출기한 (선택, 기관 목록 화면에 표시됩니다)</label>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <input type="date" id="roundDeadlineInput" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px; flex:1;" />
-              <button type="button" class="btn btn-secondary btn-sm" onclick="saveRoundDeadline()">저장</button>
-            </div>
           </div>
         </div>
 
@@ -963,20 +964,18 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       ? 'background:#f0fdf4; border-color:#bbf7d0; margin-bottom:0; flex:1 1 0; width:100%;'
       : 'background:#f0fdf4; border-color:#bbf7d0; margin-bottom:20px;';
     panel.innerHTML =
-      '<div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px;">' +
-      '<h4 style="color:#166534; margin:0;">🏷️ 제출 기관 명단 관리</h4>' +
-      '<div style="display:flex; align-items:center; gap:6px;">' +
+      '<div style="display:grid; grid-template-columns: minmax(200px,1fr) minmax(280px,1.3fr); gap:8px 20px; align-items:start;">' +
+      '<h4 style="color:#166534; margin:0; grid-column:1;">🏷️ 제출 기관 명단 관리</h4>' +
+      '<div style="grid-column:2; display:flex; align-items:center; gap:6px;">' +
       '<label style="font-size:12.1px; color:#166534; white-space:nowrap;">명단 이름</label>' +
       '<input type="text" id="agencyListNameInput" placeholder="예: 서울 지역 요양시설" ' +
-      'style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; width:200px;" />' +
+      'style="flex:1; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />' +
       '</div>' +
-      '</div>' +
-      '<ul style="font-size:13.2px; color:#166534; margin:4px 0 10px 0; padding-left:18px;">' +
+      '<ul style="grid-column:1 / -1; font-size:13.2px; color:#166534; margin:0; padding-left:18px;">' +
       '<li>기관들을 여러 개의 명단으로 저장·관리</li>' +
       '<li>"응답 취합" 화면에서 원하는 명단으로 필터링해서 조회</li>' +
       '</ul>' +
-      '<div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">' +
-      '<div style="flex:1 1 0; min-width:200px; display:flex; flex-direction:column; gap:10px;">' +
+      '<div style="grid-column:1; display:flex; flex-direction:column; gap:10px;">' +
       '<div class="form-group" style="margin-bottom:0;">' +
       '<label>명단 선택</label>' +
       '<select id="agencyListSelect" onchange="loadAgencyListToEditor(this.value)" ' +
@@ -988,7 +987,7 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       '</div>' +
       '<button type="button" class="btn btn-sm btn-excel" id="saveAgencyListBtn" onclick="saveAgencyList()" style="margin-top:auto;">💾 이 명단 저장</button>' +
       '</div>' +
-      '<div style="flex:1 1 0; min-width:280px;">' +
+      '<div style="grid-column:2;">' +
       '<div class="form-group" style="margin-bottom:0;">' +
       '<label>소속 기관명 (한 줄에 하나씩 입력)</label>' +
       '<textarea id="agencyListNamesTextarea" rows="5" placeholder="예:\n행복한노인요양원\n사랑의집요양원" ' +
@@ -1727,12 +1726,20 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       event.target.value = '';
       return;
     }
+    if (!storage) {
+      alert('Firebase Storage가 초기화되지 않았습니다. 페이지를 새로고침해보세요.');
+      event.target.value = '';
+      return;
+    }
     var statusEl = document.getElementById('fileUploadManagerStatus');
-    if (statusEl) statusEl.textContent = '업로드 중...';
+    if (statusEl) statusEl.textContent = '업로드 중... (0%)';
+    console.log('[파일업로드] 시작', file.name, file.size + ' bytes');
     try {
+      console.log('[파일업로드] 엑셀 파싱 중...');
       var buf = await file.arrayBuffer();
       var wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
       var sheetNames = wb.SheetNames || [];
+      console.log('[파일업로드] 시트 목록:', sheetNames);
       if (sheetNames.length === 0) {
         alert('엑셀 파일에서 시트를 찾을 수 없습니다.');
         return;
@@ -1740,9 +1747,34 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
 
       var storagePath = 'managers/' + currentUser.id + '/rounds/' + currentRoundId +
         '/fileUploadTemplate/' + Date.now() + '_' + sanitizeFileName(file.name);
-      var ref = storage.ref().child(storagePath);
-      var snap = await ref.put(file);
-      var url = await snap.ref.getDownloadURL();
+      console.log('[파일업로드] Storage 업로드 시작:', storagePath);
+
+      var uploadTask = storage.ref().child(storagePath).put(file);
+      var url = await new Promise(function (resolve, reject) {
+        var settled = false;
+        var timer = setTimeout(function () {
+          if (settled) return;
+          settled = true;
+          reject(new Error('20초 넘게 응답이 없습니다. Firebase Storage 설정(보안 규칙/CORS) 또는 네트워크 연결, 또는 이 페이지를 http(s) 주소로 열었는지 확인해주세요.'));
+        }, 20000);
+        uploadTask.on('state_changed', function (snap) {
+          var pct = snap.totalBytes ? Math.round((snap.bytesTransferred / snap.totalBytes) * 100) : 0;
+          console.log('[파일업로드] 진행률', pct + '%');
+          if (statusEl) statusEl.textContent = '업로드 중... (' + pct + '%)';
+        }, function (err) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          reject(err);
+        }, function () {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          console.log('[파일업로드] 업로드 완료, 다운로드 URL 가져오는 중...');
+          uploadTask.snapshot.ref.getDownloadURL().then(resolve).catch(reject);
+        });
+      });
+      console.log('[파일업로드] 다운로드 URL:', url);
 
       var prevMeta = currentUser.fileUploadSheetsMeta || [];
       var newMeta = sheetNames.map(function (name) {
@@ -1757,8 +1789,11 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       renderColumnConfigEditor();
       alert('서식 파일이 업로드되었습니다. 시트별 설정을 지정한 뒤 "임시 저장" 또는 "취합서식 확정"을 눌러주세요.');
     } catch (err) {
-      console.error(err);
-      alert('업로드 중 오류가 발생했습니다: ' + err.message);
+      console.error('[파일업로드] 오류:', err);
+      if (statusEl) statusEl.textContent = '❌ 업로드 실패';
+      alert('업로드 중 오류가 발생했습니다: ' + (err && err.message ? err.message : err) +
+        (err && err.code ? '\n(오류 코드: ' + err.code + ')' : '') +
+        '\n\n브라우저 개발자 도구(F12) → Console 탭에서 더 자세한 로그를 확인할 수 있습니다.');
     } finally {
       event.target.value = '';
     }
