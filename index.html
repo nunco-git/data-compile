@@ -963,7 +963,14 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       ? 'background:#f0fdf4; border-color:#bbf7d0; margin-bottom:0; flex:1 1 0; width:100%;'
       : 'background:#f0fdf4; border-color:#bbf7d0; margin-bottom:20px;';
     panel.innerHTML =
-      '<h4 style="color:#166534; margin-top:0;">🏷️ 제출 기관 명단 관리</h4>' +
+      '<div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px;">' +
+      '<h4 style="color:#166534; margin:0;">🏷️ 제출 기관 명단 관리</h4>' +
+      '<div style="display:flex; align-items:center; gap:6px;">' +
+      '<label style="font-size:12.1px; color:#166534; white-space:nowrap;">명단 이름</label>' +
+      '<input type="text" id="agencyListNameInput" placeholder="예: 서울 지역 요양시설" ' +
+      'style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; width:200px;" />' +
+      '</div>' +
+      '</div>' +
       '<ul style="font-size:13.2px; color:#166534; margin:4px 0 10px 0; padding-left:18px;">' +
       '<li>기관들을 여러 개의 명단으로 저장·관리</li>' +
       '<li>"응답 취합" 화면에서 원하는 명단으로 필터링해서 조회</li>' +
@@ -979,20 +986,15 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       '<button type="button" class="btn btn-secondary btn-sm" onclick="createNewAgencyList()">➕ 새 명단 만들기</button>' +
       '<button type="button" class="btn btn-danger btn-sm" onclick="deleteAgencyList()">🗑️ 이 명단 삭제</button>' +
       '</div>' +
+      '<button type="button" class="btn btn-sm btn-excel" id="saveAgencyListBtn" onclick="saveAgencyList()" style="margin-top:auto;">💾 이 명단 저장</button>' +
       '</div>' +
-      '<div style="flex:1 1 0; min-width:280px; display:flex; flex-direction:column;">' +
-      '<div class="form-group" style="margin-bottom:8px;">' +
-      '<label>명단 이름</label>' +
-      '<input type="text" id="agencyListNameInput" placeholder="예: 서울 지역 요양시설" ' +
-      'style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />' +
-      '</div>' +
-      '<div class="form-group" style="margin-bottom:0; flex:1; display:flex; flex-direction:column;">' +
+      '<div style="flex:1 1 0; min-width:280px;">' +
+      '<div class="form-group" style="margin-bottom:0;">' +
       '<label>소속 기관명 (한 줄에 하나씩 입력)</label>' +
-      '<textarea id="agencyListNamesTextarea" rows="8" placeholder="예:\n행복한노인요양원\n사랑의집요양원" ' +
-      'style="width:100%; flex:1; min-height:150px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; resize:vertical;"></textarea>' +
+      '<textarea id="agencyListNamesTextarea" rows="5" placeholder="예:\n행복한노인요양원\n사랑의집요양원" ' +
+      'style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; resize:vertical;"></textarea>' +
       '<p style="font-size:12.1px; color:#94a3b8; margin:4px 0 0 0;">기관에서 제출할 때 입력하는 "기관명(제출 시 표시되는 이름)"과 정확히 같은 문자열이어야 필터링이 적용됩니다.</p>' +
       '</div>' +
-      '<button type="button" class="btn btn-sm btn-excel" id="saveAgencyListBtn" onclick="saveAgencyList()" style="margin-top:10px;">💾 이 명단 저장</button>' +
       '</div>' +
       '</div>';
 
