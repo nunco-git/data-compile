@@ -1630,6 +1630,7 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       try {
         var data = new Uint8Array(e.target.result);
         var wb = XLSX.read(data, { type: 'array' });
+        validateXlsxFileOrThrow(file, data, wb);
         var sheetsMeta = activeSurveyInfo.templateSheets || [];
 
         if (templateFillSheetsData.length === 0) {
@@ -1737,7 +1738,9 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
     try {
       console.log('[파일업로드] 엑셀 파싱 중...');
       var buf = await file.arrayBuffer();
-      var wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+      var bytes = new Uint8Array(buf);
+      var wb = XLSX.read(bytes, { type: 'array' });
+      validateXlsxFileOrThrow(file, bytes, wb);
       var sheetNames = wb.SheetNames || [];
       console.log('[파일업로드] 시트 목록:', sheetNames);
       if (sheetNames.length === 0) {
@@ -1997,7 +2000,9 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
     var reader = new FileReader();
     reader.onload = function (e) {
       try {
-        var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        var bytes = new Uint8Array(e.target.result);
+        var wb = XLSX.read(bytes, { type: 'array' });
+        validateXlsxFileOrThrow(file, bytes, wb);
         var sheetsMeta = activeSurveyInfo.fileUploadSheetsMeta || [];
         var result = [];
         var totalRows = 0;
@@ -2367,6 +2372,26 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
     _origLogoutForRoundStats.apply(this, arguments);
   };
 })();
+</script>
+
+
+<!-- ================================================================
+     [보안 강화] 업로드되는 엑셀 파일 검증: .xlsx 확장자만 허용, 실제
+     파일 시그니처(ZIP) 확인, 매크로(VBA) 포함 여부 검사
+     ================================================================ -->
+<script>
+  function validateXlsxFileOrThrow(file, bytes, wb) {
+    var name = (file && file.name || '').toLowerCase();
+    if (!name.endsWith('.xlsx')) {
+      throw new Error('.xlsx 파일만 업로드할 수 있습니다. (.xls, .xlsm 등 다른 형식은 허용되지 않습니다)');
+    }
+    if (!bytes || bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4B || bytes[2] !== 0x03 || bytes[3] !== 0x04) {
+      throw new Error('올바른 엑셀(xlsx) 파일 형식이 아닙니다. 확장자만 xlsx로 바뀐 다른 파일일 수 있습니다.');
+    }
+    if (wb && wb.vbaraw) {
+      throw new Error('매크로(VBA)가 포함된 파일은 업로드할 수 없습니다. 매크로를 제거한 뒤 다시 저장해서 업로드해주세요.');
+    }
+  }
 </script>
 
 </body>
