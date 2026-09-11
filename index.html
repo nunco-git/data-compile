@@ -91,7 +91,7 @@
 
     .login-summary-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
     .login-summary-list li { display: flex; align-items: flex-start; gap: 9px; background: rgba(255,255,255,0.55); border: 1px solid rgba(187,247,208,0.7); border-radius: 9px; padding: 8px 11px; font-size: 0.913rem; line-height: 1.5; }
-    .login-summary-list .feat-icon { flex-shrink: 0; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; background: #16a34a; color: white; display: flex; align-items: center; justify-content: center; font-size: 12.1px; box-shadow: 0 2px 4px rgba(22,163,74,0.25); }
+    .login-summary-list .feat-icon { flex-shrink: 0; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; background: #16a34a; color: white; display: flex; align-items: center; justify-content: center; font-size: 14.1px; box-shadow: 0 2px 4px rgba(22,163,74,0.25); }
     .login-summary-list strong { font-size: 0.913rem; font-weight: 700; color: #14532d; }
     .login-summary-list .feat-desc { color: #166534; font-weight: 400; }
 
@@ -172,7 +172,7 @@
     .mode-card h3 { margin: 0 0 8px 0; font-size: 17.6px; color: #1e293b; }
     .mode-card p { margin: 0; font-size: 13.2px; color: #64748b; line-height: 1.4; }
     .mode-check { position: absolute; top: 10px; right: 12px; font-size: 14.3px; font-weight: bold; color: #2563eb; }
-    .mode-hint { font-size: 12.1px; color: #94a3b8; margin: 0 0 16px 0; text-align: left; }
+    .mode-hint { font-size: 14.1px; color: #94a3b8; margin: 0 0 16px 0; text-align: left; }
 
     .grid-top-scroll {
       overflow-x: auto; overflow-y: hidden; height: 16px; margin-bottom: 4px;
@@ -191,7 +191,7 @@
     .grid-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 7px; }
     .grid-container::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 7px; border: 3px solid #f1f5f9; }
     .grid-container::-webkit-scrollbar-thumb:hover { background: #64748b; }
-    .grid-hint { font-size: 12.1px; color: #94a3b8; margin: 0 0 10px 0; }
+    .grid-hint { font-size: 14.1px; color: #94a3b8; margin: 0 0 10px 0; }
 
     table.data-grid { width: 100%; border-collapse: collapse; background-color: white; font-size: 14.3px; table-layout: fixed; }
     table.data-grid th, table.data-grid td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; min-width: 130px; }
@@ -234,7 +234,7 @@
       .section-heading { font-size: 14.9px; margin: 14px 0 8px 0; }
       .tabs { flex-wrap: wrap; gap: 4px; }
       .tab-btn { padding: 8px 10px; font-size: 12.8px; }
-      table.data-grid { font-size: 12.1px; }
+      table.data-grid { font-size: 14.1px; }
       .btn { font-size: 13.9px; padding: 9px; }
     }
   </style>
@@ -288,7 +288,7 @@
               <div class="form-group">
                 <label>기관 접속 코드 (기관에서 접속할 때 입력할 코드)</label>
                 <input type="text" id="regAgencyCode" placeholder="예: buyeo-safety-2026" required />
-                <p style="font-size:12.1px; color:#94a3b8; margin:4px 0 0 0;">영문/숫자 조합 권장, 다른 담당자와 겹치지 않아야 합니다.</p>
+                <p style="font-size:14.1px; color:#94a3b8; margin:4px 0 0 0;">영문/숫자 조합 권장, 다른 담당자와 겹치지 않아야 합니다.</p>
               </div>
               <button type="submit" class="btn">계정 생성 완료</button>
             </form>
@@ -487,7 +487,7 @@
       <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:stretch; margin-bottom:20px;">
         <div id="agencyListManageSlot" style="flex:1 1 0; min-width:280px; display:flex;"></div>
         <div class="q-card" style="background:#fff7ed; border-color:#fdba74; margin-bottom:0; flex:1 1 0; min-width:280px;">
-          <h4 style="margin-top:0; color:#9a3412;">📋 진행 중인 회차 목록</h4>
+          <h4 style="margin-top:0; color:#9a3412;">📋 진행 중인 회차 목록 <span style="font-size:14.1px; font-weight:normal; color:#9a3412;">(아래 목록 클릭 시 취합기관 현황 확인 가능)</span></h4>
           <div id="openRoundsList" style="font-size:13.2px;"></div>
         </div>
       </div>
@@ -525,7 +525,7 @@
         <div id="panelManageSurvey" class="hidden">
           <div class="q-card" style="background:#eff6ff; border-color:#bfdbfe;">
             <h4 style="color:#1e40af; margin-top:0;">➕ 새 설문 질문 추가</h4>
-            <p style="font-size:12.1px; color:#64748b; margin-top:-6px;"><strong>"취합서식 확정"을 눌러야 기관이 이 질문에 답변할 수 있습니다.</strong> 확정 전까지는 자유롭게 추가/삭제할 수 있고 기관 화면에는 보이지 않습니다.</p>
+            <p style="font-size:14.1px; color:#64748b; margin-top:-6px;"><strong>"취합서식 확정"을 눌러야 기관이 이 질문에 답변할 수 있습니다.</strong> 확정 전까지는 자유롭게 추가/삭제할 수 있고 기관 화면에는 보이지 않습니다.</p>
             <div id="questionLockBanner" class="status-banner error hidden">🔒 이미 응답이 제출된 회차입니다. 질문 구성을 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
             <div id="questionConfirmedBanner" class="status-banner ok hidden">✅ 확정된 질문입니다. 기관이 답변할 수 있습니다. 수정하려면 "새 회차 시작"으로 새 회차를 만들어주세요.</div>
             <div id="questionDraftBanner" class="status-banner hidden" style="background:#fff7ed; color:#9a3412;">✏️ 아직 확정되지 않았습니다. 기관 화면에는 표시되지 않습니다.</div>
@@ -545,7 +545,7 @@
               <label>객관식 옵션 (쉼표 ','로 구분)</label>
               <input type="text" id="newQOptions" placeholder="예: 완료, 진행중, 미착수" />
             </div>
-            <p id="fileTypeHint" class="hidden" style="font-size:12.1px; color:#94a3b8; margin-top:-8px;">여러 장을 한 번에 선택할 수 있습니다 (원본 파일은 개당 100MB까지, 초과 시 업로드 불가). 사진은 자동으로 용량을 줄여서 첨부됩니다. <strong>첨부된 파일은 20일간만 저장되며, 이후 자동 삭제됩니다.</strong></p>
+            <p id="fileTypeHint" class="hidden" style="font-size:14.1px; color:#94a3b8; margin-top:-8px;">여러 장을 한 번에 선택할 수 있습니다 (원본 파일은 개당 100MB까지, 초과 시 업로드 불가). 사진은 자동으로 용량을 줄여서 첨부됩니다. <strong>첨부된 파일은 20일간만 저장되며, 이후 자동 삭제됩니다.</strong></p>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button type="button" class="btn btn-sm" id="addQuestionBtn" onclick="addQuestion()">질문 추가</button>
               <button type="button" class="btn btn-sm btn-excel" id="confirmQuestionsBtn" onclick="confirmQuestions()">🔒 취합서식 확정</button>
@@ -633,7 +633,7 @@
           <button class="btn btn-excel btn-sm" onclick="exportToExcel()">📥 취합 응답 엑셀 다운로드 (.xlsx)</button>
           <button class="btn btn-secondary btn-sm" onclick="exportSchemaExcel()">📄 이 회차 서식(빈 양식) 다운로드</button>
           <button class="btn btn-secondary btn-sm" onclick="downloadAttachmentsByType()">📷 사진 일괄 다운로드 (.zip)</button>
-          <span id="responseLiveHint" style="font-size:12.1px; color:#94a3b8;">🔄 실시간 반영 중 (새로고침 불필요)</span>
+          <span id="responseLiveHint" style="font-size:14.1px; color:#94a3b8;">🔄 실시간 반영 중 (새로고침 불필요)</span>
         </div>
         <div style="overflow-x: auto;">
           <table class="data-grid" id="responseTable">
@@ -740,7 +740,7 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       '<label style="font-size:13.2px; display:flex; align-items:center; gap:4px;">끝열 번호' +
       '<input type="number" min="1" id="templateEndColInput" ' +
       'style="width:60px; padding:4px; border:1px solid #cbd5e1; border-radius:4px;"></label>' +
-      '<span style="font-size:12.1px; color:#94a3b8; max-width:260px;">' +
+      '<span style="font-size:14.1px; color:#94a3b8; max-width:260px;">' +
       '3가지를 모두 입력해야 서식을 저장할 수 있습니다. 취합 시 헤더 행 아래의 각 데이터 행이 ' +
       '결과 시트의 한 행으로 쌓입니다.</span>';
     container.parentNode.insertBefore(panel, container);
@@ -983,7 +983,7 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       '<div style="display:grid; grid-template-columns: minmax(200px,1fr) minmax(280px,1fr); gap:8px 20px; align-items:start;">' +
       '<h4 style="color:#166534; margin:0; grid-column:1; align-self:center;">🏷️ 제출 기관 명단 관리</h4>' +
       '<div style="grid-column:2; display:flex; align-items:center; gap:6px;">' +
-      '<label style="font-size:12.1px; color:#166534; white-space:nowrap;">명단 이름</label>' +
+      '<label style="font-size:14.1px; color:#166534; white-space:nowrap;">명단 이름</label>' +
       '<input type="text" id="agencyListNameInput" placeholder="예: 서울 지역 요양시설" ' +
       'style="flex:1; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />' +
       '</div>' +
@@ -999,14 +999,14 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       'style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></select>' +
       '</div>' +
       '<button type="button" class="btn btn-secondary btn-sm" onclick="assignRoundTargetList()">📌 이번 회차 취합할 명단으로 선택</button>' +
-      '<div id="roundTargetListStatus" style="font-size:12.1px; color:#64748b;"></div>' +
+      '<div id="roundTargetListStatus" style="font-size:14.1px; color:#64748b;"></div>' +
       '</div>' +
       '<div style="grid-column:2;">' +
       '<div class="form-group" style="margin-bottom:0;">' +
-      '<label>소속 기관명 (한 줄에 하나씩 입력)</label>' +
+      '<label>소속 기관명 (한줄에 하나씩 입력, 목록 붙여넣기 가능)</label>' +
       '<textarea id="agencyListNamesTextarea" rows="7" placeholder="예:\n행복한노인요양원\n사랑의집요양원" ' +
       'style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; resize:vertical;"></textarea>' +
-      '<p style="font-size:12.1px; color:#94a3b8; margin:4px 0 0 0;">기관에서 제출할 때 입력하는 "기관명(제출 시 표시되는 이름)"과 정확히 같은 문자열이어야 필터링이 적용됩니다.</p>' +
+      '<p style="font-size:14.1px; color:#94a3b8; margin:4px 0 0 0;">기관에서 제출할 때 입력하는 "기관명(제출 시 표시되는 이름)"과 정확히 같은 문자열이어야 필터링이 적용됩니다.</p>' +
       '</div>' +
       '</div>' +
       '</div>';
@@ -1871,7 +1871,7 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
       return;
     }
     container.innerHTML = '<h4 style="margin:10px 0 8px 0; font-size:14.3px; color:#334155;">시트별 취합 설정</h4>' +
-      '<p style="font-size:12.1px; color:#94a3b8; margin:0 0 8px 0;">각 시트마다 헤더 행 번호 / 입력행 첫 행 번호 / 끝열 번호를 지정해야 취합 시 행 단위로 정리됩니다. 모두 입력해야 "취합서식 확정"이 가능합니다.</p>' +
+      '<p style="font-size:14.1px; color:#94a3b8; margin:0 0 8px 0;">각 시트마다 헤더 행 번호 / 입력행 첫 행 번호 / 끝열 번호를 지정해야 취합 시 행 단위로 정리됩니다. 모두 입력해야 "취합서식 확정"이 가능합니다.</p>' +
       meta.map(function (m, idx) {
         return '<div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:8px; padding:8px; border:1px solid #e2e8f0; border-radius:6px;">' +
           '<strong style="font-size:13.2px; min-width:100px;">📄 ' + m.name + '</strong>' +
@@ -2399,9 +2399,9 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
         '<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; flex-wrap:wrap; gap:6px; cursor:pointer;" onclick="toggleRoundListDetail(\'' + r.id + '\')">' +
         '<span>▾ ' + (r.id === currentRoundId ? '✏️ ' : '') + '<strong>' + esc(r.name) + '</strong>' +
         (r.deadline ? ' <span style="color:#94a3b8;">(기한: ' + esc(r.deadline) + ')</span>' : '') +
-        (list ? ' <span style="color:#0369a1; font-size:12.1px;">[' + esc(list.name) + ']</span>' : '') +
+        (list ? ' <span style="color:#0369a1; font-size:14.1px;">[' + esc(list.name) + ']</span>' : '') +
         '</span>' +
-        '<span id="roundListStats_' + r.id + '" style="font-size:12.1px; color:#64748b;">불러오는 중...</span>' +
+        '<span id="roundListStats_' + r.id + '" style="font-size:14.1px; color:#64748b;">불러오는 중...</span>' +
         '</div>' +
         '<div id="roundListDetail_' + r.id + '" class="hidden" style="padding:0 0 10px 18px;"></div>' +
         '</div>';
@@ -2430,16 +2430,16 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
         var detailEl = document.getElementById('roundListDetail_' + r.id);
         if (detailEl) {
           if (target.length === 0) {
-            detailEl.innerHTML = '<span style="font-size:12.1px; color:#94a3b8;">제출 기관 명단 관리에 명단을 등록하면 미제출 기관을 여기서 볼 수 있습니다.</span>';
+            detailEl.innerHTML = '<span style="font-size:14.1px; color:#94a3b8;">제출 기관 명단 관리에 명단을 등록하면 미제출 기관을 여기서 볼 수 있습니다.</span>';
           } else {
             var missing = target.filter(function (a) { return !respondedSet[a]; });
             if (missing.length === 0) {
-              detailEl.innerHTML = '<span style="font-size:12.1px; color:#16a34a;">✅ 대상 기관이 모두 제출을 완료했습니다.</span>';
+              detailEl.innerHTML = '<span style="font-size:14.1px; color:#16a34a;">✅ 대상 기관이 모두 제출을 완료했습니다.</span>';
             } else {
-              detailEl.innerHTML = '<div style="font-size:12.1px; color:#9a3412; margin-bottom:4px;">미제출 기관 (' + missing.length + '곳)</div>' +
+              detailEl.innerHTML = '<div style="font-size:14.1px; color:#9a3412; margin-bottom:4px;">미제출 기관 (' + missing.length + '곳)</div>' +
                 '<div style="display:flex; flex-wrap:wrap; gap:6px;">' +
                 missing.map(function (name) {
-                  return '<span style="background:#fff; border:1px solid #fecaca; color:#b91c1c; border-radius:999px; padding:3px 10px; font-size:12.1px;">' + esc(name) + '</span>';
+                  return '<span style="background:#fff; border:1px solid #fecaca; color:#b91c1c; border-radius:999px; padding:3px 10px; font-size:14.1px;">' + esc(name) + '</span>';
                 }).join('') + '</div>';
             }
           }
