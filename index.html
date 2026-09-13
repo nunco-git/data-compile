@@ -673,6 +673,19 @@
           <tbody id="superAdminTableBody"></tbody>
         </table>
       </div>
+
+      <div id="pendingRegistrationsWrap" class="hidden" style="margin-top:24px;">
+        <h3>📝 승인 대기 중인 가입 신청 (go.kr/or.kr/ac.kr/re.kr 외 이메일)</h3>
+        <p style="font-size:13px; color:#64748b;">이메일이 실제로 신청한 기관의 것인지 직접 확인(전화, 홈페이지 조회 등)하신 후 승인해주세요.</p>
+        <div style="overflow-x: auto;">
+          <table class="data-grid">
+            <thead>
+              <tr><th>성명/부서</th><th>신청 이메일</th><th>희망 접속 코드</th><th>처리</th></tr>
+            </thead>
+            <tbody id="pendingRegistrationsBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -2645,6 +2658,63 @@ async function renderSuperAdminView() {
     delTd.appendChild(delBtn);
     tbody.appendChild(tr);
   });
+  await renderPendingRegistrations();
+}
+
+// [신규] go.kr/or.kr/ac.kr/re.kr/korea.kr이 아닌 이메일로 가입 신청한 사람들의
+// 목록을 보여주고, 슈퍼관리자가 "이 이메일이 실제 그 기관 것인지" 직접 확인한
+// 뒤 승인/거절할 수 있게 한다.
+async function renderPendingRegistrations() {
+  const wrap = document.getElementById('pendingRegistrationsWrap');
+  const tbody = document.getElementById('pendingRegistrationsBody');
+  if (!wrap || !tbody) return;
+  tbody.innerHTML = '';
+  const snap = await db.collection('registration_requests').where('status', '==', 'pending').get();
+  if (snap.empty) {
+    wrap.classList.add('hidden');
+    return;
+  }
+  wrap.classList.remove('hidden');
+  snap.forEach(doc => {
+    const uid = doc.id;
+    const r = doc.data();
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + escapeHtmlSafe(r.name || '-') + '</td>' +
+      '<td>' + escapeHtmlSafe(r.email || '-') + '</td>' +
+      '<td>' + escapeHtmlSafe(r.agencyCode || '-') + '</td>' +
+      '<td></td>';
+    const actionTd = tr.lastElementChild;
+    const approveBtn = document.createElement('button');
+    approveBtn.className = 'btn btn-sm';
+    approveBtn.textContent = '승인';
+    approveBtn.style.marginRight = '6px';
+    approveBtn.addEventListener('click', () => decideRegistration(uid, 'approved'));
+    const rejectBtn = document.createElement('button');
+    rejectBtn.className = 'btn btn-danger btn-sm';
+    rejectBtn.textContent = '거절';
+    rejectBtn.addEventListener('click', () => decideRegistration(uid, 'rejected'));
+    actionTd.appendChild(approveBtn);
+    actionTd.appendChild(rejectBtn);
+    tbody.appendChild(tr);
+  });
+}
+
+async function decideRegistration(uid, decision) {
+  const label = decision === 'approved' ? '승인' : '거절';
+  if (decision === 'approved') {
+    const req = await db.collection('registration_requests').doc(uid).get();
+    const email = req.exists ? req.data().email : '';
+    if (!confirm('이메일 "' + email + '"이(가) 신청서에 적힌 기관의 것이 맞는지 직접 확인하셨나요? 확인하셨다면 승인하겠습니다.')) return;
+  } else {
+    if (!confirm('이 가입 신청을 거절하시겠습니까?')) return;
+  }
+  await db.collection('registration_requests').doc(uid).update({
+    status: decision,
+    decidedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  alert(label + ' 처리했습니다.');
+  await renderPendingRegistrations();
 }
 </script>
 
@@ -2819,35 +2889,112 @@ async function renderSuperAdminView() {
 window.__verifiedEmailAddress = null;
 
 function govEmailLooksValid(email) {
-  return /^[^\s@]+@[a-zA-Z0-9.-]+\.(go|or)\.kr$/i.test(email);
+  return /^[^\s@]+@(korea\.kr|[a-zA-Z0-9.-]+\.(go|or|ac|re)\.kr)$/i.test(email);
 }
 
 window.sendVerificationCodeUI = async function () {
   const emailInput = document.getElementById('regGovEmail');
   const email = (emailInput.value || '').trim();
   const statusEl = document.getElementById('emailVerifyStatus');
-  if (!govEmailLooksValid(email)) {
-    statusEl.textContent = 'go.kr 또는 or.kr로 끝나는 기관 이메일 형식이 아닙니다.';
+  const btn = document.getElementById('sendCodeBtn');
+
+  if (!email) {
+    statusEl.textContent = '이메일 주소를 입력해주세요.';
     statusEl.style.color = '#dc2626';
     return;
   }
-  const btn = document.getElementById('sendCodeBtn');
+
+  // go.kr/or.kr/ac.kr/re.kr/korea.kr 형식이면 예전과 동일하게 즉시 인증번호 발송으로 진행.
+  if (govEmailLooksValid(email)) {
+    btn.disabled = true;
+    btn.textContent = '발송 중...';
+    try {
+      const send = firebase.functions().httpsCallable('sendVerificationCode');
+      await send({ email: email });
+      document.getElementById('codeInputWrap').classList.remove('hidden');
+      statusEl.textContent = '인증번호를 보냈습니다. 메일함을 확인해주세요 (10분 이내 유효).';
+      statusEl.style.color = '#16a34a';
+      window.__verifiedEmailAddress = null;
+    } catch (e) {
+      console.error(e);
+      statusEl.textContent = '발송 실패: ' + e.message;
+      statusEl.style.color = '#dc2626';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '인증번호 발송';
+    }
+    return;
+  }
+
+  // 그 외 도메인이면, 관리자가 이 이메일이 실제 그 기관 것인지 수동으로 확인해서
+  // 승인해줄 때까지는 인증번호를 보낼 수 없다. 요청 문서를 만들고 승인 상태를 확인한다.
+  if (!pendingGoogleUser) {
+    statusEl.textContent = '먼저 Google 계정으로 가입을 시작해주세요.';
+    statusEl.style.color = '#dc2626';
+    return;
+  }
   btn.disabled = true;
-  btn.textContent = '발송 중...';
+  btn.textContent = '확인 중...';
   try {
-    const send = firebase.functions().httpsCallable('sendVerificationCode');
-    await send({ email: email });
-    document.getElementById('codeInputWrap').classList.remove('hidden');
-    statusEl.textContent = '인증번호를 보냈습니다. 메일함을 확인해주세요 (10분 이내 유효).';
-    statusEl.style.color = '#16a34a';
-    window.__verifiedEmailAddress = null;
+    const uid = pendingGoogleUser.uid;
+    const reqRef = db.collection('registration_requests').doc(uid);
+    const snap = await reqRef.get();
+
+    if (!snap.exists) {
+      const name = (document.getElementById('regName').value || '').trim();
+      const agencyCode = (document.getElementById('regAgencyCode').value || '').trim();
+      await reqRef.set({
+        name: name,
+        email: email,
+        agencyCode: agencyCode,
+        status: 'pending',
+        requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      statusEl.textContent = 'go.kr/or.kr/ac.kr/re.kr 형식이 아니어서 관리자 승인이 필요합니다. 승인 요청을 접수했습니다. 관리자 승인 후 이 버튼을 다시 눌러주세요.';
+      statusEl.style.color = '#d97706';
+      btn.textContent = '승인 상태 확인';
+      return;
+    }
+
+    const data = snap.data();
+    if (data.email !== email) {
+      // 이메일을 바꿔서 다시 요청하는 경우 - 요청 내용을 갱신한다.
+      await reqRef.update({ email: email, status: 'pending' });
+      statusEl.textContent = '변경된 이메일로 승인 요청을 다시 접수했습니다. 관리자 승인을 기다려주세요.';
+      statusEl.style.color = '#d97706';
+      btn.textContent = '승인 상태 확인';
+      return;
+    }
+
+    if (data.status === 'pending') {
+      statusEl.textContent = '아직 관리자 승인 대기 중입니다. 승인 후 다시 눌러주세요.';
+      statusEl.style.color = '#d97706';
+      btn.textContent = '승인 상태 확인';
+      return;
+    }
+    if (data.status === 'rejected') {
+      statusEl.textContent = '요청이 거절되었습니다. 관리자에게 문의해주세요.';
+      statusEl.style.color = '#dc2626';
+      btn.textContent = '승인 상태 확인';
+      return;
+    }
+    if (data.status === 'approved') {
+      // 승인이 확인됐으니 이제 실제 인증번호를 발송한다.
+      btn.textContent = '발송 중...';
+      const send = firebase.functions().httpsCallable('sendVerificationCode');
+      await send({ email: email });
+      document.getElementById('codeInputWrap').classList.remove('hidden');
+      statusEl.textContent = '관리자 승인이 확인되어 인증번호를 보냈습니다. 메일함을 확인해주세요 (10분 이내 유효).';
+      statusEl.style.color = '#16a34a';
+      window.__verifiedEmailAddress = null;
+      btn.textContent = '인증번호 발송';
+    }
   } catch (e) {
     console.error(e);
-    statusEl.textContent = '발송 실패: ' + e.message;
+    statusEl.textContent = '처리 중 오류: ' + e.message;
     statusEl.style.color = '#dc2626';
   } finally {
     btn.disabled = false;
-    btn.textContent = '인증번호 발송';
   }
 };
 
