@@ -3345,5 +3345,84 @@ try {
   };
 })();
 </script>
+
+<script>
+// ---------------------------------------------------------------------
+// [보안 수정] Stored XSS 방지.
+// 기관이 제출한 서술형 답변/엑셀 셀 값/서식 채움 값/기관명이 이스케이프 없이
+// 관리자의 "응답 보기" 화면에 그대로 삽입되고 있었다 - 악의적인 제출자가
+// <img onerror=...> 같은 값을 입력하면 담당자가 응답을 열람하는 순간
+// 담당자 브라우저에서 그 코드가 실행될 수 있었다(Stored XSS).
+// renderManagerResponses()의 표 그리기 로직 자체는 전혀 건드리지 않고(복잡하고
+// 난독화되어 있어 손대면 레이아웃이 깨질 위험이 있음), 그 함수가 읽는
+// cachedResponseDocs를 채우는 subscribeResponses()만 다시 정의해서, Firestore에서
+// 읽어온 원본 텍스트를 화면에 넣기 전에 이스케이프한다.
+// (첨부파일 항목의 name/url은 업로드 시 이미 <>":*?\/| 같은 위험 문자가 제거된
+//  값이고, 이스케이프하면 JSON.parse가 깨지므로 이스케이프 대상에서 제외한다.)
+function escapeHtmlForDisplay(value) {
+  if (typeof value !== 'string') return value;
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function sanitizeResponseDocForDisplay(doc, fileQuestionIds) {
+  var sanitized = Object.assign({}, doc);
+  sanitized.agencyName = escapeHtmlForDisplay(doc.agencyName);
+
+  if (doc.answers) {
+    var safeAnswers = {};
+    Object.keys(doc.answers).forEach(function (qid) {
+      var v = doc.answers[qid];
+      safeAnswers[qid] = fileQuestionIds.indexOf(qid) !== -1 ? v : escapeHtmlForDisplay(v);
+    });
+    sanitized.answers = safeAnswers;
+  }
+
+  if (Array.isArray(doc.gridRows)) {
+    sanitized.gridRows = doc.gridRows.map(function (row) {
+      if (!row || !Array.isArray(row.cells)) return row;
+      return { cells: row.cells.map(escapeHtmlForDisplay) };
+    });
+  }
+
+  if (Array.isArray(doc.templateAnswersSheets)) {
+    sanitized.templateAnswersSheets = doc.templateAnswersSheets.map(function (sheet) {
+      return {
+        name: escapeHtmlForDisplay(sheet && sheet.name),
+        rows: ((sheet && sheet.rows) || []).map(function (r) {
+          return { cells: (r.cells || []).map(escapeHtmlForDisplay) };
+        })
+      };
+    });
+  }
+  if (Array.isArray(doc.templateAnswers)) {
+    sanitized.templateAnswers = doc.templateAnswers.map(function (r) {
+      return { cells: (r.cells || []).map(escapeHtmlForDisplay) };
+    });
+  }
+  return sanitized;
+}
+
+function subscribeResponses() {
+  if (!currentUser || !viewingRoundId) return;
+  if (responsesUnsub) { responsesUnsub(); responsesUnsub = null; }
+  cachedResponseDocs = [];
+  var fileQuestionIds = ((viewingRoundMeta && viewingRoundMeta.questions) || [])
+    .filter(function (q) { return q.type === 'file'; })
+    .map(function (q) { return q.id; });
+  var query = db.collection('managers').doc(currentUser.id)
+    .collection('rounds').doc(viewingRoundId)
+    .collection('responses').orderBy('submittedAtTs', 'desc');
+  responsesUnsub = query.onSnapshot(function (snap) {
+    cachedResponseDocs = snap.docs.map(function (d) {
+      return sanitizeResponseDocForDisplay(Object.assign({ id: d.id }, d.data()), fileQuestionIds);
+    });
+    renderManagerResponses();
+  }, function (err) { console.error('응답 구독 오류:', err); });
+}
+</script>
 </body>
 </html>
