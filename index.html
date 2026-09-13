@@ -2936,6 +2936,9 @@ function govEmailLooksValid(email) {
 }
 
 window.sendVerificationCodeUI = async function () {
+  // [진단용] F12 없이 확인할 수 있도록 현재 로그인 상태를 알림창으로 표시
+  alert('진단: 현재 로그인 상태 = ' + (auth && auth.currentUser ? ('로그인됨 (' + auth.currentUser.email + ')') : '로그인 안 됨(null)'));
+
   const emailInput = document.getElementById('regGovEmail');
   const email = (emailInput.value || '').trim();
   const statusEl = document.getElementById('emailVerifyStatus');
