@@ -239,6 +239,26 @@
       table.data-grid { font-size: 14.1px; }
       .btn { font-size: 13.9px; padding: 9px; }
     }
+    /* 담당자 로그인 / 담당자 계정생성 / 기관 참여·제출 화면 글자 크기를
+       전체적으로 2px씩 키움. 컨테이너 자체에만 걸어서 상속되게 하고(자식이
+       겹겹이 다시 커지는 것을 방지), 그 안에서 자기만의 크기를 따로 지정해둔
+       요소들은 아래에서 각각 2px씩 더해준다. */
+    #panelLogin, #panelRegister, #formSurveyAccess {
+      font-size: calc(1em + 2px);
+    }
+    /* 위 3개 화면 안에서 자기만의 크기를 이미 갖고 있던 라벨/입력창/버튼도
+       똑같이 2px씩 키운다 (다른 화면의 같은 클래스는 그대로 유지). */
+    #panelLogin .form-group label, #panelRegister .form-group label, #formSurveyAccess .form-group label {
+      font-size: 16.3px;
+    }
+    #panelLogin .form-group input, #panelLogin .form-group select,
+    #panelRegister .form-group input, #panelRegister .form-group select,
+    #formSurveyAccess .form-group input, #formSurveyAccess .form-group select {
+      font-size: 17.4px;
+    }
+    #panelLogin .btn, #panelRegister .btn, #formSurveyAccess .btn {
+      font-size: 17.4px;
+    }
   </style>
 </head>
 <body>
@@ -262,12 +282,12 @@
           <div class="tabs" style="justify-content: center;">
             <button class="tab-btn active" id="tabLoginBtn" onclick="switchLoginMode('login')">담당자 로그인</button>
             <button class="tab-btn" id="tabRegisterBtn" onclick="switchLoginMode('register')">담당자 계정생성</button>
-            <button class="tab-btn" id="tabSurveyBtn" onclick="switchLoginMode('surveyAccess')">기관 참여/제출</button>
+            <button class="tab-btn" id="tabSurveyBtn" onclick="switchLoginMode('surveyAccess')">기관/시설 자료 제출</button>
           </div>
 
           <!-- 담당자 로그인 (Google) -->
           <div id="panelLogin">
-            <p style="font-size:13.2px; color:#64748b; text-align:center; margin-bottom:16px;">이미 계정이 있는 담당자는 아래 버튼으로 Google 로그인하세요.</p>
+            <p style="font-size:15.2px; color:#64748b; text-align:center; margin-bottom:16px;">이미 계정이 있는 담당자는 아래 버튼으로 Google 로그인하세요.</p>
             <button type="button" class="btn btn-google" id="googleLoginBtn" onclick="handleGoogleLogin()">
               <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 6 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 19 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.5 6 29.6 4 24 4 16 4 9.1 8.6 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.3-1.9 14-5.1l-6.5-5.5C29.5 35.3 26.9 36 24 36c-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9 39.4 15.9 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.6l6.5 5.5C40.9 36 44 30.6 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg>
               Google 계정으로 로그인
@@ -276,7 +296,7 @@
 
           <!-- 담당자 계정 생성 (Google + 성명/접속코드) -->
           <div id="panelRegister" class="hidden">
-            <p style="font-size:13.2px; color:#64748b; text-align:center; margin-bottom:16px;">처음 사용하시는 담당자는 Google 계정으로 가입해주세요.</p>
+            <p style="font-size:15.2px; color:#64748b; text-align:center; margin-bottom:16px;">처음 사용하시는 담당자는 Google 계정으로 가입해주세요.</p>
             <button type="button" class="btn btn-google" id="googleRegisterBtn" onclick="handleGoogleRegisterStart()">
               <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 6 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 19 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.5 6 29.6 4 24 4 16 4 9.1 8.6 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.3-1.9 14-5.1l-6.5-5.5C29.5 35.3 26.9 36 24 36c-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9 39.4 15.9 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.6l6.5 5.5C40.9 36 44 30.6 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg>
               Google 계정으로 가입 시작
@@ -292,25 +312,25 @@
                 <input type="text" id="regDeptName" placeholder="예: 행정과" required />
               </div>
               <div class="form-group">
-                <label>기관 접속 코드 (기관에서 접속할 때 입력할 코드)</label>
+                <label>담당자 접속코드(자료를 제출하는 기관과 시설에서 접속시 입력하는 코드)</label>
                 <input type="text" id="regAgencyCode" placeholder="예: buyeo-safety-2026" required />
-                <p style="font-size:14.1px; color:#94a3b8; margin:4px 0 0 0;">영문/숫자 조합 권장, 다른 담당자와 겹치지 않아야 합니다.</p>
+                <p style="font-size:16.1px; color:#94a3b8; margin:4px 0 0 0;">영어, 숫자, 특수문자를 포함하여 10글자 이상으로 만들어주세요. 다른 담당자와 겹치지 않아야 합니다.</p>
               </div>
               <div class="form-group">
                 <label>소속기관 이메일</label>
-                <p style="font-size:14.1px; color:#94a3b8; margin:2px 0 8px 0;">
+                <p style="font-size:16.1px; color:#94a3b8; margin:2px 0 8px 0;">
                   korea.kr, go.kr, or.kr, ac.kr, re.kr 로 끝나는 이메일은 인증번호를 바로 보내드립니다.<br/>
                   그 외 이메일은 신청서 접수 후 관리자가 실제 소속기관 이메일인지 직접 확인하여 승인하면, 그때 인증번호 발송이 진행됩니다.
                 </p>
                 <div style="display:flex; gap:8px; align-items:stretch;">
-                  <input type="email" id="regGovEmail" placeholder="예: hong@buyeo.go.kr" style="flex:1 1 auto; min-width:0; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:15.4px;" />
+                  <input type="email" id="regGovEmail" placeholder="예: hong@buyeo.go.kr" style="flex:1 1 auto; min-width:0; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:17.4px;" />
                   <button type="button" class="btn" id="sendCodeBtn" onclick="sendVerificationCodeUI()" style="width:auto; flex-shrink:0; white-space:nowrap; padding-left:16px; padding-right:16px;">인증번호 발송</button>
                 </div>
                 <div id="codeInputWrap" class="hidden" style="display:flex; gap:8px; align-items:stretch; margin-top:8px;">
-                  <input type="text" id="regVerifyCode" placeholder="인증번호 6자리" style="flex:1 1 auto; min-width:0; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:15.4px;" />
+                  <input type="text" id="regVerifyCode" placeholder="인증번호 6자리" style="flex:1 1 auto; min-width:0; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:17.4px;" />
                   <button type="button" class="btn" id="verifyCodeBtn" onclick="verifyEmailCodeUI()" style="width:auto; flex-shrink:0; white-space:nowrap; padding-left:16px; padding-right:16px;">확인</button>
                 </div>
-                <p id="emailVerifyStatus" style="font-size:14.1px; color:#94a3b8; margin:4px 0 0 0;"></p>
+                <p id="emailVerifyStatus" style="font-size:16.1px; color:#94a3b8; margin:4px 0 0 0;"></p>
               </div>
               <button type="submit" class="btn">계정 생성 완료</button>
             </form>
