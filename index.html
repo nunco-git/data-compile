@@ -5,27 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>스마트 자료취합 시스템</title>
   <!-- 제목/본문에 쓰이는 Pretendard 폰트를 실제로 불러온다 -->
-  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css" integrity="sha384-2nNKoOPayicGa+aRguOQuiZP+RqQ4G3jalfDeOgftkKD7zBM2gJXTwcFqCZltdv0">
   <!-- 제목 전용 폰트: Jua (둥글고 귀여운 스타일) -->
   <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
 
   <!-- SheetJS (엑셀 다운로드) -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
 
   <!-- jspreadsheet-ce (실제 엑셀처럼 셀 선택/드래그/붙여넣기가 되는 입력 그리드) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsuites@4/dist/jsuites.css" type="text/css" />
-  <script src="https://cdn.jsdelivr.net/npm/jsuites@4/dist/jsuites.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jspreadsheet-ce@4/dist/jspreadsheet.css" type="text/css" />
-  <script src="https://cdn.jsdelivr.net/npm/jspreadsheet-ce@4/dist/index.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsuites@4.17.7/dist/jsuites.css" type="text/css" integrity="sha384-tVCEgfMr66ww4jP1oaXRUMmIwkWWWnN3jyqP7I8ldSJyUYMSAIWHH/9MnAkzS2pK" crossorigin="anonymous" />
+  <script src="https://cdn.jsdelivr.net/npm/jsuites@4.17.7/dist/jsuites.js" integrity="sha384-ib+NurVH/c+VUfu8u6Q2z71uVwiY9p5oMc48FD5ps+uqkENgZWlk3iLscME/7SUX" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jspreadsheet-ce@4.15.0/dist/jspreadsheet.css" type="text/css" integrity="sha384-ov8ACv/GylMG+HuImPuruot3HcL2zIuV828gQVL4lbHqIbZMHJOLXS0CtX+HuNed" crossorigin="anonymous" />
+  <script src="https://cdn.jsdelivr.net/npm/jspreadsheet-ce@4.15.0/dist/index.js" integrity="sha384-O0ZydxKsIQhMqK84XlwwkJAoYKRfTpirT0rVtrAthYnNVu3ZdQayPBQX1oDhsS36" crossorigin="anonymous"></script>
 
   <!-- Firebase (Auth + Firestore) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" integrity="sha384-AQ3POAMqIhwS81FrUH95ekxqBZHeP5tG2JfEL3+7GuTtfRLWnrRh32UxwzM+//A9" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" integrity="sha384-TnlRYaR4JYz/lpaGuaiU61PjNberSA4vjLjtF+oRC/IkohkJqnWxw5EmDSOt1vA1" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js" integrity="sha384-qn4Jh88HhJA8dplNQyGjOh9OGI4izVhrfj/qIFgaKcdgOE06pXqIKGlsCILZcLAC" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js" integrity="sha384-6I0gWsz4FIAr30c0TxIxJnPQuJiZ1FfILdZrgJdjxTH3R8dgPGTvexbyqTvReV6Z" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js" integrity="sha384-3IYu+dnH2y9gX1s6p9F4D55XbEmZBfJ3D1Ylh8J6bfdqnJCOmDVSRTq1yhJsBY1H" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js" integrity="sha384-E3vxFxXu8FhW5kvqdQJ5Yf8ugrV7iCJP8jgnItRH2Rk8Q08cJzJGTi/oMC3FEp3j" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>
 
   <style>
     * { box-sizing: border-box; }
@@ -3158,6 +3158,82 @@ try {
 } catch (e) {
   console.error('App Check 활성화 실패:', e);
 }
+
+// [신규] 제출 내용에 주민등록번호로 보이는 값이 있으면 제출 자체를 막는다.
+// 원래 submitCombined()는 전혀 건드리지 않고, 제출 직전에 한 번 더 검사만
+// 추가한다 (검사를 통과하면 원래 함수를 그대로 호출).
+(function () {
+  // 실제 주민등록번호 체크섬 규칙으로 검증한다 (그냥 13자리 숫자와는 다르게,
+  // 진짜 주민등록번호 형식/검증숫자까지 맞아야만 "발견"으로 판단해서
+  // 문서번호 같은 우연의 13자리 숫자를 오탐지하지 않게 한다).
+  function isValidResidentNumber(digits) {
+    if (!/^\d{13}$/.test(digits)) return false;
+    var d = digits.split('').map(Number);
+    if ([1, 2, 3, 4, 5, 6, 7, 8].indexOf(d[6]) === -1) return false;
+    var weights = [2, 3, 4, 5, 6, 7, 8, 9, 2, 3, 4, 5];
+    var sum = 0;
+    for (var i = 0; i < 12; i++) sum += d[i] * weights[i];
+    var check = (11 - (sum % 11)) % 10;
+    return check === d[12];
+  }
+
+  function findResidentNumberIn(text) {
+    if (!text) return false;
+    var matches = String(text).match(/\d{6}\s?-?\s?\d{7}/g) || [];
+    for (var i = 0; i < matches.length; i++) {
+      var digits = matches[i].replace(/[\s-]/g, '');
+      if (isValidResidentNumber(digits)) return true;
+    }
+    return false;
+  }
+
+  function collectSubmissionTextForRrnCheck() {
+    var texts = [];
+    if (activeSurveyInfo && activeSurveyInfo.useSurvey) {
+      var formEl = document.getElementById('combinedSubmitForm');
+      var fd = new FormData(formEl);
+      (activeSurveyInfo.questions || []).forEach(function (q) {
+        if (q.type === 'file') return;
+        var v = fd.get('q_' + q.id);
+        if (v) texts.push(String(v));
+      });
+    }
+    if (activeSurveyInfo && activeSurveyInfo.useExcel && typeof gridInstance !== 'undefined' && gridInstance) {
+      try {
+        gridInstance.getData().forEach(function (row) {
+          row.forEach(function (cell) { if (cell) texts.push(String(cell)); });
+        });
+      } catch (e) {}
+    }
+    if (activeSurveyInfo && activeSurveyInfo.useTemplate && typeof templateFillGrid !== 'undefined' && templateFillGrid) {
+      try {
+        captureCurrentTemplateFillSheet();
+        (templateFillSheetsData || []).forEach(function (sheet) {
+          (sheet || []).forEach(function (row) {
+            (row || []).forEach(function (cell) { if (cell) texts.push(String(cell)); });
+          });
+        });
+      } catch (e) {}
+    }
+    return texts;
+  }
+
+  var _origSubmitCombined = window.submitCombined;
+  window.submitCombined = async function (e) {
+    var texts = collectSubmissionTextForRrnCheck();
+    var found = texts.some(function (t) { return findResidentNumberIn(t); });
+    if (found) {
+      e.preventDefault();
+      alert(
+        '⚠ 제출할 수 없습니다\n\n' +
+        '입력하신 내용에 주민등록번호로 보이는 값이 포함되어 있습니다.\n' +
+        '이 시스템은 개인정보가 포함된 자료를 취합할 수 없습니다. 해당 값을 지운 뒤 다시 제출해주세요.'
+      );
+      return;
+    }
+    return _origSubmitCombined(e);
+  };
+})();
 </script>
 </body>
 </html>
