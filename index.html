@@ -283,8 +283,12 @@
 
             <form id="formCompleteRegister" class="hidden" onsubmit="handleCompleteRegister(event)" style="margin-top:16px;">
               <div class="form-group">
-                <label>담당자 성명 / 부서명</label>
-                <input type="text" id="regName" placeholder="예: 홍길동 (행정과)" required />
+                <label>기관명</label>
+                <input type="text" id="regOrgName" placeholder="예: 부여군청" required />
+              </div>
+              <div class="form-group">
+                <label>부서명</label>
+                <input type="text" id="regDeptName" placeholder="예: 행정과" required />
               </div>
               <div class="form-group">
                 <label>기관 접속 코드 (기관에서 접속할 때 입력할 코드)</label>
@@ -360,7 +364,7 @@
             <div class="login-summary-title"><span class="title-icon-sm">📋</span>스마트 자료취합 시스템이란?</div>
             <div class="login-summary-highlight">
               <span class="highlight-icon">⚡</span>
-              <div><strong>간편취합</strong><span class="highlight-desc">기관·시설에서 자료(사진 포함) 취합 시 간편하게 취합 가능</span></div>
+              <div><strong>간편취합</strong><span class="highlight-desc">기관·시설에서 자료(사진 포함) 취합 시 간편하게 취합 가능</span><br/><strong style="color:#dc2626;">개인정보 포함 문서 취합 시에는 활용 불가</strong></div>
             </div>
             <ul class="login-summary-list">
               <li><span class="feat-icon">✓</span><span><strong>개인정보 미포함 자료 전용</strong> — <span class="feat-desc">개인정보가 미포함된 자료 취합 시에만 활용 가능</span></span></li>
@@ -2945,7 +2949,9 @@ window.sendVerificationCodeUI = async function () {
     const snap = await reqRef.get();
 
     if (!snap.exists) {
-      const name = (document.getElementById('regName').value || '').trim();
+      const orgName = (document.getElementById('regOrgName').value || '').trim();
+      const deptName = (document.getElementById('regDeptName').value || '').trim();
+      const name = orgName + ' ' + deptName;
       const agencyCode = (document.getElementById('regAgencyCode').value || '').trim();
       await reqRef.set({
         name: name,
@@ -3043,10 +3049,12 @@ window.handleCompleteRegister = async function (e) {
   e.preventDefault();
   if (!pendingGoogleUser) { alert('먼저 Google 계정으로 가입을 시작해주세요.'); return; }
 
-  const name = document.getElementById('regName').value.trim();
+  const orgName = document.getElementById('regOrgName').value.trim();
+  const deptName = document.getElementById('regDeptName').value.trim();
+  const name = (orgName + ' ' + deptName).trim();
   const agencyCode = document.getElementById('regAgencyCode').value.trim();
   const emailInput = document.getElementById('regGovEmail').value.trim();
-  if (!name || !agencyCode) return;
+  if (!orgName || !deptName || !agencyCode) return;
 
   if (!window.__verifiedEmailAddress) {
     alert('소속기관 이메일 인증을 먼저 완료해주세요.');
@@ -3071,6 +3079,8 @@ window.handleCompleteRegister = async function (e) {
     const uid = pendingGoogleUser.uid;
     await db.collection('managers').doc(uid).set({
       name: name,
+      orgName: orgName,
+      deptName: deptName,
       role: 'manager',
       surveyPw: '',
       useSurvey: true,
@@ -3099,6 +3109,24 @@ window.handleCompleteRegister = async function (e) {
     btn.innerText = '계정 생성 완료';
   }
 };
+
+// [신규] 로그인 성공 시(담당자/슈퍼관리자 공통) 개인정보 관련 안내 팝업을 띄운다.
+// 원래 함수(enterAppForUser)는 전혀 건드리지 않고, 그 위에 한 겹 씌워서
+// 로그인이 실제로 성공했을 때만(true를 반환했을 때만) 팝업을 보여준다.
+(function () {
+  var _origEnterAppForUser = window.enterAppForUser;
+  window.enterAppForUser = async function (user) {
+    var ok = await _origEnterAppForUser(user);
+    if (ok) {
+      alert(
+        '⚠ 개인정보 취급 안내\n\n' +
+        '이 시스템은 개인정보가 포함된 문서(자료)를 취합하는 용도로 사용할 수 없습니다.\n' +
+        '성명, 연락처, 주민등록번호 등 개인정보가 포함된 자료는 절대 취합하지 마세요.'
+      );
+    }
+    return ok;
+  };
+})();
 </script>
 </body>
 </html>
