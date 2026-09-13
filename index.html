@@ -3234,6 +3234,98 @@ try {
     return _origSubmitCombined(e);
   };
 })();
+
+// [신규] 사진 원본 용량을 100MB→10MB로 낮추고, 제출 하나당 최대 20장까지만
+// 업로드할 수 있게 제한한다 (여러 개의 "파일 첨부" 질문이 있어도 전체 합산 20장).
+// 원래 함수와 100% 동일한 안내 문구를 그대로 쓰고, 두 가지 제한만 추가/변경했다.
+(function () {
+  var MAX_RAW_FILE_MB_NEW = 10;
+  var MAX_UPLOAD_MB_NEW = 50;
+  var MAX_TOTAL_PHOTOS = 20;
+
+  function countPendingPhotosExcept(exceptQuestionId) {
+    var total = 0;
+    Object.keys(pendingFileAnswers || {}).forEach(function (qid) {
+      if (qid === String(exceptQuestionId)) return;
+      total += (pendingFileAnswers[qid] || []).length;
+    });
+    return total;
+  }
+
+  window.handleFileQuestionChange = async function (e, questionId) {
+    var files = Array.from(e.target.files || []);
+    var statusEl = document.getElementById('fileStatus_' + questionId);
+
+    if (files.length === 0) {
+      delete pendingFileAnswers[questionId];
+      if (statusEl) statusEl.textContent = '';
+      return;
+    }
+
+    var nonImage = files.some(function (f) { return !f.type.startsWith('image/'); });
+    if (nonImage) {
+      alert('사진 파일만 첨부할 수 있습니다.');
+      e.target.value = '';
+      delete pendingFileAnswers[questionId];
+      return;
+    }
+
+    // [신규] 이 회차 제출 전체에서 사진이 20장을 넘지 않는지 확인.
+    var otherCount = countPendingPhotosExcept(questionId);
+    if (otherCount + files.length > MAX_TOTAL_PHOTOS) {
+      alert(
+        '사진은 이 제출 하나당 최대 ' + MAX_TOTAL_PHOTOS + '장까지만 첨부할 수 있습니다.\n\n' +
+        '(다른 항목에 이미 첨부된 ' + otherCount + '장 포함, 지금 선택하신 ' + files.length + '장을 더하면 ' + (otherCount + files.length) + '장이 됩니다.)'
+      );
+      e.target.value = '';
+      delete pendingFileAnswers[questionId];
+      return;
+    }
+
+    var tooLarge = files.filter(function (f) { return f.size > MAX_RAW_FILE_MB_NEW * 1024 * 1024; });
+    if (tooLarge.length > 0) {
+      alert(
+        '다음 파일은 용량이 너무 커서(' + MAX_RAW_FILE_MB_NEW + 'MB 초과) 브라우저에서 처리할 수 없습니다:\n' +
+        tooLarge.map(function (f) { return '- ' + f.name + ' (' + Math.round(f.size / 1024 / 1024) + 'MB)'; }).join('\n') +
+        '\n\n용량을 줄인 뒤 다시 첨부해주세요.'
+      );
+      e.target.value = '';
+      delete pendingFileAnswers[questionId];
+      return;
+    }
+
+    var compressed = [];
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i];
+      var progressLabel = files.length > 1 ? '(' + (i + 1) + '/' + files.length + ') ' : '';
+      try {
+        if (statusEl) statusEl.textContent = '⏳ ' + progressLabel + '사진 압축 중... (' + file.name + ')';
+        var blob = await compressImageFile(file);
+        if (blob.size > MAX_UPLOAD_MB_NEW * 1024 * 1024) {
+          if (statusEl) statusEl.textContent = '❌ (' + file.name + ') 처리 후에도 용량이 너무 커서(' + Math.round(blob.size / 1024 / 1024) + 'MB) 업로드할 수 없습니다. (한도 ' + MAX_UPLOAD_MB_NEW + 'MB)';
+          continue;
+        }
+        compressed.push({ blob: blob, name: file.name, type: file.type });
+      } catch (err) {
+        console.error('파일 처리 오류:', err);
+        if (statusEl) statusEl.textContent = '❌ (' + file.name + ') 처리 중 오류: ' + err.message;
+      }
+    }
+
+    pendingFileAnswers[questionId] = compressed;
+    if (compressed.length === 0) {
+      if (statusEl) statusEl.textContent = '❌ 처리된 파일이 없습니다.';
+      return;
+    }
+    if (statusEl) {
+      var totalKb = compressed.reduce(function (sum, c) { return sum + Math.round((c.blob.size || 0) / 1024); }, 0);
+      var failedCount = files.length - compressed.length;
+      var msg = '✅ ' + compressed.length + '개 처리 완료 (총 약 ' + totalKb + 'KB)';
+      if (failedCount > 0) msg += ', 실패 ' + failedCount + '개';
+      statusEl.textContent = msg;
+    }
+  };
+})();
 </script>
 </body>
 </html>
