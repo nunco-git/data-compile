@@ -2264,8 +2264,22 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
         return;
       }
 
-      await db.collection('managers').doc(activeSurveyInfo.managerId).collection('rounds')
-        .doc(activeSurveyInfo.roundId).collection('responses').add(docData);
+      // [보안 수정] 클라이언트가 Firestore에 직접 쓰지 않고, 비밀번호/회차 상태를
+      // 서버에서 다시 확인하는 Cloud Function을 통해 제출한다. verifyAccessCredentials
+      // 단계에서 확인해둔 접속코드/비밀번호(window.__verifiedAccess)를 그대로 사용한다.
+      var verified = window.__verifiedAccess;
+      if (!verified || !verified.password) {
+        alert('접속 정보가 만료되었습니다. 새로고침 후 접속 코드와 비밀번호를 다시 입력해주세요.');
+        return;
+      }
+      var submit = firebase.functions().httpsCallable('submitSurveyResponse');
+      await submit({
+        agencyCode: verified.agencyCode,
+        password: verified.password,
+        roundId: activeSurveyInfo.roundId,
+        agencyName: activeSurveyInfo.agencyName,
+        payload: docData
+      });
 
       try {
         var markKey = activeSurveyInfo.roundId + '_' + activeSurveyInfo.agencyName;
@@ -2810,7 +2824,7 @@ async function decideRegistration(uid, decision) {
         return;
       }
 
-      window.__verifiedAccess = { managerUid: data.managerUid, agencyCode: agencyCode };
+      window.__verifiedAccess = { managerUid: data.managerUid, agencyCode: agencyCode, password: pw };
 
       var names = getAgencyNamesFromLists(data.agencyLists);
       var sel = document.getElementById('accessAgencyNameSelect');
