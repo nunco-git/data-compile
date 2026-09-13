@@ -2936,8 +2936,6 @@ function govEmailLooksValid(email) {
 }
 
 window.sendVerificationCodeUI = async function () {
-  // [진단용] F12 없이 확인할 수 있도록 현재 로그인 상태를 알림창으로 표시
-  alert('진단: 현재 로그인 상태 = ' + (auth && auth.currentUser ? ('로그인됨 (' + auth.currentUser.email + ')') : '로그인 안 됨(null)'));
 
   const emailInput = document.getElementById('regGovEmail');
   const email = (emailInput.value || '').trim();
@@ -3171,7 +3169,10 @@ window.handleCompleteRegister = async function (e) {
 // (Firestore 초기화 코드는 전혀 건드리지 않고, firebase.initializeApp()이 이미
 // 실행된 뒤에 이 스크립트가 나중에 로드되므로 안전하게 추가로 활성화만 한다.)
 try {
-  firebase.appCheck().activate('6LdbFbktAAAAAFEEAeqoqi-2c6cNlV_gu9-lV9VN', true);
+  firebase.appCheck().activate(
+    new firebase.appCheck.ReCaptchaEnterpriseProvider('6LeFfLktAAAAANS2TCKuARKz8ByPqh7fKM-kauh1'),
+    true
+  );
 } catch (e) {
   console.error('App Check 활성화 실패:', e);
 }
