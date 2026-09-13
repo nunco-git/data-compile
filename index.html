@@ -23,6 +23,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
   <style>
@@ -289,6 +290,18 @@
                 <label>기관 접속 코드 (기관에서 접속할 때 입력할 코드)</label>
                 <input type="text" id="regAgencyCode" placeholder="예: buyeo-safety-2026" required />
                 <p style="font-size:14.1px; color:#94a3b8; margin:4px 0 0 0;">영문/숫자 조합 권장, 다른 담당자와 겹치지 않아야 합니다.</p>
+              </div>
+              <div class="form-group">
+                <label>소속기관 이메일 (go.kr 또는 or.kr 로 끝나야 합니다)</label>
+                <div style="display:flex; gap:8px;">
+                  <input type="email" id="regGovEmail" placeholder="예: hong@buyeo.go.kr" style="flex:1;" />
+                  <button type="button" class="btn" id="sendCodeBtn" onclick="sendVerificationCodeUI()">인증번호 발송</button>
+                </div>
+                <div id="codeInputWrap" class="hidden" style="display:flex; gap:8px; margin-top:8px;">
+                  <input type="text" id="regVerifyCode" placeholder="인증번호 6자리" style="flex:1;" />
+                  <button type="button" class="btn" id="verifyCodeBtn" onclick="verifyEmailCodeUI()">확인</button>
+                </div>
+                <p id="emailVerifyStatus" style="font-size:14.1px; color:#94a3b8; margin:4px 0 0 0;"></p>
               </div>
               <button type="submit" class="btn">계정 생성 완료</button>
             </form>
@@ -2511,5 +2524,430 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
 })();
 </script>
 
+
+<script>
+// [보안 수정] 아래 3개 함수를 원래 코드보다 더 안전한 버전으로 다시 정의한다.
+// (원래 함수를 직접 수정하지 않고, 나중에 로드되는 이 스크립트가 같은 이름의
+// 전역 함수를 다시 선언해서 덮어쓰는 방식 - 페이지의 다른 모든 코드는 그대로다.)
+//
+// 문제: 응답 제출 화면(설문/엑셀시트)에 들어오는 값은 전부 "로그인하지 않은
+// 외부 응답자"가 직접 입력한 내용인데, 그 값을 담당자 화면에 innerHTML로
+// 그대로 꽂아 넣고 있었다. 응답자가 답변 칸에 <img src=x onerror=...> 같은
+// 내용을 넣으면, 담당자(로그인된 계정)가 응답 목록을 보는 순간 그 코드가
+// 담당자의 브라우저에서 실행된다. 또한 슈퍼관리자 화면(전체 담당자 목록)도
+// 담당자가 스스로 정한 이름/기관코드를 이스케이프 없이 표시하고 있어서,
+// 악의적인 이름으로 가입한 담당자가 슈퍼관리자 세션을 공격할 수 있었다.
+function escapeHtmlSafe(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// 첨부파일 링크의 URL도 신뢰할 수 없는 값이므로, http(s)로 시작하는 것만
+// 실제 링크로 만들고 그 외(javascript: 등)는 무시한다.
+function isSafeHttpUrl(u) {
+  return typeof u === 'string' && /^https?:\/\//i.test(u);
+}
+
+function renderAnswerCellValue(question, value) {
+  if (!value) return '-';
+  if (question.type === 'file') {
+    try {
+      const parsed = JSON.parse(value);
+      const arr = Array.isArray(parsed) ? parsed : [parsed];
+      const links = arr
+        .filter(f => f && f.url && isSafeHttpUrl(f.url))
+        .map(f => '<a href="' + escapeHtmlSafe(f.url) + '" target="_blank" rel="noopener">📎 ' + escapeHtmlSafe(f.name || '첨부파일') + '</a>');
+      if (links.length > 0) return links.join('<br/>');
+    } catch (e) {}
+  }
+  return escapeHtmlSafe(value);
+}
+
+function renderManagerResponses() {
+  if (!currentUser || !viewingRoundMeta) return;
+  const useSurvey = !!viewingRoundMeta.useSurvey;
+  const useExcel = !!viewingRoundMeta.useExcel;
+  const useTemplate = !!viewingRoundMeta.useTemplate;
+  const questions = useSurvey ? viewingRoundMeta.questions || [] : [];
+  const columns = useExcel ? viewingRoundMeta.columns || [] : [];
+  const headerEl = document.getElementById('responseTableHeader');
+  const bodyEl = document.getElementById('responseTableBody');
+  bodyEl.innerHTML = '';
+  let header = '<th>제출 기관명</th><th>제출일시</th>';
+  header += questions.map(q => '<th>' + escapeHtmlSafe(q.title) + '</th>').join('');
+  header += columns.map(c => '<th>' + escapeHtmlSafe(c.name) + '</th>').join('');
+  if (useTemplate) header += '<th>서식 응답</th>';
+  headerEl.innerHTML = header;
+  cachedResponseDocs.forEach((doc, idx) => {
+    const questionCells = questions.map(q => {
+      const val = doc.answers ? doc.answers[q.id] : undefined;
+      return '<td>' + renderAnswerCellValue(q, val) + '</td>';
+    }).join('');
+    const templateCell = useTemplate
+      ? '<td>' + ((doc.templateAnswersSheets || doc.templateAnswers) ? '<button class="btn btn-secondary btn-sm" onclick="exportTemplateResponse(' + idx + ')">📥 다운로드</button>' : '-') + '</td>'
+      : '';
+    if (useExcel && Array.isArray(doc.rows) && doc.rows.length > 0) {
+      doc.rows.forEach((row, rIdx) => {
+        const cells = row && row.cells ? row.cells : [];
+        const tr = document.createElement('tr');
+        const cellsHtml = cells.map(c => '<td>' + escapeHtmlSafe(c) + '</td>').join('');
+        tr.innerHTML = '<td><strong>' + escapeHtmlSafe(doc.agencyName) + '</strong></td><td>' + escapeHtmlSafe(doc.submittedAt) + '</td>' + questionCells + cellsHtml + (rIdx === 0 ? templateCell : (useTemplate ? '<td>-</td>' : ''));
+        bodyEl.appendChild(tr);
+      });
+    } else {
+      const tr = document.createElement('tr');
+      const emptyCols = columns.map(() => '<td>-</td>').join('');
+      tr.innerHTML = '<td><strong>' + escapeHtmlSafe(doc.agencyName) + '</strong></td><td>' + escapeHtmlSafe(doc.submittedAt) + '</td>' + questionCells + emptyCols + templateCell;
+      bodyEl.appendChild(tr);
+    }
+  });
+}
+
+async function renderSuperAdminView() {
+  const tbody = document.getElementById('superAdminTableBody');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">불러오는 중...</td></tr>';
+  const idxSnap = await db.collection('system').doc('manager_index').get();
+  const idxData = idxSnap.exists ? idxSnap.data() : {};
+  const uids = Object.keys(idxData);
+  tbody.innerHTML = '';
+  if (uids.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">등록된 담당자 계정이 없습니다.</td></tr>';
+    return;
+  }
+  const snaps = await Promise.all(uids.map(uid => db.collection('managers').doc(uid).get()));
+  snaps.forEach((snap, i) => {
+    const uid = uids[i];
+    if (!snap.exists) return;
+    const m = snap.data();
+    const modes = [];
+    if (m.useSurvey) modes.push('📝 자체설문');
+    if (m.useExcel) modes.push('📊 엑셀시트');
+    if (m.useTemplate) modes.push('📐 자유서식');
+    const modesStr = modes.length > 0 ? modes.join(' + ') : '미설정';
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '\n          <td><strong>' + escapeHtmlSafe(m.agencyCode || '-') + '</strong></td>' +
+      '\n          <td>' + escapeHtmlSafe(m.name) + '</td>' +
+      '\n          <td>' + modesStr + '</td>' +
+      '\n          <td>' + (m.surveyPw ? '🔒 설정됨' : '❌ 미설정') + '</td>' +
+      '\n          <td></td>\n        ';
+    // 삭제 버튼은 문자열로 조립하지 않고 직접 DOM으로 만든다 - 담당자가 스스로
+    // 정한 agencyCode 값에 따옴표가 들어 있어도 onclick 속성이 깨지지 않는다.
+    const delTd = tr.lastElementChild;
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-danger btn-sm';
+    delBtn.textContent = '삭제';
+    delBtn.addEventListener('click', () => deleteManager(uid, m.agencyCode || ''));
+    delTd.appendChild(delBtn);
+    tbody.appendChild(tr);
+  });
+}
+</script>
+
+<script>
+// [보안 수정 - 비밀번호 서버 검증] "제출 전용 비밀번호" 확인을 더 이상
+// 브라우저에서 담당자 문서를 직접 읽어 비교하지 않고, Cloud Functions의
+// verifySurveyAccess 함수를 호출해서 서버에서만 비교하도록 바꾼다.
+// (이 함수를 쓰려면 functions/ 폴더의 Cloud Function을 배포해야 하고,
+// Firestore 규칙에서 managers/{managerId}의 공개 get 권한도 제거해야 한다 -
+// 자세한 내용은 대화에서 설명한 배포 안내를 참고.)
+(function () {
+  'use strict';
+
+  var MANUAL_OPTION_VALUE = '__manual__';
+
+  function getAgencyNamesFromLists(agencyLists) {
+    var set = {};
+    var ordered = [];
+    (agencyLists || []).forEach(function (list) {
+      (list.agencies || []).forEach(function (name) {
+        var trimmed = (name || '').trim();
+        if (trimmed && !set[trimmed]) {
+          set[trimmed] = true;
+          ordered.push(trimmed);
+        }
+      });
+    });
+    ordered.sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+    return ordered;
+  }
+
+  // 기존 switchLoginMode 래퍼(로그인 화면 전환 시 초기화) 위에 한 겹 더 씌워서,
+  // 새로 추가한 window.__verifiedAccess 값도 같이 초기화되게 한다.
+  var _prevSwitchLoginMode = window.switchLoginMode;
+  window.switchLoginMode = function () {
+    _prevSwitchLoginMode.apply(this, arguments);
+    window.__verifiedAccess = null;
+  };
+
+  window.verifyAccessCredentials = async function () {
+    if (!db) { alert('시스템 초기화에 실패했습니다.'); return; }
+    var codeInput = document.getElementById('accessManagerId');
+    var pwInput = document.getElementById('accessSurveyPw');
+    var agencyCode = (codeInput.value || '').trim();
+    var pw = (pwInput.value || '').trim();
+    if (!agencyCode || !pw) {
+      alert('접속 코드와 비밀번호를 모두 입력해주세요.');
+      return;
+    }
+    var btn = document.getElementById('verifyAccessBtn');
+    btn.disabled = true;
+    btn.textContent = '확인 중...';
+    try {
+      var verify = firebase.functions().httpsCallable('verifySurveyAccess');
+      var result = await verify({ agencyCode: agencyCode, password: pw });
+      var data = result.data || {};
+
+      if (!data.ok) {
+        if (data.reason === 'NOT_FOUND') {
+          alert('존재하지 않는 접속 코드이거나 담당자입니다.');
+        } else {
+          alert('제출 전용 비밀번호가 올바르지 않습니다.');
+        }
+        return;
+      }
+
+      window.__verifiedAccess = { managerUid: data.managerUid, agencyCode: agencyCode };
+
+      var names = getAgencyNamesFromLists(data.agencyLists);
+      var sel = document.getElementById('accessAgencyNameSelect');
+      var selectWrap = document.getElementById('agencyNameSelectWrap');
+      var manualWrap = document.getElementById('agencyNameManualWrap');
+
+      if (names.length > 0) {
+        sel.innerHTML = '<option value="">-- 기관을 선택하세요 --</option>' +
+          names.map(function (n) {
+            return '<option value="' + n.replace(/"/g, '&quot;') + '">' + n.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</option>';
+          }).join('') +
+          '<option value="' + MANUAL_OPTION_VALUE + '">✏️ 명단에 없음 (직접 입력)</option>';
+        selectWrap.classList.remove('hidden');
+        manualWrap.classList.add('hidden');
+      } else {
+        selectWrap.classList.add('hidden');
+        manualWrap.classList.remove('hidden');
+      }
+
+      document.getElementById('agencyNameStep').classList.remove('hidden');
+      codeInput.disabled = true;
+      pwInput.disabled = true;
+      btn.textContent = '✅ 확인됨 (다시 하려면 새로고침)';
+    } catch (e) {
+      console.error(e);
+      alert('확인 중 오류가 발생했습니다: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = '확인';
+    }
+  };
+
+  window.handleAgencyNameSelectChange = function () {
+    var sel = document.getElementById('accessAgencyNameSelect');
+    var manualWrap = document.getElementById('agencyNameManualWrap');
+    if (!sel || !manualWrap) return;
+    manualWrap.classList.toggle('hidden', sel.value !== MANUAL_OPTION_VALUE);
+  };
+
+  window.startSurveyAccessWithAgency = async function () {
+    if (!window.__verifiedAccess) {
+      alert('먼저 접속 코드와 비밀번호를 확인해주세요.');
+      return;
+    }
+    var sel = document.getElementById('accessAgencyNameSelect');
+    var manualInput = document.getElementById('accessAgencyName');
+    var selectVisible = sel && !document.getElementById('agencyNameSelectWrap').classList.contains('hidden');
+
+    var agencyName = '';
+    if (selectVisible && sel.value && sel.value !== MANUAL_OPTION_VALUE) {
+      agencyName = sel.value;
+    } else {
+      agencyName = (manualInput.value || '').trim();
+    }
+    if (!agencyName) {
+      alert('제출 기관명을 선택하거나 입력해주세요.');
+      return;
+    }
+
+    var btn = document.getElementById('startSurveyAccessBtn');
+    btn.disabled = true;
+    btn.textContent = '확인 중...';
+    try {
+      var managerUid = window.__verifiedAccess.managerUid;
+      var agencyCode = window.__verifiedAccess.agencyCode;
+      var roundsSnap = await db.collection('managers').doc(managerUid).collection('rounds').get();
+      var openRounds = roundsSnap.docs
+        .map(function (d) { return Object.assign({ id: d.id }, d.data()); })
+        .filter(function (r) { return r.status === 'open'; })
+        .filter(function (r) {
+          return (r.useSurvey && r.questionsConfirmed) ||
+                 (r.useExcel && r.columnsConfirmed) ||
+                 (r.useTemplate && r.templateConfirmed);
+        });
+
+      if (openRounds.length === 0) {
+        alert('현재 제출 가능한 설문이 없습니다. 담당자에게 문의해주세요.');
+        return;
+      }
+      if (openRounds.length === 1) {
+        lastAccessSession = null;
+        enterSurveyForRound(managerUid, agencyCode, agencyName, openRounds[0]);
+        return;
+      }
+      pendingAgencyAccess = { managerUid: managerUid, agencyCode: agencyCode, agencyName: agencyName };
+      lastAccessSession = { managerUid: managerUid, agencyCode: agencyCode, agencyName: agencyName, openRounds: openRounds };
+      await showRoundPicker(openRounds, agencyName);
+    } catch (e) {
+      console.error(e);
+      alert('접속 중 오류가 발생했습니다: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '작성/제출 시작하기';
+    }
+  };
+})();
+</script>
+
+<script>
+// [신규 기능] 가입 시 go.kr/or.kr 소속기관 이메일 인증
+// - "인증번호 발송" -> Cloud Function sendVerificationCode 호출 (이메일 형식도 서버에서 재검증)
+// - 사용자가 메일함에서 받은 6자리 번호를 입력 -> verifyEmailCode 호출
+// - 성공하면 서버가 email_verifications/{uid} 문서에 검증 완료를 기록해두고,
+//   Firestore 규칙이 "이 uid에 대해 검증된 이메일과 가입 시 제출한 agencyEmail이
+//   일치할 때만" managers 문서 생성을 허용하도록 강제한다 (브라우저에서 우회 불가).
+window.__verifiedEmailAddress = null;
+
+function govEmailLooksValid(email) {
+  return /^[^\s@]+@[a-zA-Z0-9.-]+\.(go|or)\.kr$/i.test(email);
+}
+
+window.sendVerificationCodeUI = async function () {
+  const emailInput = document.getElementById('regGovEmail');
+  const email = (emailInput.value || '').trim();
+  const statusEl = document.getElementById('emailVerifyStatus');
+  if (!govEmailLooksValid(email)) {
+    statusEl.textContent = 'go.kr 또는 or.kr로 끝나는 기관 이메일 형식이 아닙니다.';
+    statusEl.style.color = '#dc2626';
+    return;
+  }
+  const btn = document.getElementById('sendCodeBtn');
+  btn.disabled = true;
+  btn.textContent = '발송 중...';
+  try {
+    const send = firebase.functions().httpsCallable('sendVerificationCode');
+    await send({ email: email });
+    document.getElementById('codeInputWrap').classList.remove('hidden');
+    statusEl.textContent = '인증번호를 보냈습니다. 메일함을 확인해주세요 (10분 이내 유효).';
+    statusEl.style.color = '#16a34a';
+    window.__verifiedEmailAddress = null;
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = '발송 실패: ' + e.message;
+    statusEl.style.color = '#dc2626';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '인증번호 발송';
+  }
+};
+
+window.verifyEmailCodeUI = async function () {
+  const code = (document.getElementById('regVerifyCode').value || '').trim();
+  const statusEl = document.getElementById('emailVerifyStatus');
+  if (!code) { statusEl.textContent = '인증번호를 입력해주세요.'; statusEl.style.color = '#dc2626'; return; }
+  const btn = document.getElementById('verifyCodeBtn');
+  btn.disabled = true;
+  btn.textContent = '확인 중...';
+  try {
+    const verify = firebase.functions().httpsCallable('verifyEmailCode');
+    const result = await verify({ code: code });
+    const data = result.data || {};
+    if (!data.ok) {
+      const msgs = {
+        WRONG_CODE: '인증번호가 올바르지 않습니다.',
+        EXPIRED: '인증번호가 만료되었습니다. 다시 발송해주세요.',
+        NOT_REQUESTED: '먼저 인증번호를 발송해주세요.',
+        ALREADY_USED: '이미 사용된 인증번호입니다. 다시 발송해주세요.',
+      };
+      statusEl.textContent = msgs[data.reason] || '인증에 실패했습니다.';
+      statusEl.style.color = '#dc2626';
+      return;
+    }
+    window.__verifiedEmailAddress = data.email;
+    statusEl.textContent = '✅ 이메일 인증 완료: ' + data.email;
+    statusEl.style.color = '#16a34a';
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = '확인 실패: ' + e.message;
+    statusEl.style.color = '#dc2626';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '확인';
+  }
+};
+
+// handleCompleteRegister를 이메일 인증 확인 + agencyEmail 저장이 포함된
+// 버전으로 다시 정의한다 (나머지 로직은 원래와 동일).
+window.handleCompleteRegister = async function (e) {
+  e.preventDefault();
+  if (!pendingGoogleUser) { alert('먼저 Google 계정으로 가입을 시작해주세요.'); return; }
+
+  const name = document.getElementById('regName').value.trim();
+  const agencyCode = document.getElementById('regAgencyCode').value.trim();
+  const emailInput = document.getElementById('regGovEmail').value.trim();
+  if (!name || !agencyCode) return;
+
+  if (!window.__verifiedEmailAddress) {
+    alert('소속기관 이메일 인증을 먼저 완료해주세요.');
+    return;
+  }
+  if (emailInput !== window.__verifiedEmailAddress) {
+    alert('인증된 이메일과 입력하신 이메일이 다릅니다. 다시 인증해주세요.');
+    window.__verifiedEmailAddress = null;
+    return;
+  }
+
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.innerText = '처리 중...';
+  try {
+    const idxSnap = await db.collection('system').doc('agency_code_index').get();
+    const idxData = idxSnap.exists ? idxSnap.data() : {};
+    if (idxData[agencyCode]) {
+      alert('이미 사용 중인 접속 코드입니다.');
+      return;
+    }
+    const uid = pendingGoogleUser.uid;
+    await db.collection('managers').doc(uid).set({
+      name: name,
+      role: 'manager',
+      surveyPw: '',
+      useSurvey: true,
+      useExcel: false,
+      questions: [],
+      columns: cloneDefaultColumns(),
+      agencyCode: agencyCode,
+      agencyEmail: window.__verifiedEmailAddress,
+    });
+    await db.collection('system').doc('manager_index').set({ [uid]: name }, { merge: true });
+    await db.collection('system').doc('agency_code_index').set({ [agencyCode]: uid }, { merge: true });
+    alert('가입이 완료되었습니다. 다시 로그인해주세요.');
+    pendingGoogleUser = null;
+    registrationInProgress = false;
+    window.__verifiedEmailAddress = null;
+    await auth.signOut();
+    document.getElementById('formCompleteRegister').classList.add('hidden');
+    document.getElementById('googleRegisterBtn').classList.remove('hidden');
+    document.getElementById('formCompleteRegister').reset();
+    switchLoginMode('login');
+  } catch (err) {
+    console.error(err);
+    alert('가입 중 오류가 발생했습니다: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerText = '계정 생성 완료';
+  }
+};
+</script>
 </body>
 </html>
