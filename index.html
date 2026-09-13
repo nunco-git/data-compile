@@ -292,14 +292,18 @@
                 <p style="font-size:14.1px; color:#94a3b8; margin:4px 0 0 0;">영문/숫자 조합 권장, 다른 담당자와 겹치지 않아야 합니다.</p>
               </div>
               <div class="form-group">
-                <label>소속기관 이메일 (go.kr 또는 or.kr 로 끝나야 합니다)</label>
-                <div style="display:flex; gap:8px;">
-                  <input type="email" id="regGovEmail" placeholder="예: hong@buyeo.go.kr" style="flex:1;" />
-                  <button type="button" class="btn" id="sendCodeBtn" onclick="sendVerificationCodeUI()">인증번호 발송</button>
+                <label>소속기관 이메일</label>
+                <p style="font-size:14.1px; color:#94a3b8; margin:2px 0 8px 0;">
+                  korea.kr, go.kr, or.kr, ac.kr, re.kr 로 끝나는 이메일은 인증번호를 바로 보내드립니다.<br/>
+                  그 외 이메일은 신청서 접수 후 관리자가 실제 소속기관 이메일인지 직접 확인하여 승인하면, 그때 인증번호 발송이 진행됩니다.
+                </p>
+                <div style="display:flex; gap:8px; align-items:stretch;">
+                  <input type="email" id="regGovEmail" placeholder="예: hong@buyeo.go.kr" style="flex:1 1 auto; min-width:0; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:15.4px;" />
+                  <button type="button" class="btn" id="sendCodeBtn" onclick="sendVerificationCodeUI()" style="width:auto; flex-shrink:0; white-space:nowrap; padding-left:16px; padding-right:16px;">인증번호 발송</button>
                 </div>
-                <div id="codeInputWrap" class="hidden" style="display:flex; gap:8px; margin-top:8px;">
-                  <input type="text" id="regVerifyCode" placeholder="인증번호 6자리" style="flex:1;" />
-                  <button type="button" class="btn" id="verifyCodeBtn" onclick="verifyEmailCodeUI()">확인</button>
+                <div id="codeInputWrap" class="hidden" style="display:flex; gap:8px; align-items:stretch; margin-top:8px;">
+                  <input type="text" id="regVerifyCode" placeholder="인증번호 6자리" style="flex:1 1 auto; min-width:0; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:15.4px;" />
+                  <button type="button" class="btn" id="verifyCodeBtn" onclick="verifyEmailCodeUI()" style="width:auto; flex-shrink:0; white-space:nowrap; padding-left:16px; padding-right:16px;">확인</button>
                 </div>
                 <p id="emailVerifyStatus" style="font-size:14.1px; color:#94a3b8; margin:4px 0 0 0;"></p>
               </div>
