@@ -421,12 +421,12 @@
 
         <div id="excelGridSection" class="hidden">
           <div class="section-heading">📁 서식 파일 다운로드 후 작성</div>
-          <p class="grid-hint">① 아래 버튼으로 담당자가 등록한 서식 파일을 다운로드하세요. ② 엑셀에서 작성한 뒤, 같은 파일을 그대로 업로드하세요.</p>
+          <p class="grid-hint">① 아래 버튼으로 담당자가 등록한 서식 파일을 다운로드하세요. ② 엑셀에서 작성한 뒤, 같은 파일을 그대로 업로드하세요. <strong style="color:#b91c1c;">(.xlsx 형식만 업로드 가능 — 예전 .xls 형식은 엑셀에서 "다른 이름으로 저장" → "Excel 통합 문서(*.xlsx)"로 다시 저장한 뒤 업로드해주세요.)</strong></p>
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
             <button type="button" class="btn btn-secondary" style="width:auto; padding:10px 20px;" onclick="downloadFileUploadTemplate()">📥 서식 파일 다운로드</button>
             <label class="btn btn-excel" style="width:auto; padding:10px 20px; margin:0; display:inline-flex; align-items:center; cursor:pointer;">
               📤 작성한 파일 업로드
-              <input type="file" id="fileUploadAgencyInput" accept=".xlsx,.xls" onchange="handleAgencyFileUpload(event)" style="display:none;" />
+              <input type="file" id="fileUploadAgencyInput" accept=".xlsx" onchange="handleAgencyFileUpload(event)" style="display:none;" />
             </label>
           </div>
           <div id="fileUploadAgencyStatus" class="status-banner" style="text-align:left; background:#f1f5f9; color:#475569;">아직 업로드된 파일이 없습니다.</div>
@@ -462,12 +462,12 @@
           </div>
 
           <div id="templateFillUploadArea" class="hidden">
-            <p class="grid-hint">① 아래 버튼으로 서식을 엑셀 파일로 받아서 작성하세요. ② 다 작성했으면 그 파일을 그대로 업로드하세요. 화면에 표를 직접 입력할 필요는 없습니다.</p>
+            <p class="grid-hint">① 아래 버튼으로 서식을 엑셀 파일로 받아서 작성하세요. ② 다 작성했으면 그 파일을 그대로 업로드하세요. 화면에 표를 직접 입력할 필요는 없습니다. <strong style="color:#b91c1c;">(.xlsx 형식만 업로드 가능 — 다운로드한 파일을 수정 없이 그대로 저장해서 올리면 됩니다.)</strong></p>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
               <button type="button" class="btn btn-secondary" style="width:auto; padding:10px 20px;" onclick="downloadTemplateBlankExcel()">📥 서식 다운로드(빈 양식)</button>
               <label class="btn btn-excel" style="width:auto; padding:10px 20px; margin:0; display:inline-flex; align-items:center; cursor:pointer;">
                 📤 작성한 엑셀 업로드
-                <input type="file" id="templateFillUploadInput" accept=".xlsx,.xls" onchange="handleTemplateFillUpload(event)" style="display:none;" />
+                <input type="file" id="templateFillUploadInput" accept=".xlsx" onchange="handleTemplateFillUpload(event)" style="display:none;" />
               </label>
             </div>
             <div id="templateFillUploadStatus" class="status-banner" style="text-align:left; background:#f1f5f9; color:#475569;">아직 업로드된 파일이 없습니다.</div>
@@ -610,7 +610,7 @@
             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
               <label id="fileUploadManagerLabel" class="btn btn-excel btn-sm" style="width:auto; margin:0; display:inline-flex; align-items:center; cursor:pointer;">
                 📤 서식 파일 업로드/교체
-                <input type="file" id="fileUploadManagerInput" accept=".xlsx,.xls" onchange="handleManagerFileUploadTemplate(event)" style="display:none;" />
+                <input type="file" id="fileUploadManagerInput" accept=".xlsx" onchange="handleManagerFileUploadTemplate(event)" style="display:none;" />
               </label>
               <span id="fileUploadManagerStatus" style="font-size:14.3px; color:#334155;">등록된 서식 파일이 없습니다.</span>
             </div>
