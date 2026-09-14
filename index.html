@@ -259,9 +259,65 @@
     #panelLogin .btn, #panelRegister .btn, #formSurveyAccess .btn {
       font-size: 17.4px;
     }
+
+    /* [신규] 개인정보 안내 팝업 - 기본 alert()보다 훨씬 크고 잘 보이게 */
+    #privacyNoticeOverlay {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.55);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999; padding: 20px;
+    }
+    #privacyNoticeOverlay.hidden { display: none; }
+    #privacyNoticeBox {
+      background: #fff; border-radius: 16px; max-width: 640px; width: 100%;
+      padding: 36px 32px; box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+      border-top: 10px solid #dc2626;
+    }
+    #privacyNoticeBox .privacy-icon { font-size: 48px; text-align: center; margin-bottom: 8px; }
+    #privacyNoticeBox h2 {
+      font-size: 26px; color: #b91c1c; text-align: center; margin: 0 0 20px 0;
+    }
+    #privacyNoticeBox p {
+      font-size: 20px; line-height: 1.6; color: #1e293b; margin: 0 0 14px 0;
+    }
+    #privacyNoticeBox p.emph {
+      font-weight: bold; color: #b91c1c; font-size: 21px;
+    }
+    #privacyNoticeBox button {
+      display: block; width: 100%; margin-top: 20px; padding: 16px;
+      font-size: 20px; font-weight: bold; color: #fff; background: #2563eb;
+      border: none; border-radius: 10px; cursor: pointer;
+    }
+    #privacyNoticeBox button:hover { background: #1d4ed8; }
   </style>
 </head>
 <body>
+
+  <div id="privacyNoticeOverlay" class="hidden">
+    <div id="privacyNoticeBox">
+      <div class="privacy-icon" id="privacyNoticeIcon">⚠️</div>
+      <h2 id="privacyNoticeTitle">개인정보 취급 안내</h2>
+      <div id="privacyNoticeBody"></div>
+      <button type="button" onclick="document.getElementById('privacyNoticeOverlay').classList.add('hidden')">확인했습니다</button>
+    </div>
+  </div>
+  <script>
+    // [신규] 어디서든 쓸 수 있는 "크게 보이는 안내창" 헬퍼.
+    // paragraphs: 문단 배열. 각 문단은 문자열이거나 {text, emph:true} 형태.
+    window.showBigNotice = function (title, paragraphs, icon) {
+      var overlay = document.getElementById('privacyNoticeOverlay');
+      if (!overlay) { alert(title + '\n\n' + paragraphs.map(function (p) { return typeof p === 'string' ? p : p.text; }).join('\n')); return; }
+      document.getElementById('privacyNoticeTitle').textContent = title;
+      document.getElementById('privacyNoticeIcon').textContent = icon || '⚠️';
+      var body = document.getElementById('privacyNoticeBody');
+      body.innerHTML = paragraphs.map(function (p) {
+        var text = typeof p === 'string' ? p : p.text;
+        var cls = (typeof p === 'object' && p.emph) ? ' class="emph"' : '';
+        return '<p' + cls + '>' + text + '</p>';
+      }).join('');
+      overlay.classList.remove('hidden');
+    };
+  </script>
+
 
   <div class="container">
 
@@ -3182,11 +3238,10 @@ window.handleCompleteRegister = async function (e) {
   window.enterAppForUser = async function (user) {
     var ok = await _origEnterAppForUser(user);
     if (ok) {
-      alert(
-        '⚠ 개인정보 취급 안내\n\n' +
-        '이 시스템은 개인정보가 포함된 문서(자료)를 취합하는 용도로 사용할 수 없습니다.\n' +
-        '성명, 연락처, 주민등록번호 등 개인정보가 포함된 자료는 절대 취합하지 마세요.'
-      );
+      showBigNotice('개인정보 취급 안내', [
+        { text: '이 시스템은 개인정보가 포함된 문서(자료)를 취합·제출하는 용도로 사용할 수 없습니다.', emph: true },
+        { text: '성명, 연락처, 주민등록번호 등 개인정보가 포함된 자료는 절대 취합하지 마세요.' }
+      ]);
     }
     return ok;
   };
@@ -3270,11 +3325,10 @@ try {
     var found = texts.some(function (t) { return findResidentNumberIn(t); });
     if (found) {
       e.preventDefault();
-      alert(
-        '⚠ 제출할 수 없습니다\n\n' +
-        '입력하신 내용에 주민등록번호로 보이는 값이 포함되어 있습니다.\n' +
-        '이 시스템은 개인정보가 포함된 자료를 취합할 수 없습니다. 해당 값을 지운 뒤 다시 제출해주세요.'
-      );
+      showBigNotice('제출할 수 없습니다', [
+        { text: '입력하신 내용에 주민등록번호로 보이는 값이 포함되어 있습니다.', emph: true },
+        { text: '이 시스템은 개인정보가 포함된 자료를 취합할 수 없습니다. 해당 값을 지운 뒤 다시 제출해주세요.' }
+      ], '🚫');
       return;
     }
     return _origSubmitCombined(e);
