@@ -450,16 +450,14 @@
 
           <div id="templateFillGridArea">
             <p class="grid-hint">회색으로 표시된 칸은 고정된 항목이며, 흰색 빈칸에만 내용을 입력할 수 있습니다. 필요하면 아래쪽에 행을 추가해서 더 입력할 수 있습니다.<br/><strong style="color:#b91c1c;">⚠️ 표가 화면보다 넓을 수 있습니다. 오른쪽에 더 입력할 칸이 있을 수 있으니, 아래 버튼이나 표를 좌우로 스크롤해서 끝까지 확인하며 작성해주세요.</strong></p>
-            <div id="templateFillSheetTabs" style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px;"></div>
-            <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
-              <button type="button" class="btn" style="width:auto; padding:10px 20px; font-size:16.5px;" onclick="scrollTemplateFill(-1)">◀ 왼쪽으로 스크롤</button>
-              <button type="button" class="btn" style="width:auto; padding:10px 20px; font-size:16.5px;" onclick="scrollTemplateFill(1)">오른쪽으로 스크롤 ▶</button>
+            <div id="templateFillSheetTabs" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;"></div>
+            <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; align-items:center;">
+              <button type="button" class="btn" style="width:auto; padding:10px 18px; font-size:15.5px; background:#2563eb; border-color:#2563eb; color:#fff;" onclick="scrollTemplateFill(-1)">◀ 열 이동(왼쪽)</button>
+              <button type="button" class="btn" style="width:auto; padding:10px 18px; font-size:15.5px; background:#2563eb; border-color:#2563eb; color:#fff;" onclick="scrollTemplateFill(1)">열 이동(오른쪽) ▶</button>
+              <button type="button" class="btn" style="width:auto; padding:10px 18px; font-size:15.5px; background:#16a34a; border-color:#16a34a; color:#fff;" onclick="addTemplateFillRow()">▼ 행 추가</button>
             </div>
             <div id="templateFillWrap" style="max-height:480px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
               <div id="templateFillSpreadsheet"></div>
-            </div>
-            <div style="margin-bottom:16px;">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="addTemplateFillRow()">+ 행 추가</button>
             </div>
           </div>
 
@@ -1374,7 +1372,37 @@ const _0x294d0=_0x46e1;(function(_0x379069,_0x687691){const _0x25fa22=_0x46e1,_0
 
       verifiedAccess = { managerUid: managerUid, agencyCode: agencyCode };
 
-      var names = getAgencyNamesFromLists(managerData.agencyLists);
+      // [수정] 담당자가 등록한 "전체" 명단이 아니라, 이 접속코드로 실제 제출 가능한
+      // (열려 있고 확정된) 회차들이 지정해 둔 명단만 후보로 사용한다.
+      // 명단이 지정되지 않은(전체 명단 대상) 열린 회차가 하나라도 있으면
+      // 안전하게 기존처럼 전체 명단을 사용한다.
+      var relevantAgencyLists = managerData.agencyLists || [];
+      try {
+        var roundsSnapForFilter = await db.collection('managers').doc(managerUid).collection('rounds').get();
+        var openRoundsForFilter = roundsSnapForFilter.docs
+          .map(function (d) { return Object.assign({ id: d.id }, d.data()); })
+          .filter(function (r) { return r.status === 'open'; })
+          .filter(function (r) {
+            return (r.useSurvey && r.questionsConfirmed) ||
+                   (r.useExcel && r.columnsConfirmed) ||
+                   (r.useTemplate && r.templateConfirmed);
+          });
+        var hasUntargetedOpenRound = openRoundsForFilter.some(function (r) { return !r.targetAgencyListId; });
+        if (!hasUntargetedOpenRound) {
+          var targetListIds = {};
+          openRoundsForFilter.forEach(function (r) {
+            if (r.targetAgencyListId) targetListIds[r.targetAgencyListId] = true;
+          });
+          if (Object.keys(targetListIds).length > 0) {
+            relevantAgencyLists = relevantAgencyLists.filter(function (l) { return targetListIds[l.id]; });
+          }
+        }
+      } catch (e) {
+        console.error('제출 대상 명단 필터링 중 오류(전체 명단으로 대체):', e);
+        relevantAgencyLists = managerData.agencyLists || [];
+      }
+
+      var names = getAgencyNamesFromLists(relevantAgencyLists);
       var sel = document.getElementById('accessAgencyNameSelect');
       var selectWrap = document.getElementById('agencyNameSelectWrap');
       var manualWrap = document.getElementById('agencyNameManualWrap');
@@ -3250,6 +3278,51 @@ try {
       return;
     }
     return _origSubmitCombined(e);
+  };
+})();
+
+// [신규] 자유서식(템플릿) 방식에서 시트가 여러 개인데 일부 시트를 확인하지 않고
+// 제출해버리는 일을 막기 위해, 제출 전 확인창을 띄운다. 또한 시트 탭에
+// 색상을 입혀서(선택된 시트/미선택 시트 구분) 시트가 여러 개라는 것을
+// 한눈에 알아볼 수 있게 한다.
+(function () {
+  var _origSubmitCombined2 = window.submitCombined;
+  window.submitCombined = async function (e) {
+    if (
+      activeSurveyInfo &&
+      activeSurveyInfo.useTemplate &&
+      Array.isArray(activeSurveyInfo.templateSheets) &&
+      activeSurveyInfo.templateSheets.length > 1
+    ) {
+      var sheetNames = activeSurveyInfo.templateSheets
+        .map(function (s, i) { return s.name || ('시트' + (i + 1)); })
+        .join(', ');
+      var ok = confirm(
+        '⚠ 이 서식은 시트가 ' + activeSurveyInfo.templateSheets.length + '개입니다 (' + sheetNames + ').\n\n' +
+        '제출하기 전에 모든 시트를 한 번씩 눌러 빠짐없이 작성했는지 확인해주세요.\n\n' +
+        '모든 시트를 확인했고, 이대로 제출하시겠습니까?'
+      );
+      if (!ok) {
+        e.preventDefault();
+        return;
+      }
+    }
+    return _origSubmitCombined2(e);
+  };
+
+  var _origRenderTemplateFillTabs = window.renderTemplateFillTabs;
+  window.renderTemplateFillTabs = function () {
+    _origRenderTemplateFillTabs.apply(this, arguments);
+    var wrap = document.getElementById('templateFillSheetTabs');
+    if (!wrap) return;
+    var buttons = wrap.querySelectorAll('button');
+    buttons.forEach(function (btn, idx) {
+      var isActive = idx === templateFillSheetIndex;
+      btn.style.background = isActive ? '#f97316' : '#e2e8f0';
+      btn.style.color = isActive ? '#fff' : '#334155';
+      btn.style.border = isActive ? '2px solid #c2410c' : '1px solid #cbd5e1';
+      btn.style.fontWeight = isActive ? 'bold' : 'normal';
+    });
   };
 })();
 
