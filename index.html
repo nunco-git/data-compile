@@ -3551,5 +3551,72 @@ function subscribeResponses() {
   }, function (err) { console.error('응답 구독 오류:', err); });
 }
 </script>
+
+<script>
+  // [신규] "시트1"을 포함해 모든 템플릿 시트의 이름을 나중에도 바꿀 수 있게 한다.
+  // (기존에는 "+ 시트 추가"로 새로 만들 때만 이름을 지정할 수 있었고,
+  //  자동 생성되는 기본 시트("시트1")는 이름을 바꿀 방법이 없었음)
+  (function () {
+    window.renameTemplateSheet = async function (idx) {
+      if (typeof templateLocked !== 'undefined' && templateLocked) return;
+      if (!currentUser || !currentUser.templateSheets || !currentUser.templateSheets[idx]) return;
+      var current = currentUser.templateSheets[idx].name || ('시트' + (idx + 1));
+      var name = prompt('시트 이름을 입력하세요:', current);
+      if (!name) return;
+      name = name.trim();
+      if (!name) return;
+      if (idx === currentTemplateSheetIndex && typeof captureCurrentTemplateSheet === 'function') {
+        captureCurrentTemplateSheet();
+      }
+      currentUser.templateSheets[idx].name = name;
+      renderTemplateSheetTabs();
+    };
+
+    var _origRenderTemplateSheetTabs = window.renderTemplateSheetTabs;
+    window.renderTemplateSheetTabs = function () {
+      _origRenderTemplateSheetTabs.apply(this, arguments);
+      var wrap = document.getElementById('templateSheetTabs');
+      if (!wrap || !currentUser || !currentUser.templateSheets) return;
+      var sheets = currentUser.templateSheets;
+      wrap.style.display = 'flex';
+      wrap.style.flexWrap = 'wrap';
+      wrap.style.gap = '6px';
+      wrap.innerHTML = sheets.map(function (s, i) {
+        var active = i === currentTemplateSheetIndex;
+        var editBtn = templateLocked ? '' :
+          '<button type="button" class="btn btn-secondary btn-sm" title="시트 이름 바꾸기" ' +
+          'style="padding:6px 9px;" onclick="renameTemplateSheet(' + i + ')">✎</button>';
+        return '<span style="display:inline-flex; align-items:center; gap:2px;">' +
+          '<button type="button" class="btn ' + (active ? '' : 'btn-secondary') + ' btn-sm" ' +
+          'onclick="switchTemplateSheet(' + i + ')">' + (s.name || ('시트' + (i + 1))) + '</button>' +
+          editBtn +
+          '</span>';
+      }).join('');
+    };
+  })();
+
+  // [신규] 카카오톡 인앱 브라우저나 아이폰(iOS)에서 접속하면 사진 첨부/제출 등 일부
+  // 기능이 제대로 동작하지 않을 수 있어, 기관이 실제 제출 화면에 들어갈 때마다
+  // 컴퓨터로 접속하라는 안내를 큰 팝업으로 띄운다.
+  (function () {
+    function isRiskyMobileBrowser() {
+      var ua = navigator.userAgent || '';
+      var isKakao = /KAKAOTALK/i.test(ua);
+      var isIOS = /iPhone|iPad|iPod/i.test(ua);
+      return isKakao || isIOS;
+    }
+    var _origEnterSurveyForRound3 = window.enterSurveyForRound;
+    window.enterSurveyForRound = function () {
+      _origEnterSurveyForRound3.apply(this, arguments);
+      if (isRiskyMobileBrowser() && typeof showBigNotice === 'function') {
+        showBigNotice('접속 환경 안내', [
+          { text: '카카오톡 메신저 안이나 아이폰(iOS)에서 접속하신 것으로 보입니다.', emph: true },
+          { text: '이 환경에서는 사진 첨부나 제출 등 일부 기능이 정상적으로 동작하지 않을 수 있습니다.' },
+          { text: '가능하면 컴퓨터로 접속해주세요. 카카오톡이라면 화면 오른쪽 위 "···" 메뉴에서 "다른 브라우저로 열기"를 눌러 접속하시면 도움이 됩니다.' }
+        ], '📱');
+      }
+    };
+  })();
+</script>
 </body>
 </html>
