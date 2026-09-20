@@ -330,8 +330,8 @@
 
     <!-- 1. 메인 로그인 / 회원가입 / 기관 접속 -->
     <div id="viewLogin">
-      <div class="login-split">
-        <div class="login-left-col">
+      <div class="login-split" id="loginSplitWrap">
+        <div class="login-left-col" id="loginLeftCol">
           <div class="header">
             <h1>🗂️ 스마트 자료취합 시스템</h1>
             <p>담당자는 Google 계정으로 로그인하고, 기관은 접속 코드로 참여합니다.</p>
@@ -442,13 +442,16 @@
           <div id="panelDemo" class="hidden">
             <div class="status-banner" style="background:#eff6ff; color:#1d4ed8;">
               회원가입이나 접속코드 없이, 예시(가짜) 데이터로 <strong>업무 담당자·기관(제출자)</strong> 화면을 모두 눌러볼 수 있는 체험판입니다. 10개 기관과 자체 설문·파일 업로드·자유서식 세 가지 취합 방식이 미리 준비되어 있습니다. 여기서 입력한 내용은 저장되지 않고, 새로고침하면 처음 상태로 되돌아갑니다.
+              (주소창은 이 페이지 그대로 유지됩니다)
             </div>
-            <a href="./test-demo.html" target="_blank" rel="noopener" class="btn" style="display:block; text-align:center; text-decoration:none; box-sizing:border-box;">🧪 체험판 새 탭에서 열기</a>
+            <div id="demoIframeWrap" style="border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+              <iframe id="demoIframe" title="스마트 자료취합 시스템 체험판" style="width:100%; height:78vh; min-height:520px; border:none; display:block;"></iframe>
+            </div>
           </div>
           </div>
         </div>
 
-        <div class="login-right">
+        <div class="login-right" id="loginRightPanel">
           <div class="login-summary">
             <div class="login-summary-title"><span class="title-icon-sm">📋</span>스마트 자료취합 시스템이란?</div>
             <div style="background:#fef2f2; border:2px solid #fca5a5; border-radius:10px; padding:14px 16px; margin-bottom:14px; display:flex; align-items:center; gap:10px;">
@@ -6176,9 +6179,12 @@ window.toggleOptionInput = function () {
 // 다른 모드로 돌아갈 때는 panelDemo와 체험판 탭 활성화 표시를 정리한다.
 (function () {
   var _prevSwitchLoginModeForDemo = window.switchLoginMode;
+  var DEMO_SRC = './test-demo.html';
   window.switchLoginMode = function (mode) {
     var tabDemoBtn = document.getElementById('tabDemoBtn');
     var panelDemo = document.getElementById('panelDemo');
+    var loginRightPanel = document.getElementById('loginRightPanel');
+    var loginLeftCol = document.getElementById('loginLeftCol');
     if (mode === 'demo') {
       ['tabLoginBtn', 'tabRegisterBtn', 'tabSurveyBtn'].forEach(function (id) {
         var el = document.getElementById(id);
@@ -6190,10 +6196,19 @@ window.toggleOptionInput = function () {
       });
       if (tabDemoBtn) tabDemoBtn.classList.add('active');
       if (panelDemo) panelDemo.classList.remove('hidden');
+      // 체험판을 볼 때는 오른쪽 소개 패널을 숨기고 왼쪽 영역을 넓혀서
+      // 체험판 화면(iframe)이 더 넓게 보이도록 한다. 주소창(URL)은 그대로 유지된다.
+      if (loginRightPanel) loginRightPanel.classList.add('hidden');
+      if (loginLeftCol) loginLeftCol.style.flex = '1 1 100%';
+      // 체험판 탭을 처음 열 때만 iframe에 실제로 파일을 불러온다(불필요한 선로딩 방지).
+      var iframe = document.getElementById('demoIframe');
+      if (iframe && !iframe.getAttribute('src')) iframe.setAttribute('src', DEMO_SRC);
       return;
     }
     if (tabDemoBtn) tabDemoBtn.classList.remove('active');
     if (panelDemo) panelDemo.classList.add('hidden');
+    if (loginRightPanel) loginRightPanel.classList.remove('hidden');
+    if (loginLeftCol) loginLeftCol.style.flex = '';
     return _prevSwitchLoginModeForDemo(mode);
   };
 })();
