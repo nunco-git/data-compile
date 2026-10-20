@@ -311,9 +311,26 @@
     #demoOverlayBar button:hover { background: rgba(255,255,255,0.25); }
     #demoOverlayBar span { font-size: 13px; color: #cbd5e1; }
     #demoOverlay iframe { flex: 1; width: 100%; border: none; }
+
+    /* 링크 입력 취합 전체화면 오버레이 (체험판 오버레이와 동일한 방식) */
+    #linkOverlay { position: fixed; inset: 0; background: #f1f5f9; z-index: 200; display: flex; flex-direction: column; }
+    #linkOverlay.hidden { display: none; }
+    #linkOverlayBar { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: #1e293b; color: #fff; }
+    #linkOverlayBar button { background: rgba(255,255,255,0.15); color: #fff; border: none; border-radius: 6px; padding: 8px 14px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    #linkOverlayBar button:hover { background: rgba(255,255,255,0.25); }
+    #linkOverlayBar span { font-size: 13px; color: #cbd5e1; }
+    #linkOverlay iframe { flex: 1; width: 100%; border: none; background: #fff; }
   </style>
 </head>
 <body>
+
+  <div id="linkOverlay" class="hidden">
+    <div id="linkOverlayBar">
+      <button onclick="closeLinkOverlay()">← 초기화면으로 돌아가기</button>
+      <span>링크 입력 취합 - 엑셀·한글파일을 부서원과 실시간으로 수정</span>
+    </div>
+    <iframe id="linkIframe" src="about:blank" title="링크 입력 취합" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+  </div>
 
   <div id="demoOverlay" class="hidden">
     <div id="demoOverlayBar">
@@ -371,7 +388,7 @@
             </button>
 
             <!-- 링크 입력 취합 바로가기 -->
-            <a href="https://nunco-git.github.io/hwpxexcelonmerge/" target="_blank" rel="noopener"
+            <a href="https://nunco-git.github.io/hwpxexcelonmerge/" onclick="openLinkOverlay(event)"
                style="display:block; margin-top:16px; text-decoration:none; background:linear-gradient(160deg,#eff6ff 0%,#dbeafe 100%); border:1.5px solid #93c5fd; border-radius:12px; padding:14px 16px; text-align:center; transition:box-shadow 0.2s ease, transform 0.15s ease;"
                onmouseover="this.style.boxShadow='0 6px 16px rgba(37,99,235,0.18)'; this.style.transform='translateY(-1px)';"
                onmouseout="this.style.boxShadow='none'; this.style.transform='none';">
@@ -6233,6 +6250,19 @@ function openDemoOverlay() {
   }
   var overlay = document.getElementById('demoOverlay');
   if (overlay) overlay.classList.remove('hidden');
+}
+function openLinkOverlay(ev) {
+  if (ev) ev.preventDefault();
+  var iframe = document.getElementById('linkIframe');
+  if (iframe && (iframe.getAttribute('src') === 'about:blank' || !iframe.getAttribute('src'))) {
+    iframe.setAttribute('src', 'https://nunco-git.github.io/hwpxexcelonmerge/');
+  }
+  var overlay = document.getElementById('linkOverlay');
+  if (overlay) overlay.classList.remove('hidden');
+}
+function closeLinkOverlay() {
+  var overlay = document.getElementById('linkOverlay');
+  if (overlay) overlay.classList.add('hidden');
 }
 function closeDemoOverlay() {
   var overlay = document.getElementById('demoOverlay');
