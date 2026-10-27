@@ -320,6 +320,15 @@
     #linkOverlayBar button:hover { background: rgba(255,255,255,0.25); }
     #linkOverlayBar span { font-size: 13px; color: #cbd5e1; }
     #linkOverlay iframe { flex: 1; width: 100%; border: none; background: #fff; }
+
+    /* 변수 입력 취합 전체화면 오버레이 (링크 입력 취합 오버레이와 동일한 방식) */
+    #varOverlay { position: fixed; inset: 0; background: #f1f5f9; z-index: 200; display: flex; flex-direction: column; }
+    #varOverlay.hidden { display: none; }
+    #varOverlayBar { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: #1e293b; color: #fff; }
+    #varOverlayBar button { background: rgba(255,255,255,0.15); color: #fff; border: none; border-radius: 6px; padding: 8px 14px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    #varOverlayBar button:hover { background: rgba(255,255,255,0.25); }
+    #varOverlayBar span { font-size: 13px; color: #cbd5e1; }
+    #varOverlay iframe { flex: 1; width: 100%; border: none; background: #fff; }
   </style>
 </head>
 <body>
@@ -330,6 +339,14 @@
       <span>링크 입력 취합 - 엑셀·한글파일을 부서원과 실시간으로 수정</span>
     </div>
     <iframe id="linkIframe" src="about:blank" title="링크 입력 취합" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+  </div>
+
+  <div id="varOverlay" class="hidden">
+    <div id="varOverlayBar">
+      <button onclick="closeVarOverlay()">← 초기화면으로 돌아가기</button>
+      <span>변수 입력 취합 - 한글 문서의 부서명·전화·팩스를 변수로 만들어 여러 명이 함께 입력</span>
+    </div>
+    <iframe id="varIframe" src="about:blank" title="변수 입력 취합" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
   </div>
 
   <div id="demoOverlay" class="hidden">
@@ -394,6 +411,15 @@
                onmouseout="this.style.boxShadow='none'; this.style.transform='none';">
               <span style="display:block; font-size:17.4px; font-weight:800; color:#1d4ed8;">🔗 링크 입력 취합 바로가기 →</span>
               <span style="display:block; margin-top:5px; font-size:14.3px; font-weight:600; color:#1e40af; line-height:1.5;">엑셀이나 한글파일을 실시간으로 부서원과 수정작업 가능</span>
+            </a>
+
+            <!-- 변수 입력 취합 바로가기 -->
+            <a href="https://nunco-git.github.io/variablehwpx/" onclick="openVarOverlay(event)"
+               style="display:block; margin-top:12px; text-decoration:none; background:linear-gradient(160deg,#fff7ed 0%,#ffedd5 100%); border:1.5px solid #fdba74; border-radius:12px; padding:14px 16px; text-align:center; transition:box-shadow 0.2s ease, transform 0.15s ease;"
+               onmouseover="this.style.boxShadow='0 6px 16px rgba(194,65,12,0.18)'; this.style.transform='translateY(-1px)';"
+               onmouseout="this.style.boxShadow='none'; this.style.transform='none';">
+              <span style="display:block; font-size:17.4px; font-weight:800; color:#9a3412;">📝 변수 입력 취합 바로가기 →</span>
+              <span style="display:block; margin-top:5px; font-size:14.3px; font-weight:600; color:#b45309; line-height:1.5;">한글 문서의 부서명·전화·팩스를 변수로 만들어 여러 명이 입력하고 한 번에 반영</span>
             </a>
           </div>
 
@@ -6262,6 +6288,19 @@ function openLinkOverlay(ev) {
 }
 function closeLinkOverlay() {
   var overlay = document.getElementById('linkOverlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+function openVarOverlay(ev) {
+  if (ev) ev.preventDefault();
+  var iframe = document.getElementById('varIframe');
+  if (iframe && (iframe.getAttribute('src') === 'about:blank' || !iframe.getAttribute('src'))) {
+    iframe.setAttribute('src', 'https://nunco-git.github.io/variablehwpx/');
+  }
+  var overlay = document.getElementById('varOverlay');
+  if (overlay) overlay.classList.remove('hidden');
+}
+function closeVarOverlay() {
+  var overlay = document.getElementById('varOverlay');
   if (overlay) overlay.classList.add('hidden');
 }
 function closeDemoOverlay() {
