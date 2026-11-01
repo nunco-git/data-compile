@@ -6316,5 +6316,307 @@ window.renderCustomSurvey = function () {
   activeSurveyInfo.questions = backup;
 };
 </script>
+
+<script>
+// =====================================================================
+// [수정] 회차별 "취합 대상 명단" 분리 - 명단이 서로 섞이지 않도록
+//  1) 기관 접속: 기관명 목록에는 "현재 진행 중인 회차에 지정된 명단"의 기관만 표시
+//     (모든 명단을 합쳐서 보여주던 방식 제거)
+//  2) 기관이 기관명을 고른 뒤에는, 그 기관이 대상 명단에 들어 있는 회차만 표시
+//     (명단이 지정되지 않은 회차는 기존처럼 누구나 참여 가능)
+//  3) 담당자 화면: 명단 선택창과 아래 입력칸(기관명 목록)이 어긋나서 다른 명단을
+//     덮어쓰던 문제 수정, 편집 회차를 바꾸면 그 회차의 지정 명단이 자동 선택됨
+//  4) 응답 화면: 명단이 지정되지 않은 회차로 바꾸면 이전 회차의 필터가 남지 않도록 초기화
+//  5) 회차에 지정된 명단을 삭제하면 그 회차의 지정도 함께 해제
+// =====================================================================
+(function () {
+  'use strict';
+
+  var MANUAL_OPTION_VALUE = '__manual__';
+
+  function normName(s) { return (s || '').toString().trim(); }
+
+  function namesOfList(list) {
+    return ((list && list.agencies) || []).map(normName).filter(function (s) { return s; });
+  }
+
+  function findList(lists, id) {
+    return (lists || []).find(function (l) { return l.id === id; }) || null;
+  }
+
+  function isSubmittableRound(r) {
+    return r.status === 'open' && (
+      (r.useSurvey && r.questionsConfirmed) ||
+      (r.useExcel && r.columnsConfirmed) ||
+      (r.useTemplate && r.templateConfirmed)
+    );
+  }
+
+  // 회차의 참여 허용 기관 목록. null이면 제한 없음(명단 미지정 회차)
+  function allowedNamesForRound(round, lists) {
+    if (!round || !round.targetAgencyListId) return null;
+    var list = findList(lists, round.targetAgencyListId);
+    if (!list) return null;
+    return namesOfList(list);
+  }
+
+  function roundAllowsAgency(round, lists, agencyName) {
+    var allowed = allowedNamesForRound(round, lists);
+    return !allowed || allowed.indexOf(normName(agencyName)) !== -1;
+  }
+
+  async function fetchSubmittableRounds(managerUid) {
+    var snap = await db.collection('managers').doc(managerUid).collection('rounds').get();
+    return snap.docs
+      .map(function (d) { return Object.assign({ id: d.id }, d.data()); })
+      .filter(isSubmittableRound);
+  }
+
+  // 진행 중인 회차들 기준으로 기관명 선택 목록을 만든다
+  function buildAgencyChoices(openRounds, lists) {
+    var hasUnrestricted = openRounds.some(function (r) { return allowedNamesForRound(r, lists) === null; });
+    var set = {};
+    var names = [];
+    function add(n) { if (n && !set[n]) { set[n] = true; names.push(n); } }
+
+    if (hasUnrestricted) {
+      // 명단이 지정되지 않은 회차가 있으면 그 회차는 누구나 참여 가능 → 전체 명단 + 직접 입력 허용
+      (lists || []).forEach(function (l) { namesOfList(l).forEach(add); });
+    } else {
+      // 모든 회차에 명단이 지정되어 있으면, 지정된 명단의 기관만 표시
+      openRounds.forEach(function (r) { (allowedNamesForRound(r, lists) || []).forEach(add); });
+    }
+    names.sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+    return { names: names, allowManual: hasUnrestricted };
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ---------------- 기관: 접속 확인 ----------------
+  window.verifyAccessCredentials = async function () {
+    if (!db) { alert('시스템 초기화에 실패했습니다.'); return; }
+    var codeInput = document.getElementById('accessManagerId');
+    var pwInput = document.getElementById('accessSurveyPw');
+    var agencyCode = (codeInput.value || '').trim();
+    var pw = (pwInput.value || '').trim();
+    if (!agencyCode || !pw) {
+      alert('접속 코드와 비밀번호를 모두 입력해주세요.');
+      return;
+    }
+    var btn = document.getElementById('verifyAccessBtn');
+    btn.disabled = true;
+    btn.textContent = '확인 중...';
+    try {
+      var verify = firebase.functions().httpsCallable('verifySurveyAccess');
+      var result = await verify({ agencyCode: agencyCode, password: pw });
+      var data = result.data || {};
+      if (!data.ok) {
+        alert(data.reason === 'NOT_FOUND'
+          ? '존재하지 않는 접속 코드이거나 담당자입니다.'
+          : '제출 전용 비밀번호가 올바르지 않습니다.');
+        btn.disabled = false;
+        btn.textContent = '확인';
+        return;
+      }
+
+      var lists = data.agencyLists || [];
+      var openRounds = await fetchSubmittableRounds(data.managerUid);
+      if (openRounds.length === 0) {
+        alert('현재 제출 가능한 설문이 없습니다. 담당자에게 문의해주세요.');
+        btn.disabled = false;
+        btn.textContent = '확인';
+        return;
+      }
+
+      window.__verifiedAccess = {
+        managerUid: data.managerUid,
+        agencyCode: agencyCode,
+        password: pw,
+        agencyLists: lists
+      };
+
+      var choices = buildAgencyChoices(openRounds, lists);
+      var sel = document.getElementById('accessAgencyNameSelect');
+      var selectWrap = document.getElementById('agencyNameSelectWrap');
+      var manualWrap = document.getElementById('agencyNameManualWrap');
+
+      if (choices.names.length > 0) {
+        sel.innerHTML = '<option value="">-- 기관을 선택하세요 --</option>' +
+          choices.names.map(function (n) {
+            return '<option value="' + escHtml(n) + '">' + escHtml(n) + '</option>';
+          }).join('') +
+          (choices.allowManual ? '<option value="' + MANUAL_OPTION_VALUE + '">✏️ 명단에 없음 (직접 입력)</option>' : '');
+        selectWrap.classList.remove('hidden');
+        manualWrap.classList.add('hidden');
+      } else if (choices.allowManual) {
+        selectWrap.classList.add('hidden');
+        manualWrap.classList.remove('hidden');
+      } else {
+        alert('지정된 취합 대상 명단에 등록된 기관이 없습니다. 담당자에게 문의해주세요.');
+        btn.disabled = false;
+        btn.textContent = '확인';
+        return;
+      }
+
+      document.getElementById('agencyNameStep').classList.remove('hidden');
+      codeInput.disabled = true;
+      pwInput.disabled = true;
+      btn.textContent = '✅ 확인됨 (다시 하려면 새로고침)';
+    } catch (e) {
+      console.error(e);
+      alert('확인 중 오류가 발생했습니다: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = '확인';
+    }
+  };
+
+  // ---------------- 기관: 기관명 선택 후 참여 ----------------
+  window.startSurveyAccessWithAgency = async function () {
+    var verified = window.__verifiedAccess;
+    if (!verified) {
+      alert('먼저 접속 코드와 비밀번호를 확인해주세요.');
+      return;
+    }
+    var sel = document.getElementById('accessAgencyNameSelect');
+    var manualInput = document.getElementById('accessAgencyName');
+    var selectVisible = sel && !document.getElementById('agencyNameSelectWrap').classList.contains('hidden');
+
+    var agencyName = (selectVisible && sel.value && sel.value !== MANUAL_OPTION_VALUE)
+      ? sel.value
+      : normName(manualInput.value);
+    agencyName = normName(agencyName);
+    if (!agencyName) {
+      alert('제출 기관명을 선택하거나 입력해주세요.');
+      return;
+    }
+    if (!confirm('선택하신 제출 기관이 "' + agencyName + '" 맞습니까?\n다른 기관을 선택하지 않았는지 다시 한번 확인해주세요.')) {
+      return;
+    }
+
+    var btn = document.getElementById('startSurveyAccessBtn');
+    btn.disabled = true;
+    btn.textContent = '확인 중...';
+    try {
+      var lists = verified.agencyLists || [];
+      var openRounds = (await fetchSubmittableRounds(verified.managerUid))
+        .filter(function (r) { return roundAllowsAgency(r, lists, agencyName); });
+
+      if (openRounds.length === 0) {
+        alert('"' + agencyName + '"은(는) 현재 진행 중인 설문의 취합 대상 기관이 아닙니다.\n기관명을 다시 확인하거나 담당자에게 문의해주세요.');
+        return;
+      }
+      if (openRounds.length === 1) {
+        lastAccessSession = null;
+        enterSurveyForRound(verified.managerUid, verified.agencyCode, agencyName, openRounds[0]);
+        return;
+      }
+      pendingAgencyAccess = { managerUid: verified.managerUid, agencyCode: verified.agencyCode, agencyName: agencyName };
+      lastAccessSession = { managerUid: verified.managerUid, agencyCode: verified.agencyCode, agencyName: agencyName, openRounds: openRounds };
+      await showRoundPicker(openRounds, agencyName);
+    } catch (e) {
+      console.error(e);
+      alert('접속 중 오류가 발생했습니다: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '작성/제출 시작하기';
+    }
+  };
+
+  // ---------------- 담당자: 명단 선택창 ↔ 입력칸 동기화 ----------------
+  var editorListId = null; // 아래 입력칸에 현재 불러와져 있는 명단 id
+
+  var _origLoadAgencyListToEditor = window.loadAgencyListToEditor;
+  window.loadAgencyListToEditor = function (listId) {
+    _origLoadAgencyListToEditor(listId);
+    editorListId = listId || null;
+  };
+
+  function currentRoundTargetListId() {
+    var round = (roundsList || []).find(function (r) { return r.id === currentRoundId; });
+    return round && round.targetAgencyListId ? round.targetAgencyListId : null;
+  }
+
+  // preferRoundTarget: true면 편집 중인 회차의 지정 명단을 우선 선택
+  function syncAgencyListEditor(preferRoundTarget) {
+    var sel = document.getElementById('agencyListSelect');
+    if (!sel) return;
+    var targetId = currentRoundTargetListId();
+    if (preferRoundTarget && targetId &&
+        Array.prototype.some.call(sel.options, function (o) { return o.value === targetId; })) {
+      sel.value = targetId;
+    }
+    if ((sel.value || null) !== editorListId) {
+      window.loadAgencyListToEditor(sel.value);
+    }
+  }
+
+  var _origRenderModeSelectionForSync = window.renderModeSelection;
+  window.renderModeSelection = function () {
+    _origRenderModeSelectionForSync.apply(this, arguments);
+    syncAgencyListEditor(editorListId === null);
+  };
+
+  var _origSwitchEditingRoundForSync = window.switchEditingRound;
+  window.switchEditingRound = async function () {
+    var result = await _origSwitchEditingRoundForSync.apply(this, arguments);
+    syncAgencyListEditor(true);
+    return result;
+  };
+
+  var _origSaveAgencyList = window.saveAgencyList;
+  window.saveAgencyList = async function () {
+    var sel = document.getElementById('agencyListSelect');
+    if (sel && sel.value && sel.value !== editorListId) {
+      alert('선택된 명단과 아래 입력칸의 내용이 서로 다른 명단입니다. 선택한 명단을 다시 불러왔으니 확인 후 저장해주세요.');
+      window.loadAgencyListToEditor(sel.value);
+      return;
+    }
+    return _origSaveAgencyList.apply(this, arguments);
+  };
+
+  // 회차에 지정된 명단을 삭제하면, 그 회차들의 지정도 함께 해제
+  var _origDeleteAgencyList = window.deleteAgencyList;
+  window.deleteAgencyList = async function () {
+    var sel = document.getElementById('agencyListSelect');
+    var listId = sel && sel.value;
+    var affected = (roundsList || []).filter(function (r) { return listId && r.targetAgencyListId === listId; });
+    if (affected.length > 0 &&
+        !confirm('이 명단은 다음 회차의 취합 대상으로 지정되어 있습니다:\n' +
+          affected.map(function (r) { return '- ' + r.name; }).join('\n') +
+          '\n\n삭제하면 해당 회차의 명단 지정도 해제됩니다. 계속하시겠습니까?')) {
+      return;
+    }
+    await _origDeleteAgencyList.apply(this, arguments);
+    var stillExists = (currentUser.agencyLists || []).some(function (l) { return l.id === listId; });
+    if (!listId || stillExists) return;
+    editorListId = null;
+    for (var i = 0; i < affected.length; i++) {
+      try {
+        await db.collection('managers').doc(currentUser.id).collection('rounds').doc(affected[i].id).update({
+          targetAgencyListId: firebase.firestore.FieldValue.delete()
+        });
+        affected[i].targetAgencyListId = null;
+      } catch (e) { console.error('회차 명단 지정 해제 오류:', e); }
+    }
+    if (typeof renderRoundManagementPanel === 'function') renderRoundManagementPanel();
+    syncAgencyListEditor(false);
+  };
+
+  // ---------------- 담당자: 응답 화면 필터가 이전 회차 것으로 남지 않게 ----------------
+  var _origSwitchViewingRoundForFilter = window.switchViewingRound;
+  window.switchViewingRound = async function () {
+    await _origSwitchViewingRoundForFilter.apply(this, arguments);
+    var filterSel = document.getElementById('agencyListFilterSelect');
+    if (!filterSel || !viewingRoundMeta) return;
+    var targetId = viewingRoundMeta.targetAgencyListId;
+    var exists = targetId && Array.prototype.some.call(filterSel.options, function (o) { return o.value === targetId; });
+    filterSel.value = exists ? targetId : '__all__';
+    if (typeof window.renderManagerResponses === 'function') window.renderManagerResponses();
+  };
+})();
+</script>
+
 </body>
 </html>
