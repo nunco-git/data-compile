@@ -329,7 +329,17 @@
     #varOverlayBar button:hover { background: rgba(255,255,255,0.25); }
     #varOverlayBar span { font-size: 13px; color: #cbd5e1; }
     #varOverlay iframe { flex: 1; width: 100%; border: none; background: #fff; }
-  </style>
+  
+/*mobile-fontfix*/
+@media (max-width:640px){
+.btn-sm{font-size:15px !important}
+.mode-card p{font-size:15px !important}
+.status-banner{font-size:15px !important}
+#demoOverlayBar span{font-size:15px !important}
+#linkOverlayBar span{font-size:15px !important}
+#varOverlayBar span{font-size:15px !important}
+}
+</style>
 </head>
 <body>
 
@@ -6618,5 +6628,17 @@ window.renderCustomSurvey = function () {
 })();
 </script>
 
+<script>/*mobile-fontfix-js*/
+(function(){try{if(!window.matchMedia||!matchMedia('(max-width:640px)').matches)return;var MIN=14;
+function fix(root){var list=[];if(root.nodeType!==1)return;list.push(root);var q=root.querySelectorAll('*');for(var i=0;i<q.length;i++)list.push(q[i]);
+for(var j=0;j<list.length;j++){var e=list[j];if(e.__mf||/^(SCRIPT|STYLE|SVG|CANVAS|PATH|G|LINE|RECT|CIRCLE|TEXT|TSPAN)$/i.test(e.tagName))continue;var has=false;for(var n=e.firstChild;n;n=n.nextSibling){if(n.nodeType===3&&n.nodeValue.trim()){has=true;break}}
+if(!has)continue;e.__mf=1;var f=parseFloat(getComputedStyle(e).fontSize);if(f>0&&f<MIN)e.style.setProperty('font-size',MIN+'px','important')}}
+function run(){fix(document.body)}
+var t=null;function later(){clearTimeout(t);t=setTimeout(run,300)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run);else run();
+window.addEventListener('load',run);
+new MutationObserver(later).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+}catch(e){}})();
+</script>
 </body>
 </html>
