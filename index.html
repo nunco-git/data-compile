@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>if (/[?&]notice=/.test(location.search)) document.documentElement.className += ' np';</script>
+  <style>html.np .container{display:none !important} html.np #noticePublic{display:block !important}</style>
   <title>스마트 자료취합 시스템</title>
   <!-- 제목/본문에 쓰이는 Pretendard 폰트를 실제로 불러온다 -->
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css" integrity="sha384-2nNKoOPayicGa+aRguOQuiZP+RqQ4G3jalfDeOgftkKD7zBM2gJXTwcFqCZltdv0">
@@ -884,6 +886,14 @@
   </div>
 
 
+  <!-- 공유 링크(?notice=...)로 열리는 공지 열람 전용 화면 (로그인 불필요) -->
+  <div id="noticePublic" style="display:none; position:fixed; inset:0; z-index:9500; background:#f1f5f9; overflow:auto;">
+    <div style="padding:12px 16px; background:#0369a1; color:#fff; font-size:18px; font-weight:800;">📢 기관 공지</div>
+    <div style="max-width:900px; margin:0 auto; padding:16px;">
+      <div id="noticePublicList"><div style="color:#64748b;">공지를 불러오는 중...</div></div>
+    </div>
+  </div>
+
   <!-- 기관 공지 올리기 전용 창 -->
   <div id="noticeOverlay" style="display:none; position:fixed; inset:0; z-index:9000; background:#f1f5f9; overflow:auto;">
     <div style="position:sticky; top:0; z-index:1; display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:10px 16px; background:#0369a1; color:#fff;">
@@ -894,6 +904,16 @@
       </span>
     </div>
     <div style="max-width:900px; margin:0 auto; padding:16px;">
+      <div class="q-card" style="background:#fefce8; border-color:#fde68a;">
+        <h4 style="color:#92400e; margin-top:0;">🔗 카카오톡 공유용 링크</h4>
+        <p style="font-size:13.2px; color:#78350f; margin:4px 0 8px 0;">이 링크를 카톡 단톡방에 한 번만 올려 두세요. 로그인 없이 열리고, 새 공지를 올리면 <strong>같은 링크에서 자동으로 최신 공지</strong>가 보입니다. 링크를 아는 사람은 누구나 볼 수 있습니다.</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <input type="text" id="noticeShareUrl" readonly onclick="this.select()" style="flex:1 1 260px; min-width:0; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px;" />
+          <button type="button" class="btn btn-sm" style="width:auto;" onclick="copyNoticeLink()">링크 복사</button>
+          <button type="button" class="btn btn-sm" style="width:auto; background:#16a34a;" onclick="shareNoticeLink()">공유하기</button>
+        </div>
+        <span id="noticeShareStatus" style="font-size:13px; color:#16a34a;"></span>
+      </div>
 
       <!-- 기관 공지 올리기 (PDF 전용) -->
       <div class="q-card" id="noticeManagerCard" style="background:#f0f9ff; border-color:#bae6fd;">
@@ -6727,24 +6747,67 @@ window.NoticeBoard = (function () {
   }
 
   var urlCache = {};   // noticeId -> blob URL
-  async function pdfUrl(uid, n) {
-    if (urlCache[n.id]) return urlCache[n.id];
+  var blobCache = {};  // noticeId -> Blob
+  async function pdfBlob(uid, n) {
+    if (blobCache[n.id]) return blobCache[n.id];
     var snap = await col(uid).doc(n.id).collection('chunks').orderBy('i').get();
     var parts = snap.docs.map(function (d) { return d.data().data; });
     if (!parts.length || (n.chunks && parts.length !== n.chunks)) throw new Error('파일 조각이 모두 모이지 않았습니다.');
-    urlCache[n.id] = URL.createObjectURL(base64ToBlob(parts));
-    return urlCache[n.id];
+    blobCache[n.id] = base64ToBlob(parts);
+    urlCache[n.id] = URL.createObjectURL(blobCache[n.id]);
+    return blobCache[n.id];
+  }
+
+  // 휴대폰·카카오톡 앱 안의 브라우저는 PDF를 틀 안에 못 펼치는 경우가 많아 쪽별 그림으로 그린다
+  var MOBILE = /Android|iPhone|iPad|iPod|KAKAOTALK/i.test(navigator.userAgent);
+  var pdfjsLoading = null;
+  function loadPdfJs() {
+    if (window.pdfjsLib) return Promise.resolve();
+    if (pdfjsLoading) return pdfjsLoading;
+    pdfjsLoading = new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+      sc.onload = function () {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+        resolve();
+      };
+      sc.onerror = function () { pdfjsLoading = null; reject(new Error('PDF 표시 도구를 불러오지 못했습니다.')); };
+      document.head.appendChild(sc);
+    });
+    return pdfjsLoading;
+  }
+  async function drawPages(wrap, blob) {
+    await loadPdfJs();
+    var pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+    var width = Math.max(280, wrap.clientWidth || 320);
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    for (var pg = 1; pg <= pdf.numPages; pg++) {
+      var page = await pdf.getPage(pg);
+      var base = page.getViewport({ scale: 1 });
+      var vp = page.getViewport({ scale: (width / base.width) * dpr });
+      var cv = document.createElement('canvas');
+      cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+      cv.style.cssText = 'width:100%; height:auto; display:block; margin-bottom:8px; border:1px solid #cbd5e1; background:#fff;';
+      await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      wrap.appendChild(cv);
+    }
   }
 
   async function fillFrame(slot, uid, n) {
     slot.innerHTML = '<div style="color:#64748b; font-size:14px;">PDF를 불러오는 중...</div>';
     try {
-      var u = await pdfUrl(uid, n);
+      var blob = await pdfBlob(uid, n);
+      var u = urlCache[n.id];
+      var links = '<div style="margin-top:6px; font-size:13px;"><a href="' + u + '" download="' + esc(n.fileName || 'notice.pdf') + '">PDF 파일 받기</a>' +
+        (MOBILE ? '' : ' · <a href="' + u + '" target="_blank" rel="noopener">새 창에서 크게 보기 ↗</a>') + '</div>';
+      if (MOBILE) {
+        slot.innerHTML = '<div class="notice-pages"></div>' + links;
+        try { await drawPages(slot.querySelector('.notice-pages'), blob); return; }
+        catch (e) { console.warn('[공지] 쪽별 표시 실패, 기본 보기로 전환', e); }
+      }
       slot.innerHTML =
         '<iframe src="' + u + '#toolbar=1&view=FitH" title="' + esc(n.title) + '" ' +
-        'style="width:100%; height:75vh; min-height:420px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;"></iframe>' +
-        '<div style="margin-top:6px; font-size:13px;"><a href="' + u + '" target="_blank" rel="noopener">새 창에서 크게 보기 ↗</a>' +
-        ' <span style="color:#94a3b8;">(휴대폰에서 첫 장만 보이면 이 링크를 눌러주세요)</span></div>';
+        'style="width:100%; height:75vh; min-height:420px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;"></iframe>' + links;
     } catch (e) {
       console.error('[공지] PDF 불러오기 실패', e);
       slot.innerHTML = '<div style="color:#b91c1c; font-size:14px;">PDF를 불러오지 못했습니다.</div>';
@@ -6864,7 +6927,7 @@ window.NoticeBoard = (function () {
       chunks.docs.forEach(function (d) { batch.delete(d.ref); });
       batch.delete(ref);
       await batch.commit();
-      if (urlCache[id]) { URL.revokeObjectURL(urlCache[id]); delete urlCache[id]; }
+      if (urlCache[id]) { URL.revokeObjectURL(urlCache[id]); delete urlCache[id]; delete blobCache[id]; }
       await load(current.uid);
     } catch (e) {
       console.error(e);
@@ -6872,7 +6935,20 @@ window.NoticeBoard = (function () {
     }
   }
 
-  return { load: load, upload: upload };
+  async function showPublic(uid) {
+    var el = document.getElementById('noticePublicList');
+    try {
+      if (typeof db === 'undefined' || !db) throw new Error('db');
+      var snap = await col(uid).orderBy('createdAt', 'desc').limit(30).get();
+      var list = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      render(el, list, false, uid);
+    } catch (e) {
+      console.error('[공지] 공개 열람 실패', e);
+      el.innerHTML = '<div style="color:#b91c1c;">공지를 불러오지 못했습니다. 링크가 올바른지 확인해 주세요.</div>';
+    }
+  }
+
+  return { load: load, upload: upload, showPublic: showPublic };
 })();
 
 /* 담당자 화면 진입 시 / 기관 제출 화면 진입 시 공지를 자동으로 불러온다 */
@@ -6919,6 +6995,7 @@ window.openNoticeOverlay = function () {
   if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) { alert('담당자 로그인 후 이용할 수 있습니다.'); return; }
   document.getElementById('noticeOverlayWho').textContent = '(' + (currentUser.name || '') + ')';
   document.getElementById('noticeOverlay').style.display = 'block';
+  document.getElementById('noticeShareUrl').value = location.origin + location.pathname + '?notice=' + currentUser.id;
   document.body.style.overflow = 'hidden';
   NoticeBoard.load(currentUser.id);
 };
@@ -6926,6 +7003,28 @@ window.closeNoticeOverlay = function () {
   document.getElementById('noticeOverlay').style.display = 'none';
   document.body.style.overflow = '';
 };
+
+window.copyNoticeLink = function () {
+  var inp = document.getElementById('noticeShareUrl'), st = document.getElementById('noticeShareStatus');
+  function ok() { st.textContent = '✅ 링크가 복사되었습니다. 카톡에 붙여넣기 하세요.'; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(inp.value).then(ok, function () { inp.select(); document.execCommand('copy'); ok(); });
+  } else { inp.select(); document.execCommand('copy'); ok(); }
+};
+window.shareNoticeLink = function () {
+  var url = document.getElementById('noticeShareUrl').value;
+  if (navigator.share) { navigator.share({ title: '기관 공지', url: url }).catch(function () {}); }
+  else { copyNoticeLink(); }
+};
+(function () {
+  var m = location.search.match(/[?&]notice=([^&#]+)/);
+  if (m && /^[A-Za-z0-9_-]{10,64}$/.test(decodeURIComponent(m[1]))) {
+    document.title = '기관 공지';
+    NoticeBoard.showPublic(decodeURIComponent(m[1]));
+  } else if (m) {
+    document.documentElement.className = document.documentElement.className.replace(' np', '');
+  }
+})();
 </script>
 </body>
 </html>
