@@ -924,7 +924,7 @@
           <input type="text" id="noticeTitleInput" maxlength="60" placeholder="예: 11월 2주차 주간업무" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
         </div>
         <div class="form-group" style="margin-bottom:8px;">
-          <label>PDF 파일 (6MB 이하)</label>
+          <label>PDF 파일 (20MB 이하)</label>
           <input type="file" id="noticeFileInput" accept="application/pdf,.pdf" style="width:100%;" />
         </div>
         <button type="button" class="btn btn-sm" id="noticeUploadBtn" onclick="NoticeBoard.upload()" style="width:auto;">공지 올리기</button>
@@ -6712,7 +6712,7 @@ new MutationObserver(later).observe(document.documentElement,{childList:true,sub
 /* ===== 기관 공지 (PDF 전용, 별도 뷰어 없이 화면에서 바로 열람) =====
    저장 위치: Firestore  managers/{managerUid}/notices/{id}  (+ chunks/{00,01,...} 에 PDF를 나눠 저장, Storage 불필요)  */
 window.NoticeBoard = (function () {
-  var MAX_BYTES = 6 * 1024 * 1024;   // PDF 최대 6MB
+  var MAX_BYTES = 20 * 1024 * 1024;  // PDF 최대 20MB
   var CHUNK = 600 * 1024;            // 문서 1개(1MiB 제한)에 들어가도록 600KB씩 나눠 저장
 
   function esc(v) {
@@ -6793,10 +6793,31 @@ window.NoticeBoard = (function () {
     }
   }
 
+  var STORAGE_PREFIX = 'https://firebasestorage.googleapis.com/';
   async function fillFrame(slot, uid, n) {
     slot.innerHTML = '<div style="color:#64748b; font-size:14px;">PDF를 불러오는 중...</div>';
     try {
-      var blob = await pdfBlob(uid, n);
+      if (n.url) {   // Storage에 저장된 공지
+        if (String(n.url).indexOf(STORAGE_PREFIX) !== 0) throw new Error('잘못된 파일 주소');
+        var su = esc(n.url);
+        var slinks = '<div style="margin-top:6px; font-size:13px;"><a href="' + su + '" target="_blank" rel="noopener">PDF 열기/받기 ↗</a></div>';
+        if (MOBILE) {
+          slot.innerHTML = '<div class="notice-pages"></div>' + slinks;
+          try {
+            var res = await fetch(n.url);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            await drawPages(slot.querySelector('.notice-pages'), await res.blob());
+          } catch (e) {
+            console.warn('[공지] 휴대폰 쪽별 표시 실패(저장소 CORS 설정 필요)', e);
+            slot.innerHTML = '<a class="btn" style="display:block; text-align:center; text-decoration:none;" href="' + su + '" target="_blank" rel="noopener">📄 공지 PDF 열기</a>';
+          }
+        } else {
+          slot.innerHTML = '<iframe src="' + su + '#toolbar=1&view=FitH" title="' + esc(n.title) + '" ' +
+            'style="width:100%; height:75vh; min-height:420px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;"></iframe>' + slinks;
+        }
+        return;
+      }
+      var blob = await pdfBlob(uid, n);   // 예전(Firestore 조각 저장) 공지
       var u = urlCache[n.id];
       var links = '<div style="margin-top:6px; font-size:13px;"><a href="' + u + '" download="' + esc(n.fileName || 'notice.pdf') + '">PDF 파일 받기</a>' +
         (MOBILE ? '' : ' · <a href="' + u + '" target="_blank" rel="noopener">새 창에서 크게 보기 ↗</a>') + '</div>';
@@ -6854,6 +6875,21 @@ window.NoticeBoard = (function () {
   }
 
   var EXPIRE_MS = 30 * 24 * 60 * 60 * 1000;   // 올린 지 30일이 지나면 삭제
+  function safeName(n) {
+    return String(n || 'notice.pdf').replace(/[^\w.\-가-힣]+/g, '_').slice(-80);
+  }
+  async function deleteNotice(uid, n) {
+    var ref = col(uid).doc(n.id);
+    if (n.path) { try { await storage.ref().child(n.path).delete(); } catch (e) { console.warn('[공지] 파일 삭제 건너뜀', e); } }
+    if (n.chunks) {   // 예전(Firestore 조각 저장) 방식으로 올린 공지
+      var chunks = await ref.collection('chunks').get();
+      var batch = db.batch();
+      chunks.docs.forEach(function (d) { batch.delete(d.ref); });
+      await batch.commit();
+    }
+    await ref.delete();
+    if (urlCache[n.id]) { URL.revokeObjectURL(urlCache[n.id]); delete urlCache[n.id]; delete blobCache[n.id]; }
+  }
   async function dropExpired(uid, list) {
     var cutoff = Date.now() - EXPIRE_MS, keep = [], old = [];
     list.forEach(function (n) {
@@ -6863,15 +6899,7 @@ window.NoticeBoard = (function () {
     // 화면에는 누구에게나 보이지 않게 하고, 실제 삭제는 해당 담당자(서무)가 열었을 때 한다
     if (old.length && typeof currentUser !== 'undefined' && currentUser && currentUser.id === uid) {
       for (var i = 0; i < old.length; i++) {
-        try {
-          var ref = col(uid).doc(old[i].id);
-          var chunks = await ref.collection('chunks').get();
-          var batch = db.batch();
-          chunks.docs.forEach(function (d) { batch.delete(d.ref); });
-          batch.delete(ref);
-          await batch.commit();
-          if (urlCache[old[i].id]) { URL.revokeObjectURL(urlCache[old[i].id]); delete urlCache[old[i].id]; delete blobCache[old[i].id]; }
-        } catch (e) { console.warn('[공지] 만료 공지 삭제 실패', e); }
+        try { await deleteNotice(uid, old[i]); } catch (e) { console.warn('[공지] 만료 공지 삭제 실패', e); }
       }
     }
     return keep;
@@ -6907,28 +6935,26 @@ window.NoticeBoard = (function () {
     if (!title) { alert('공지 제목을 입력해주세요.'); return; }
     if (!file) { alert('PDF 파일을 선택해주세요.'); return; }
     if (!/\.pdf$/i.test(file.name)) { alert('PDF 파일(.pdf)만 올릴 수 있습니다.'); return; }
-    if (file.size > MAX_BYTES) { alert('6MB 이하의 PDF만 올릴 수 있습니다. (용량이 크면 PDF를 줄여서 올려주세요)'); return; }
+    if (file.size > MAX_BYTES) { alert('20MB 이하의 PDF만 올릴 수 있습니다.'); return; }
     var head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
     if (String.fromCharCode.apply(null, head) !== '%PDF-') { alert('올바른 PDF 파일이 아닙니다.'); return; }
+    if (!storage) { alert('Firebase Storage가 초기화되지 않았습니다. 새로고침 후 다시 시도해주세요.'); return; }
 
     btn.disabled = true;
-    statusEl.textContent = '파일 준비 중...';
+    statusEl.textContent = '업로드 중... (0%)';
+    var uid = currentUser.id;
+    var path = 'managers/' + uid + '/notices/' + Date.now() + '_' + safeName(file.name);
     try {
-      var uid = currentUser.id;
-      var count = Math.ceil(file.size / CHUNK);
-      var ref = col(uid).doc();
-      var batch = db.batch();
-      for (var i = 0; i < count; i++) {
-        var b64 = await sliceToBase64(file.slice(i * CHUNK, (i + 1) * CHUNK));
-        batch.set(ref.collection('chunks').doc(pad(i)), { i: i, data: b64 });
-        statusEl.textContent = '파일 준비 중... (' + (i + 1) + '/' + count + ')';
-      }
-      batch.set(ref, {
-        title: title, fileName: file.name, size: file.size, chunks: count,
+      var task = storage.ref().child(path).put(file, { contentType: 'application/pdf' });
+      task.on('state_changed', function (sn) {
+        statusEl.textContent = '업로드 중... (' + (sn.totalBytes ? Math.round(sn.bytesTransferred / sn.totalBytes * 100) : 0) + '%)';
+      });
+      await task;
+      var url = await task.snapshot.ref.getDownloadURL();
+      await col(uid).add({
+        title: title, fileName: file.name, url: url, path: path, size: file.size,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      statusEl.textContent = '저장 중...';
-      await batch.commit();
       titleEl.value = ''; fileEl.value = '';
       statusEl.textContent = '✅ 공지가 등록되었습니다.';
       await load(uid);
@@ -6946,13 +6972,7 @@ window.NoticeBoard = (function () {
     if (!n || !currentUser || current.uid !== currentUser.id) return;
     if (!confirm('"' + n.title + '" 공지를 삭제할까요? 삭제하면 되돌릴 수 없습니다.')) return;
     try {
-      var ref = col(current.uid).doc(id);
-      var chunks = await ref.collection('chunks').get();
-      var batch = db.batch();
-      chunks.docs.forEach(function (d) { batch.delete(d.ref); });
-      batch.delete(ref);
-      await batch.commit();
-      if (urlCache[id]) { URL.revokeObjectURL(urlCache[id]); delete urlCache[id]; delete blobCache[id]; }
+      await deleteNotice(current.uid, n);
       await load(current.uid);
     } catch (e) {
       console.error(e);
