@@ -630,6 +630,12 @@
 
         <button type="submit" class="btn" id="surveySubmitBtn" style="margin-top:8px;">제출하기</button>
       </form>
+
+      <!-- 기관 공지 (열람 전용) -->
+      <div class="q-card" id="noticeSurveyCard" style="margin-top:24px; background:#f0f9ff; border-color:#bae6fd;">
+        <h4 style="color:#0369a1; margin-top:0;">📢 기관 공지</h4>
+        <div id="noticeSurveyList"></div>
+      </div>
     </div>
 
     <!-- 3. 업무 담당자 전용 화면 -->
@@ -831,6 +837,23 @@
             <tbody id="responseTableBody"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- 기관 공지 올리기 (PDF 전용) -->
+      <div class="q-card" id="noticeManagerCard" style="margin-top:24px; background:#f0f9ff; border-color:#bae6fd;">
+        <h4 style="color:#0369a1; margin-top:0;">📢 기관 공지 올리기 (PDF)</h4>
+        <p style="font-size:13.2px; color:#075985; margin:4px 0 10px 0;">주간업무 등 공지 파일을 <strong>PDF</strong>로 올리면, 기관이 접속 코드로 들어왔을 때 화면 맨 아래에서 바로 볼 수 있습니다. 가장 최근 공지가 펼쳐져 나오며, <strong>개인정보가 포함된 문서는 올리지 마세요.</strong></p>
+        <div class="form-group" style="margin-bottom:8px;">
+          <label>공지 제목</label>
+          <input type="text" id="noticeTitleInput" maxlength="60" placeholder="예: 11월 2주차 주간업무" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
+        </div>
+        <div class="form-group" style="margin-bottom:8px;">
+          <label>PDF 파일 (20MB 이하)</label>
+          <input type="file" id="noticeFileInput" accept="application/pdf,.pdf" style="width:100%;" />
+        </div>
+        <button type="button" class="btn btn-sm" id="noticeUploadBtn" onclick="NoticeBoard.upload()" style="width:auto;">공지 올리기</button>
+        <span id="noticeUploadStatus" style="font-size:14px; color:#64748b; margin-left:8px;"></span>
+        <div id="noticeManagerList" style="margin-top:16px;"></div>
       </div>
     </div>
 
@@ -6639,6 +6662,173 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 window.addEventListener('load',run);
 new MutationObserver(later).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
 }catch(e){}})();
+</script>
+
+<script>
+/* ===== 기관 공지 (PDF 전용, 별도 뷰어 없이 화면에서 바로 열람) =====
+   저장 위치: Firestore  managers/{managerUid}/notices/{id}
+              Storage    managers/{managerUid}/notices/{timestamp}_{파일명}  */
+window.NoticeBoard = (function () {
+  var MAX_BYTES = 20 * 1024 * 1024;
+  var URL_PREFIX = 'https://firebasestorage.googleapis.com/';
+
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function safeName(n) {
+    return String(n || 'notice.pdf').replace(/[^\w.\-가-힣]+/g, '_').slice(-80);
+  }
+  function fmtDate(ts) {
+    if (!ts || !ts.toDate) return '';
+    var d = ts.toDate();
+    function z(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '.' + z(d.getMonth() + 1) + '.' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
+  }
+  function col(uid) { return db.collection('managers').doc(uid).collection('notices'); }
+
+  function frameHtml(n) {
+    if (!n.url || n.url.indexOf(URL_PREFIX) !== 0) return '<div style="color:#b91c1c;">파일 주소가 올바르지 않습니다.</div>';
+    return '<iframe src="' + esc(n.url) + '#toolbar=1&view=FitH" title="' + esc(n.title) + '" ' +
+      'style="width:100%; height:75vh; min-height:420px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;"></iframe>' +
+      '<div style="margin-top:6px; font-size:13px;"><a href="' + esc(n.url) + '" target="_blank" rel="noopener noreferrer">새 창에서 크게 보기 ↗</a>' +
+      ' <span style="color:#94a3b8;">(휴대폰에서 첫 장만 보이면 이 링크를 눌러주세요)</span></div>';
+  }
+
+  function render(el, list, canDelete) {
+    if (!el) return;
+    if (!list.length) {
+      el.innerHTML = '<div style="color:#64748b; font-size:14.5px;">등록된 공지가 없습니다.</div>';
+      return;
+    }
+    var html = '';
+    list.forEach(function (n, i) {
+      var head = '<strong>' + esc(n.title) + '</strong> <span style="color:#64748b; font-size:13px;">' + esc(fmtDate(n.createdAt)) + '</span>';
+      var del = canDelete ? ' <button type="button" class="btn btn-secondary btn-sm" style="width:auto; margin-left:8px;" data-notice-del="' + esc(n.id) + '">삭제</button>' : '';
+      if (i === 0) {
+        html += '<div style="background:#fff; border:1px solid #bae6fd; border-radius:10px; padding:12px; margin-bottom:12px;">' +
+          '<div style="margin-bottom:8px;">🆕 ' + head + del + '</div>' + frameHtml(n) + '</div>';
+      } else {
+        html += '<details data-notice-id="' + esc(n.id) + '" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin-bottom:8px;">' +
+          '<summary style="cursor:pointer;">' + head + '</summary>' +
+          '<div style="margin:8px 0;">' + del + '</div><div class="notice-frame-slot"></div></details>';
+      }
+    });
+    el.innerHTML = html;
+    // 지난 공지는 펼칠 때만 PDF를 불러온다 (처음 화면이 느려지지 않도록)
+    el.querySelectorAll('details[data-notice-id]').forEach(function (d) {
+      d.addEventListener('toggle', function () {
+        var slot = d.querySelector('.notice-frame-slot');
+        if (d.open && slot && !slot.innerHTML) {
+          var n = list.find(function (x) { return x.id === d.getAttribute('data-notice-id'); });
+          if (n) slot.innerHTML = frameHtml(n);
+        }
+      });
+    });
+    if (canDelete) {
+      el.querySelectorAll('[data-notice-del]').forEach(function (b) {
+        b.addEventListener('click', function () { remove(b.getAttribute('data-notice-del')); });
+      });
+    }
+  }
+
+  var current = { uid: null, list: [] };
+
+  async function load(uid) {
+    current.uid = uid;
+    try {
+      var snap = await col(uid).orderBy('createdAt', 'desc').limit(30).get();
+      current.list = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+    } catch (e) {
+      console.error('[공지] 불러오기 실패', e);
+      current.list = [];
+      var msg = '<div style="color:#b91c1c; font-size:14px;">공지를 불러오지 못했습니다. (Firestore 보안 규칙에 공지 읽기 권한이 추가되었는지 확인하세요.)</div>';
+      ['noticeManagerList', 'noticeSurveyList'].forEach(function (id) { var el = document.getElementById(id); if (el) el.innerHTML = msg; });
+      return;
+    }
+    render(document.getElementById('noticeManagerList'), current.list, true);
+    render(document.getElementById('noticeSurveyList'), current.list, false);
+  }
+
+  async function upload() {
+    if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) { alert('담당자 로그인 후 이용할 수 있습니다.'); return; }
+    var titleEl = document.getElementById('noticeTitleInput');
+    var fileEl = document.getElementById('noticeFileInput');
+    var statusEl = document.getElementById('noticeUploadStatus');
+    var btn = document.getElementById('noticeUploadBtn');
+    var title = (titleEl.value || '').trim();
+    var file = fileEl.files && fileEl.files[0];
+    if (!title) { alert('공지 제목을 입력해주세요.'); return; }
+    if (!file) { alert('PDF 파일을 선택해주세요.'); return; }
+    if (!/\.pdf$/i.test(file.name)) { alert('PDF 파일(.pdf)만 올릴 수 있습니다.'); return; }
+    if (file.size > MAX_BYTES) { alert('20MB 이하의 파일만 올릴 수 있습니다.'); return; }
+    // 확장자만 바꾼 파일을 막기 위해 파일 첫 부분이 PDF 형식(%PDF-)인지 확인
+    var head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+    if (String.fromCharCode.apply(null, head) !== '%PDF-') { alert('올바른 PDF 파일이 아닙니다.'); return; }
+
+    btn.disabled = true;
+    statusEl.textContent = '업로드 중... (0%)';
+    var path = 'managers/' + currentUser.id + '/notices/' + Date.now() + '_' + safeName(file.name);
+    try {
+      var task = storage.ref().child(path).put(file, { contentType: 'application/pdf' });
+      task.on('state_changed', function (s) {
+        statusEl.textContent = '업로드 중... (' + (s.totalBytes ? Math.round(s.bytesTransferred / s.totalBytes * 100) : 0) + '%)';
+      });
+      await task;
+      var url = await task.snapshot.ref.getDownloadURL();
+      await col(currentUser.id).add({
+        title: title, fileName: file.name, url: url, path: path, size: file.size,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      titleEl.value = ''; fileEl.value = '';
+      statusEl.textContent = '✅ 공지가 등록되었습니다.';
+      await load(currentUser.id);
+    } catch (e) {
+      console.error('[공지] 업로드 실패', e);
+      statusEl.textContent = '';
+      alert('업로드에 실패했습니다: ' + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function remove(id) {
+    var n = current.list.find(function (x) { return x.id === id; });
+    if (!n || !currentUser || current.uid !== currentUser.id) return;
+    if (!confirm('"' + n.title + '" 공지를 삭제할까요? 삭제하면 되돌릴 수 없습니다.')) return;
+    try {
+      if (n.path) { try { await storage.ref().child(n.path).delete(); } catch (e) { console.warn('[공지] 파일 삭제 건너뜀', e); } }
+      await col(current.uid).doc(id).delete();
+      await load(current.uid);
+    } catch (e) {
+      console.error(e);
+      alert('삭제에 실패했습니다: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  return { load: load, upload: upload };
+})();
+
+/* 담당자 화면 진입 시 / 기관 제출 화면 진입 시 공지를 자동으로 불러온다 */
+(function () {
+  if (typeof enterAppForUser === 'function') {
+    var origEnter = enterAppForUser;
+    enterAppForUser = async function (user) {
+      var ok = await origEnter.apply(this, arguments);
+      try { if (ok && typeof currentUser !== 'undefined' && currentUser && currentUser.id) NoticeBoard.load(currentUser.id); } catch (e) { console.error(e); }
+      return ok;
+    };
+  }
+  if (typeof window.enterSurveyForRound === 'function') {
+    var origRound = window.enterSurveyForRound;
+    window.enterSurveyForRound = function (managerUid) {
+      var r = origRound.apply(this, arguments);
+      try { if (managerUid) NoticeBoard.load(managerUid); } catch (e) { console.error(e); }
+      return r;
+    };
+  }
+})();
 </script>
 </body>
 </html>
