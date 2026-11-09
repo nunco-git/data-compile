@@ -651,7 +651,7 @@
     <div id="viewManager" class="hidden">
       <div class="user-info-bar">
         <span>👤 담당자: <strong id="managerNameDisplay"></strong> <span id="managerEmailDisplay" style="color:#64748b; font-weight:normal;"></span></span>
-        <button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
+        <button class="btn btn-sm" style="width:auto; margin-right:6px; background:#16a34a;" onclick="openNoticeOverlay()">📢 기관 공지 올리기</button><button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
       </div>
 
       <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:stretch; margin-bottom:20px;">
@@ -848,22 +848,6 @@
         </div>
       </div>
 
-      <!-- 기관 공지 올리기 (PDF 전용) -->
-      <div class="q-card" id="noticeManagerCard" style="margin-top:24px; background:#f0f9ff; border-color:#bae6fd;">
-        <h4 style="color:#0369a1; margin-top:0;">📢 기관 공지 올리기 (PDF)</h4>
-        <p style="font-size:13.2px; color:#075985; margin:4px 0 10px 0;">주간업무 등 공지 파일을 <strong>PDF</strong>로 올리면, 기관이 접속 코드로 들어왔을 때 화면 맨 아래에서 바로 볼 수 있습니다. 가장 최근 공지가 펼쳐져 나오며, <strong>개인정보가 포함된 문서는 올리지 마세요.</strong></p>
-        <div class="form-group" style="margin-bottom:8px;">
-          <label>공지 제목</label>
-          <input type="text" id="noticeTitleInput" maxlength="60" placeholder="예: 11월 2주차 주간업무" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
-        </div>
-        <div class="form-group" style="margin-bottom:8px;">
-          <label>PDF 파일 (6MB 이하)</label>
-          <input type="file" id="noticeFileInput" accept="application/pdf,.pdf" style="width:100%;" />
-        </div>
-        <button type="button" class="btn btn-sm" id="noticeUploadBtn" onclick="NoticeBoard.upload()" style="width:auto;">공지 올리기</button>
-        <span id="noticeUploadStatus" style="font-size:14px; color:#64748b; margin-left:8px;"></span>
-        <div id="noticeManagerList" style="margin-top:16px;"></div>
-      </div>
     </div>
 
     <!-- 4. 전체 관리자 전용 화면 -->
@@ -899,6 +883,37 @@
 
   </div>
 
+
+  <!-- 기관 공지 올리기 전용 창 -->
+  <div id="noticeOverlay" style="display:none; position:fixed; inset:0; z-index:9000; background:#f1f5f9; overflow:auto;">
+    <div style="position:sticky; top:0; z-index:1; display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:10px 16px; background:#0369a1; color:#fff;">
+      <strong style="font-size:17px;">📢 기관 공지 올리기 <span id="noticeOverlayWho" style="font-weight:normal; font-size:13px; opacity:.85;"></span></strong>
+      <span>
+        <button type="button" class="btn btn-secondary btn-sm" style="width:auto;" onclick="closeNoticeOverlay()">← 자료취합 화면으로</button>
+        <button type="button" class="btn btn-secondary btn-sm" style="width:auto;" onclick="closeNoticeOverlay(); logout();">로그아웃</button>
+      </span>
+    </div>
+    <div style="max-width:900px; margin:0 auto; padding:16px;">
+
+      <!-- 기관 공지 올리기 (PDF 전용) -->
+      <div class="q-card" id="noticeManagerCard" style="background:#f0f9ff; border-color:#bae6fd;">
+        <h4 style="color:#0369a1; margin-top:0;">📢 기관 공지 올리기 (PDF)</h4>
+        <p style="font-size:13.2px; color:#075985; margin:4px 0 10px 0;">주간업무 등 공지 파일을 <strong>PDF</strong>로 올리면, 기관이 접속 코드로 들어왔을 때 화면 맨 아래에서 바로 볼 수 있습니다. 가장 최근 공지가 펼쳐져 나오며, <strong>개인정보가 포함된 문서는 올리지 마세요.</strong></p>
+        <div class="form-group" style="margin-bottom:8px;">
+          <label>공지 제목</label>
+          <input type="text" id="noticeTitleInput" maxlength="60" placeholder="예: 11월 2주차 주간업무" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
+        </div>
+        <div class="form-group" style="margin-bottom:8px;">
+          <label>PDF 파일 (6MB 이하)</label>
+          <input type="file" id="noticeFileInput" accept="application/pdf,.pdf" style="width:100%;" />
+        </div>
+        <button type="button" class="btn btn-sm" id="noticeUploadBtn" onclick="NoticeBoard.upload()" style="width:auto;">공지 올리기</button>
+        <span id="noticeUploadStatus" style="font-size:14px; color:#64748b; margin-left:8px;"></span>
+        <div id="noticeManagerList" style="margin-top:16px;"></div>
+      </div>
+
+    </div>
+  </div>
   <script>
 const firebaseConfig = {
   apiKey: "AIzaSyBqf_Nfq_uUiPyMaAS9b6ke6XnrMXhPBl8",
@@ -6871,8 +6886,7 @@ window.NoticeBoard = (function () {
           await NoticeBoard.load(currentUser.id);
           if (window.__goNotice) {
             window.__goNotice = false;
-            var card = document.getElementById('noticeManagerCard');
-            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            openNoticeOverlay();
           }
         }
       } catch (e) { console.error(e); }
@@ -6894,12 +6908,23 @@ window.goNoticeUpload = function (ev) {
   if (ev) ev.preventDefault();
   window.__goNotice = true;
   if (typeof auth !== 'undefined' && auth && auth.currentUser && typeof currentUser !== 'undefined' && currentUser) {
-    var c = document.getElementById('noticeManagerCard');
-    if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    openNoticeOverlay();
     return false;
   }
   handleGoogleLogin();
   return false;
+};
+
+window.openNoticeOverlay = function () {
+  if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) { alert('담당자 로그인 후 이용할 수 있습니다.'); return; }
+  document.getElementById('noticeOverlayWho').textContent = '(' + (currentUser.name || '') + ')';
+  document.getElementById('noticeOverlay').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  NoticeBoard.load(currentUser.id);
+};
+window.closeNoticeOverlay = function () {
+  document.getElementById('noticeOverlay').style.display = 'none';
+  document.body.style.overflow = '';
 };
 </script>
 </body>
