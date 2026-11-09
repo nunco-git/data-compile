@@ -644,7 +644,7 @@
 
       <!-- 기관 공지 (열람 전용) -->
       <div class="q-card" id="noticeSurveyCard" style="margin-top:24px; background:#f0f9ff; border-color:#bae6fd;">
-        <h4 style="color:#0369a1; margin-top:0;">📢 기관 공지</h4>
+        <h4 style="color:#0369a1; margin-top:0;">📢 기관 공지 <span style="font-size:12.5px; font-weight:normal; color:#64748b;">(올린 지 30일이 지난 공지는 자동 삭제됩니다)</span></h4>
         <div id="noticeSurveyList"></div>
       </div>
     </div>
@@ -918,7 +918,7 @@
       <!-- 기관 공지 올리기 (PDF 전용) -->
       <div class="q-card" id="noticeManagerCard" style="background:#f0f9ff; border-color:#bae6fd;">
         <h4 style="color:#0369a1; margin-top:0;">📢 기관 공지 올리기 (PDF)</h4>
-        <p style="font-size:13.2px; color:#075985; margin:4px 0 10px 0;">주간업무 등 공지 파일을 <strong>PDF</strong>로 올리면, 기관이 접속 코드로 들어왔을 때 화면 맨 아래에서 바로 볼 수 있습니다. 가장 최근 공지가 펼쳐져 나오며, <strong>개인정보가 포함된 문서는 올리지 마세요.</strong></p>
+        <p style="font-size:13.2px; color:#075985; margin:4px 0 10px 0;">주간업무 등 공지 파일을 <strong>PDF</strong>로 올리면, 기관이 접속 코드로 들어왔을 때 화면 맨 아래에서 바로 볼 수 있습니다. 가장 최근 공지가 펼쳐져 나오며, <strong>올린 지 30일이 지난 공지는 자동으로 삭제</strong>됩니다. <strong>개인정보가 포함된 문서는 올리지 마세요.</strong></p>
         <div class="form-group" style="margin-bottom:8px;">
           <label>공지 제목</label>
           <input type="text" id="noticeTitleInput" maxlength="60" placeholder="예: 11월 2주차 주간업무" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
@@ -6853,6 +6853,30 @@ window.NoticeBoard = (function () {
     }
   }
 
+  var EXPIRE_MS = 30 * 24 * 60 * 60 * 1000;   // 올린 지 30일이 지나면 삭제
+  async function dropExpired(uid, list) {
+    var cutoff = Date.now() - EXPIRE_MS, keep = [], old = [];
+    list.forEach(function (n) {
+      var t = n.createdAt && n.createdAt.toDate ? n.createdAt.toDate().getTime() : null;
+      (t !== null && t < cutoff ? old : keep).push(n);
+    });
+    // 화면에는 누구에게나 보이지 않게 하고, 실제 삭제는 해당 담당자(서무)가 열었을 때 한다
+    if (old.length && typeof currentUser !== 'undefined' && currentUser && currentUser.id === uid) {
+      for (var i = 0; i < old.length; i++) {
+        try {
+          var ref = col(uid).doc(old[i].id);
+          var chunks = await ref.collection('chunks').get();
+          var batch = db.batch();
+          chunks.docs.forEach(function (d) { batch.delete(d.ref); });
+          batch.delete(ref);
+          await batch.commit();
+          if (urlCache[old[i].id]) { URL.revokeObjectURL(urlCache[old[i].id]); delete urlCache[old[i].id]; delete blobCache[old[i].id]; }
+        } catch (e) { console.warn('[공지] 만료 공지 삭제 실패', e); }
+      }
+    }
+    return keep;
+  }
+
   var current = { uid: null, list: [] };
 
   async function load(uid) {
@@ -6860,6 +6884,7 @@ window.NoticeBoard = (function () {
     try {
       var snap = await col(uid).orderBy('createdAt', 'desc').limit(30).get();
       current.list = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      current.list = await dropExpired(uid, current.list);
     } catch (e) {
       console.error('[공지] 불러오기 실패', e);
       current.list = [];
@@ -6941,6 +6966,7 @@ window.NoticeBoard = (function () {
       if (typeof db === 'undefined' || !db) throw new Error('db');
       var snap = await col(uid).orderBy('createdAt', 'desc').limit(30).get();
       var list = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      list = await dropExpired(uid, list);
       render(el, list, false, uid);
     } catch (e) {
       console.error('[공지] 공개 열람 실패', e);
