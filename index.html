@@ -848,7 +848,7 @@
           <input type="text" id="noticeTitleInput" maxlength="60" placeholder="예: 11월 2주차 주간업무" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
         </div>
         <div class="form-group" style="margin-bottom:8px;">
-          <label>PDF 파일 (20MB 이하)</label>
+          <label>PDF 파일 (6MB 이하)</label>
           <input type="file" id="noticeFileInput" accept="application/pdf,.pdf" style="width:100%;" />
         </div>
         <button type="button" class="btn btn-sm" id="noticeUploadBtn" onclick="NoticeBoard.upload()" style="width:auto;">공지 올리기</button>
@@ -6666,19 +6666,15 @@ new MutationObserver(later).observe(document.documentElement,{childList:true,sub
 
 <script>
 /* ===== 기관 공지 (PDF 전용, 별도 뷰어 없이 화면에서 바로 열람) =====
-   저장 위치: Firestore  managers/{managerUid}/notices/{id}
-              Storage    managers/{managerUid}/notices/{timestamp}_{파일명}  */
+   저장 위치: Firestore  managers/{managerUid}/notices/{id}  (+ chunks/{00,01,...} 에 PDF를 나눠 저장, Storage 불필요)  */
 window.NoticeBoard = (function () {
-  var MAX_BYTES = 20 * 1024 * 1024;
-  var URL_PREFIX = 'https://firebasestorage.googleapis.com/';
+  var MAX_BYTES = 6 * 1024 * 1024;   // PDF 최대 6MB
+  var CHUNK = 600 * 1024;            // 문서 1개(1MiB 제한)에 들어가도록 600KB씩 나눠 저장
 
   function esc(v) {
     return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
-  }
-  function safeName(n) {
-    return String(n || 'notice.pdf').replace(/[^\w.\-가-힣]+/g, '_').slice(-80);
   }
   function fmtDate(ts) {
     if (!ts || !ts.toDate) return '';
@@ -6687,16 +6683,51 @@ window.NoticeBoard = (function () {
     return d.getFullYear() + '.' + z(d.getMonth() + 1) + '.' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
   }
   function col(uid) { return db.collection('managers').doc(uid).collection('notices'); }
+  function pad(i) { return (i < 10 ? '0' : '') + i; }
 
-  function frameHtml(n) {
-    if (!n.url || n.url.indexOf(URL_PREFIX) !== 0) return '<div style="color:#b91c1c;">파일 주소가 올바르지 않습니다.</div>';
-    return '<iframe src="' + esc(n.url) + '#toolbar=1&view=FitH" title="' + esc(n.title) + '" ' +
-      'style="width:100%; height:75vh; min-height:420px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;"></iframe>' +
-      '<div style="margin-top:6px; font-size:13px;"><a href="' + esc(n.url) + '" target="_blank" rel="noopener noreferrer">새 창에서 크게 보기 ↗</a>' +
-      ' <span style="color:#94a3b8;">(휴대폰에서 첫 장만 보이면 이 링크를 눌러주세요)</span></div>';
+  function sliceToBase64(blob) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onload = function () { var r = String(fr.result); resolve(r.slice(r.indexOf(',') + 1)); };
+      fr.onerror = function () { reject(fr.error || new Error('파일 읽기 실패')); };
+      fr.readAsDataURL(blob);
+    });
+  }
+  function base64ToBlob(parts) {
+    var arrs = parts.map(function (b64) {
+      var bin = atob(b64), u8 = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      return u8;
+    });
+    return new Blob(arrs, { type: 'application/pdf' });
   }
 
-  function render(el, list, canDelete) {
+  var urlCache = {};   // noticeId -> blob URL
+  async function pdfUrl(uid, n) {
+    if (urlCache[n.id]) return urlCache[n.id];
+    var snap = await col(uid).doc(n.id).collection('chunks').orderBy('i').get();
+    var parts = snap.docs.map(function (d) { return d.data().data; });
+    if (!parts.length || (n.chunks && parts.length !== n.chunks)) throw new Error('파일 조각이 모두 모이지 않았습니다.');
+    urlCache[n.id] = URL.createObjectURL(base64ToBlob(parts));
+    return urlCache[n.id];
+  }
+
+  async function fillFrame(slot, uid, n) {
+    slot.innerHTML = '<div style="color:#64748b; font-size:14px;">PDF를 불러오는 중...</div>';
+    try {
+      var u = await pdfUrl(uid, n);
+      slot.innerHTML =
+        '<iframe src="' + u + '#toolbar=1&view=FitH" title="' + esc(n.title) + '" ' +
+        'style="width:100%; height:75vh; min-height:420px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;"></iframe>' +
+        '<div style="margin-top:6px; font-size:13px;"><a href="' + u + '" target="_blank" rel="noopener">새 창에서 크게 보기 ↗</a>' +
+        ' <span style="color:#94a3b8;">(휴대폰에서 첫 장만 보이면 이 링크를 눌러주세요)</span></div>';
+    } catch (e) {
+      console.error('[공지] PDF 불러오기 실패', e);
+      slot.innerHTML = '<div style="color:#b91c1c; font-size:14px;">PDF를 불러오지 못했습니다.</div>';
+    }
+  }
+
+  function render(el, list, canDelete, uid) {
     if (!el) return;
     if (!list.length) {
       el.innerHTML = '<div style="color:#64748b; font-size:14.5px;">등록된 공지가 없습니다.</div>';
@@ -6708,7 +6739,7 @@ window.NoticeBoard = (function () {
       var del = canDelete ? ' <button type="button" class="btn btn-secondary btn-sm" style="width:auto; margin-left:8px;" data-notice-del="' + esc(n.id) + '">삭제</button>' : '';
       if (i === 0) {
         html += '<div style="background:#fff; border:1px solid #bae6fd; border-radius:10px; padding:12px; margin-bottom:12px;">' +
-          '<div style="margin-bottom:8px;">🆕 ' + head + del + '</div>' + frameHtml(n) + '</div>';
+          '<div style="margin-bottom:8px;">🆕 ' + head + del + '</div><div class="notice-frame-slot" data-notice-auto="' + esc(n.id) + '"></div></div>';
       } else {
         html += '<details data-notice-id="' + esc(n.id) + '" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin-bottom:8px;">' +
           '<summary style="cursor:pointer;">' + head + '</summary>' +
@@ -6716,13 +6747,15 @@ window.NoticeBoard = (function () {
       }
     });
     el.innerHTML = html;
-    // 지난 공지는 펼칠 때만 PDF를 불러온다 (처음 화면이 느려지지 않도록)
+    var first = el.querySelector('[data-notice-auto]');
+    if (first) fillFrame(first, uid, list[0]);
+    // 지난 공지는 펼칠 때만 PDF를 불러온다
     el.querySelectorAll('details[data-notice-id]').forEach(function (d) {
       d.addEventListener('toggle', function () {
         var slot = d.querySelector('.notice-frame-slot');
         if (d.open && slot && !slot.innerHTML) {
           var n = list.find(function (x) { return x.id === d.getAttribute('data-notice-id'); });
-          if (n) slot.innerHTML = frameHtml(n);
+          if (n) fillFrame(slot, uid, n);
         }
       });
     });
@@ -6747,8 +6780,8 @@ window.NoticeBoard = (function () {
       ['noticeManagerList', 'noticeSurveyList'].forEach(function (id) { var el = document.getElementById(id); if (el) el.innerHTML = msg; });
       return;
     }
-    render(document.getElementById('noticeManagerList'), current.list, true);
-    render(document.getElementById('noticeSurveyList'), current.list, false);
+    render(document.getElementById('noticeManagerList'), current.list, true, uid);
+    render(document.getElementById('noticeSurveyList'), current.list, false, uid);
   }
 
   async function upload() {
@@ -6762,28 +6795,31 @@ window.NoticeBoard = (function () {
     if (!title) { alert('공지 제목을 입력해주세요.'); return; }
     if (!file) { alert('PDF 파일을 선택해주세요.'); return; }
     if (!/\.pdf$/i.test(file.name)) { alert('PDF 파일(.pdf)만 올릴 수 있습니다.'); return; }
-    if (file.size > MAX_BYTES) { alert('20MB 이하의 파일만 올릴 수 있습니다.'); return; }
-    // 확장자만 바꾼 파일을 막기 위해 파일 첫 부분이 PDF 형식(%PDF-)인지 확인
+    if (file.size > MAX_BYTES) { alert('6MB 이하의 PDF만 올릴 수 있습니다. (용량이 크면 PDF를 줄여서 올려주세요)'); return; }
     var head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
     if (String.fromCharCode.apply(null, head) !== '%PDF-') { alert('올바른 PDF 파일이 아닙니다.'); return; }
 
     btn.disabled = true;
-    statusEl.textContent = '업로드 중... (0%)';
-    var path = 'managers/' + currentUser.id + '/notices/' + Date.now() + '_' + safeName(file.name);
+    statusEl.textContent = '파일 준비 중...';
     try {
-      var task = storage.ref().child(path).put(file, { contentType: 'application/pdf' });
-      task.on('state_changed', function (s) {
-        statusEl.textContent = '업로드 중... (' + (s.totalBytes ? Math.round(s.bytesTransferred / s.totalBytes * 100) : 0) + '%)';
-      });
-      await task;
-      var url = await task.snapshot.ref.getDownloadURL();
-      await col(currentUser.id).add({
-        title: title, fileName: file.name, url: url, path: path, size: file.size,
+      var uid = currentUser.id;
+      var count = Math.ceil(file.size / CHUNK);
+      var ref = col(uid).doc();
+      var batch = db.batch();
+      for (var i = 0; i < count; i++) {
+        var b64 = await sliceToBase64(file.slice(i * CHUNK, (i + 1) * CHUNK));
+        batch.set(ref.collection('chunks').doc(pad(i)), { i: i, data: b64 });
+        statusEl.textContent = '파일 준비 중... (' + (i + 1) + '/' + count + ')';
+      }
+      batch.set(ref, {
+        title: title, fileName: file.name, size: file.size, chunks: count,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
+      statusEl.textContent = '저장 중...';
+      await batch.commit();
       titleEl.value = ''; fileEl.value = '';
       statusEl.textContent = '✅ 공지가 등록되었습니다.';
-      await load(currentUser.id);
+      await load(uid);
     } catch (e) {
       console.error('[공지] 업로드 실패', e);
       statusEl.textContent = '';
@@ -6798,8 +6834,13 @@ window.NoticeBoard = (function () {
     if (!n || !currentUser || current.uid !== currentUser.id) return;
     if (!confirm('"' + n.title + '" 공지를 삭제할까요? 삭제하면 되돌릴 수 없습니다.')) return;
     try {
-      if (n.path) { try { await storage.ref().child(n.path).delete(); } catch (e) { console.warn('[공지] 파일 삭제 건너뜀', e); } }
-      await col(current.uid).doc(id).delete();
+      var ref = col(current.uid).doc(id);
+      var chunks = await ref.collection('chunks').get();
+      var batch = db.batch();
+      chunks.docs.forEach(function (d) { batch.delete(d.ref); });
+      batch.delete(ref);
+      await batch.commit();
+      if (urlCache[id]) { URL.revokeObjectURL(urlCache[id]); delete urlCache[id]; }
       await load(current.uid);
     } catch (e) {
       console.error(e);
