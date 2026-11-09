@@ -431,6 +431,15 @@
               <span style="display:block; font-size:17.4px; font-weight:800; color:#9a3412;">📝 변수 입력 취합 바로가기 →</span>
               <span style="display:block; margin-top:5px; font-size:14.3px; font-weight:600; color:#b45309; line-height:1.5;">한글 문서의 부서명·전화·팩스를 변수로 만들어 여러 명이 입력하고 한 번에 반영</span>
             </a>
+
+            <!-- 기관 공지 바로가기 (서무: Google 로그인 후 맨 아래 공지 올리기로 이동) -->
+            <a href="#noticeManagerCard" onclick="goNoticeUpload(event)"
+               style="display:block; margin-top:12px; text-decoration:none; background:linear-gradient(160deg,#f0fdf4 0%,#dcfce7 100%); border:1.5px solid #86efac; border-radius:12px; padding:14px 16px; text-align:center; transition:box-shadow 0.2s ease, transform 0.15s ease;"
+               onmouseover="this.style.boxShadow='0 6px 16px rgba(22,163,74,0.18)'; this.style.transform='translateY(-1px)';"
+               onmouseout="this.style.boxShadow='none'; this.style.transform='none';">
+              <span style="display:block; font-size:17.4px; font-weight:800; color:#166534;">📢 기관 공지 올리기 바로가기 →</span>
+              <span style="display:block; margin-top:5px; font-size:14.3px; font-weight:600; color:#15803d; line-height:1.5;">서무는 Google 로그인 후 맨 아래에서 주간업무 등 PDF 공지 등록 (기관은 접속 코드로 들어와 맨 아래에서 바로 확인)</span>
+            </a>
           </div>
 
           <!-- 담당자 계정 생성 (Google + 성명/접속코드) -->
@@ -6857,7 +6866,16 @@ window.NoticeBoard = (function () {
     var origEnter = enterAppForUser;
     enterAppForUser = async function (user) {
       var ok = await origEnter.apply(this, arguments);
-      try { if (ok && typeof currentUser !== 'undefined' && currentUser && currentUser.id) NoticeBoard.load(currentUser.id); } catch (e) { console.error(e); }
+      try {
+        if (ok && typeof currentUser !== 'undefined' && currentUser && currentUser.id) {
+          await NoticeBoard.load(currentUser.id);
+          if (window.__goNotice) {
+            window.__goNotice = false;
+            var card = document.getElementById('noticeManagerCard');
+            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      } catch (e) { console.error(e); }
       return ok;
     };
   }
@@ -6870,6 +6888,19 @@ window.NoticeBoard = (function () {
     };
   }
 })();
+
+/* 첫 화면 "기관 공지 올리기 바로가기" : Google 로그인 → 담당자(서무) 화면 맨 아래 공지 칸으로 이동 */
+window.goNoticeUpload = function (ev) {
+  if (ev) ev.preventDefault();
+  window.__goNotice = true;
+  if (typeof auth !== 'undefined' && auth && auth.currentUser && typeof currentUser !== 'undefined' && currentUser) {
+    var c = document.getElementById('noticeManagerCard');
+    if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return false;
+  }
+  handleGoogleLogin();
+  return false;
+};
 </script>
 </body>
 </html>
