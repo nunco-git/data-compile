@@ -931,7 +931,7 @@
           </div>
         </div>
         <div class="form-group" id="noticePdfWrap" style="margin-bottom:8px;">
-          <label>파일 (20MB 이하 · PDF, 한글, 엑셀, 워드, 파워포인트, CSV, 텍스트)</label>
+          <label>파일 (6MB 이하 · PDF, 한글, 엑셀, 워드, 파워포인트, CSV, 텍스트)</label>
           <input type="file" id="noticeFileInput" accept=".pdf,.hwp,.hwpx,.xls,.xlsx,.doc,.docx,.ppt,.pptx,.csv,.txt" style="width:100%;" />
         </div>
         <div class="form-group hidden" id="noticeTextWrap" style="margin-bottom:8px;">
@@ -6727,7 +6727,9 @@ new MutationObserver(later).observe(document.documentElement,{childList:true,sub
 /* ===== 글·파일 올리기 (PDF는 화면에서 바로 열람, 한글·엑셀 등은 받아서 열기) =====
    저장 위치: Firestore  managers/{managerUid}/notices/{id}  (+ chunks/{00,01,...} 에 PDF를 나눠 저장, Storage 불필요)  */
 window.NoticeBoard = (function () {
-  var MAX_BYTES = 20 * 1024 * 1024;  // PDF 최대 20MB
+  var USE_STORAGE = false;           // Storage를 만들 수 없는 프로젝트: false = 파일을 Firestore에 나눠 저장
+  var MAX_BYTES = USE_STORAGE ? 20 * 1024 * 1024 : 6 * 1024 * 1024;   // Firestore 저장 시 6MB, Storage 저장 시 20MB
+  var CHUNK = 600 * 1024;            // Firestore 문서 1개(1MiB 제한)에 들어가도록 600KB씩 나눠 저장
   var CHUNK = 600 * 1024;            // 문서 1개(1MiB 제한)에 들어가도록 600KB씩 나눠 저장
 
   function esc(v) {
@@ -6752,13 +6754,13 @@ window.NoticeBoard = (function () {
       fr.readAsDataURL(blob);
     });
   }
-  function base64ToBlob(parts) {
+  function base64ToBlob(parts, type) {
     var arrs = parts.map(function (b64) {
       var bin = atob(b64), u8 = new Uint8Array(bin.length);
       for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
       return u8;
     });
-    return new Blob(arrs, { type: 'application/pdf' });
+    return new Blob(arrs, { type: type || 'application/pdf' });
   }
 
   var urlCache = {};   // noticeId -> blob URL
@@ -6768,7 +6770,7 @@ window.NoticeBoard = (function () {
     var snap = await col(uid).doc(n.id).collection('chunks').orderBy('i').get();
     var parts = snap.docs.map(function (d) { return d.data().data; });
     if (!parts.length || (n.chunks && parts.length !== n.chunks)) throw new Error('파일 조각이 모두 모이지 않았습니다.');
-    blobCache[n.id] = base64ToBlob(parts);
+    blobCache[n.id] = base64ToBlob(parts, /\.pdf$/i.test(n.fileName || '') ? 'application/pdf' : 'application/octet-stream');
     urlCache[n.id] = URL.createObjectURL(blobCache[n.id]);
     return blobCache[n.id];
   }
@@ -6846,8 +6848,19 @@ window.NoticeBoard = (function () {
         }
         return;
       }
-      var blob = await pdfBlob(uid, n);   // 예전(Firestore 조각 저장) 공지
+      var blob = await pdfBlob(uid, n);   // Firestore 조각 저장 공지
       var u = urlCache[n.id];
+      if (!/\.pdf$/i.test(n.fileName || '')) {   // 한글·엑셀 등: 화면에 펼치지 않고 받아서 열도록 한다
+        var ext2 = ((n.fileName || '').match(/\.([A-Za-z0-9]+)$/) || [, ''])[1].toLowerCase();
+        var icon2 = { hwp: '📘', hwpx: '📘', xls: '📗', xlsx: '📗', csv: '📗', doc: '📄', docx: '📄', ppt: '📙', pptx: '📙', txt: '📄' }[ext2] || '📎';
+        var kb2 = n.size ? (n.size > 1048576 ? (n.size / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(n.size / 1024)) + 'KB') : '';
+        slot.innerHTML = '<div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">' +
+          '<span style="font-size:32px;">' + icon2 + '</span>' +
+          '<div style="flex:1 1 180px; min-width:0; word-break:break-all;"><div style="font-weight:700;">' + esc(n.fileName || '파일') + '</div><div style="font-size:13px; color:#64748b;">' + esc(kb2) + '</div></div>' +
+          '<a class="btn" style="width:auto; text-decoration:none;" href="' + u + '" download="' + esc(n.fileName || 'file') + '">⬇ 파일 받기</a></div>' +
+          '<div style="margin-top:6px; font-size:12.5px; color:#94a3b8;">카카오톡 안에서 받아지지 않으면 오른쪽 위 메뉴에서 "다른 브라우저로 열기"를 눌러 주세요.</div>';
+        return;
+      }
       var links = '<div style="margin-top:6px; font-size:13px;"><a href="' + u + '" download="' + esc(n.fileName || 'notice.pdf') + '">PDF 파일 받기</a>' +
         (MOBILE ? '' : ' · <a href="' + u + '" target="_blank" rel="noopener">새 창에서 크게 보기 ↗</a>') + '</div>';
       if (MOBILE) {
@@ -6990,6 +7003,50 @@ window.NoticeBoard = (function () {
     }
   }
 
+  function sliceToBase64(blob) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onload = function () { var r = String(fr.result); resolve(r.slice(r.indexOf(',') + 1)); };
+      fr.onerror = function () { reject(fr.error || new Error('파일 읽기 실패')); };
+      fr.readAsDataURL(blob);
+    });
+  }
+  async function uploadChunked(file, title, ext) {
+    var titleEl = document.getElementById('noticeTitleInput');
+    var fileEl = document.getElementById('noticeFileInput');
+    var statusEl = document.getElementById('noticeUploadStatus');
+    var btn = document.getElementById('noticeUploadBtn');
+    btn.disabled = true;
+    statusEl.textContent = '파일 준비 중...';
+    try {
+      var uid = currentUser.id;
+      var count = Math.ceil(file.size / CHUNK);
+      var ref = col(uid).doc();
+      var batch = db.batch();
+      for (var i = 0; i < count; i++) {
+        var b64 = await sliceToBase64(file.slice(i * CHUNK, (i + 1) * CHUNK));
+        batch.set(ref.collection('chunks').doc((i < 10 ? '0' : '') + i), { i: i, data: b64 });
+        statusEl.textContent = '파일 준비 중... (' + (i + 1) + '/' + count + ')';
+      }
+      var base = file.name.replace(/\.[A-Za-z0-9]+$/, '');
+      batch.set(ref, {
+        title: title, fileName: base + '.' + ext, size: file.size, chunks: count,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      statusEl.textContent = '저장 중...';
+      await batch.commit();
+      titleEl.value = ''; fileEl.value = '';
+      statusEl.textContent = '✅ 올렸습니다.';
+      await load(uid);
+    } catch (e) {
+      console.error('[공지] 업로드 실패', e);
+      statusEl.textContent = '';
+      alert('업로드에 실패했습니다: ' + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   async function upload() {
     if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) { alert('담당자 로그인 후 이용할 수 있습니다.'); return; }
     if (kind === 'text') return uploadText();
@@ -7004,11 +7061,12 @@ window.NoticeBoard = (function () {
     var extM = file.name.match(/\.([A-Za-z0-9]+)$/);
     var ext = extM ? extM[1].toLowerCase() : '';
     if (ALLOWED_EXT.indexOf(ext) < 0) { alert('올릴 수 있는 파일: PDF, 한글(hwp·hwpx), 엑셀(xls·xlsx·csv), 워드(doc·docx), 파워포인트(ppt·pptx), 텍스트(txt)'); return; }
-    if (file.size > MAX_BYTES) { alert('20MB 이하의 파일만 올릴 수 있습니다.'); return; }
+    if (file.size > MAX_BYTES) { alert((MAX_BYTES / 1048576) + 'MB 이하의 파일만 올릴 수 있습니다. (용량이 크면 파일을 줄여서 올려주세요)'); return; }
     if (ext === 'pdf') {
       var head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
       if (String.fromCharCode.apply(null, head) !== '%PDF-') { alert('올바른 PDF 파일이 아닙니다.'); return; }
     }
+    if (!USE_STORAGE) return uploadChunked(file, title, ext);
     if (!storage) { alert('Firebase Storage가 초기화되지 않았습니다. 새로고침 후 다시 시도해주세요.'); return; }
 
     btn.disabled = true;
