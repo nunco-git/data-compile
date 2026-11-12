@@ -1171,6 +1171,10 @@ if (auth) {
     } catch (v33) {
       console.error("로그인 처리 오류:", v33);
       authHandledUid = null;
+      if (pendingLoginAlert) {
+        alert("로그인 처리 중 오류가 발생했습니다.\n(" + (v33 && (v33.code || v33.message) || v33) + ")\n잠시 후 다시 시도해 주세요. 계속되면 이 오류 문구를 알려주세요.");
+      }
+      try { await auth.signOut(); } catch (v34) {}
     } finally {
       pendingLoginAlert = false;
     }
