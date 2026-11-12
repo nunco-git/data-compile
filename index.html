@@ -331,6 +331,12 @@
     #varOverlayBar button:hover { background: rgba(255,255,255,0.25); }
     #varOverlayBar span { font-size: 13px; color: #cbd5e1; }
     #varOverlay iframe { flex: 1; width: 100%; border: none; background: #fff; }
+    #boardOverlay { position: fixed; inset: 0; background: #f1f5f9; z-index: 9100; display: flex; flex-direction: column; }
+    #boardOverlay.hidden { display: none; }
+    #boardOverlayBar { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: #1e293b; color: #fff; }
+    #boardOverlayBar button { background: rgba(255,255,255,0.15); color: #fff; border: none; border-radius: 6px; padding: 8px 14px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    #boardOverlayBar span { font-size: 15px; color: #cbd5e1; }
+    #boardOverlay iframe { flex: 1; width: 100%; border: none; background: #fff; }
   
 /*mobile-fontfix*/
 @media (max-width:640px){
@@ -359,6 +365,14 @@
       <span>변수 입력 취합 - 한글 문서의 부서명·전화·팩스를 변수로 만들어 여러 명이 함께 입력</span>
     </div>
     <iframe id="varIframe" src="about:blank" title="변수 입력 취합" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+  </div>
+
+  <div id="boardOverlay" class="hidden">
+    <div id="boardOverlayBar">
+      <button onclick="closeBoardOverlay()">← 돌아가기</button>
+      <span>카톡 등 대화창에 글·파일 올리기 - Google 로그인만으로 누구나 사용</span>
+    </div>
+    <iframe id="boardIframe" src="about:blank" title="글·파일 올리기" allow="clipboard-read; clipboard-write; web-share; fullscreen"></iframe>
   </div>
 
   <div id="demoOverlay" class="hidden">
@@ -434,13 +448,13 @@
               <span style="display:block; margin-top:5px; font-size:14.3px; font-weight:600; color:#b45309; line-height:1.5;">한글 문서의 부서명·전화·팩스를 변수로 만들어 여러 명이 입력하고 한 번에 반영</span>
             </a>
 
-            <!-- 글·파일 올리기 바로가기 (Google 로그인 후 전용 창으로 이동) -->
-            <a href="#noticeManagerCard" onclick="goNoticeUpload(event)"
+            <!-- 글·파일 올리기 바로가기 (자료취합 담당자 계정과 별개의 board.html, Google 로그인만 하면 누구나) -->
+            <a href="board.html" onclick="openBoardOverlay(event)"
                style="display:block; margin-top:12px; text-decoration:none; background:linear-gradient(160deg,#f0fdf4 0%,#dcfce7 100%); border:1.5px solid #86efac; border-radius:12px; padding:14px 16px; text-align:center; transition:box-shadow 0.2s ease, transform 0.15s ease;"
                onmouseover="this.style.boxShadow='0 6px 16px rgba(22,163,74,0.18)'; this.style.transform='translateY(-1px)';"
                onmouseout="this.style.boxShadow='none'; this.style.transform='none';">
               <span style="display:block; font-size:17.4px; font-weight:800; color:#166534;">💬 카톡 등 대화창에 글 올리기 · 파일 올리기 →</span>
-              <span style="display:block; margin-top:5px; font-size:14.3px; font-weight:600; color:#15803d; line-height:1.5;">Google 로그인 후 긴 글이나 파일(PDF·한글·엑셀 등)을 올리고, 만들어진 링크를 카톡 등 대화창에 공유</span>
+              <span style="display:block; margin-top:5px; font-size:14.3px; font-weight:600; color:#15803d; line-height:1.5;">긴 글이나 파일(PDF·한글·엑셀 등)을 올리고 링크를 카톡에 공유 · Google 로그인만 하면 누구나 사용, 행정기관 메일 인증 없음</span>
             </a>
           </div>
 
@@ -653,7 +667,7 @@
     <div id="viewManager" class="hidden">
       <div class="user-info-bar">
         <span>👤 담당자: <strong id="managerNameDisplay"></strong> <span id="managerEmailDisplay" style="color:#64748b; font-weight:normal;"></span></span>
-        <button class="btn btn-sm" style="width:auto; margin-right:6px; background:#16a34a;" onclick="openNoticeOverlay()">💬 글·파일 올리기</button><button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
+        <button class="btn btn-sm" style="width:auto; margin-right:6px; background:#16a34a;" onclick="openBoardOverlay(event)">💬 글·파일 올리기</button><button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
       </div>
 
       <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:stretch; margin-bottom:20px;">
@@ -6394,6 +6408,19 @@ function openVarOverlay(ev) {
   }
   var overlay = document.getElementById('varOverlay');
   if (overlay) overlay.classList.remove('hidden');
+}
+function openBoardOverlay(ev) {
+  if (ev) ev.preventDefault();
+  var iframe = document.getElementById('boardIframe');
+  if (iframe && (iframe.getAttribute('src') === 'about:blank' || !iframe.getAttribute('src'))) {
+    iframe.setAttribute('src', 'board.html');
+  }
+  var overlay = document.getElementById('boardOverlay');
+  if (overlay) overlay.classList.remove('hidden');
+}
+function closeBoardOverlay() {
+  var overlay = document.getElementById('boardOverlay');
+  if (overlay) overlay.classList.add('hidden');
 }
 function closeVarOverlay() {
   var overlay = document.getElementById('varOverlay');

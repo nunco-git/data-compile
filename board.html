@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>글·파일 올리기</title>
+<script>if (/[?&]notice=/.test(location.search)) document.documentElement.className = 'pubmode';</script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" integrity="sha384-AQ3POAMqIhwS81FrUH95ekxqBZHeP5tG2JfEL3+7GuTtfRLWnrRh32UxwzM+//A9" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" integrity="sha384-TnlRYaR4JYz/lpaGuaiU61PjNberSA4vjLjtF+oRC/IkohkJqnWxw5EmDSOt1vA1" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js" integrity="sha384-qn4Jh88HhJA8dplNQyGjOh9OGI4izVhrfj/qIFgaKcdgOE06pXqIKGlsCILZcLAC" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js" integrity="sha384-E3vxFxXu8FhW5kvqdQJ5Yf8ugrV7iCJP8jgnItRH2Rk8Q08cJzJGTi/oMC3FEp3j" crossorigin="anonymous"></script>
+<style>
+  :root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--text:#0f172a;--sub:#64748b;--blue:#0369a1;--green:#16a34a;--red:#dc2626}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Malgun Gothic','Apple SD Gothic Neo',-apple-system,sans-serif;line-height:1.55}
+  .wrap{max-width:900px;margin:0 auto;padding:16px}
+  .bar{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 16px;background:var(--blue);color:#fff}
+  .bar strong{font-size:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+  .card h2{font-size:17px;margin:0 0 8px}
+  .sub{color:var(--sub);font-size:14px}
+  .btn{display:inline-block;border:0;border-radius:8px;padding:9px 14px;font-size:14px;cursor:pointer;color:#fff;background:var(--blue);text-decoration:none;font-family:inherit}
+  .btn.gray{background:#64748b}.btn.green{background:var(--green)}.btn.red{background:var(--red)}
+  .btn.sm{padding:6px 10px;font-size:13px}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn.google{background:#fff;color:#1f2937;border:1px solid #cbd5e1;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:12px;font-size:16px;font-weight:700}
+  input[type=text],select,textarea{width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;font-family:inherit;background:#fff}
+  label.l{display:block;font-size:14px;font-weight:700;margin:10px 0 4px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .hide{display:none !important}
+  .tag{display:inline-block;background:#dbeafe;color:#1d4ed8;font-size:12px;padding:1px 8px;border-radius:10px;margin-right:6px}
+  .link{background:#fff;border:1px solid #fde68a;border-radius:8px;padding:10px;margin-bottom:8px}
+  .box-y{background:#fefce8;border-color:#fde68a}
+  .item{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+  .item summary{cursor:pointer}
+  .textbody{white-space:pre-wrap;word-break:break-word;line-height:1.7;font-size:16px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px}
+  html.pubmode #login,html.pubmode #main{display:none !important}
+  html:not(.pubmode) #pub{display:none !important}
+  #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 18px;border-radius:20px;font-size:14px;display:none;z-index:9}
+</style>
+</head>
+<body>
+
+<!-- 공유 링크로 열었을 때: 로그인 없이 글·파일만 보여줌 -->
+<div id="pub">
+  <div class="bar"><strong id="pubTitle">📢 기관 공지</strong></div>
+  <div class="wrap"><div id="pubList" class="sub">불러오는 중...</div></div>
+</div>
+
+<!-- 로그인 전 -->
+<div id="login">
+  <div class="bar"><strong>💬 글·파일 올리기</strong></div>
+  <div class="wrap">
+    <div class="card">
+      <h2>카톡 등 대화창에 올리기 어려운 긴 글·파일을 링크 하나로 공유</h2>
+      <p class="sub" style="margin:4px 0 14px">구글 계정으로 로그인하면 <strong>누구나</strong> 사용할 수 있습니다. 행정기관 메일 인증이나 승인 절차는 없습니다.</p>
+      <button type="button" class="btn google" id="googleBtn">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 6 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 19 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.5 6 29.6 4 24 4 16 4 9.1 8.6 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.3-1.9 14-5.1l-6.5-5.5C29.5 35.3 26.9 36 24 36c-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9 39.4 15.9 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.6l6.5 5.5C40.9 36 44 30.6 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg>
+        Google 계정으로 로그인
+      </button>
+    </div>
+    <div class="card">
+      <h2>이렇게 쓰세요</h2>
+      <ol class="sub" style="margin:0;padding-left:20px">
+        <li>용도별 <strong>공유 링크</strong>를 만듭니다. 예) 주간업무, 공지사항</li>
+        <li>글을 쓰거나 파일(PDF·한글·엑셀 등)을 올립니다.</li>
+        <li>링크를 카톡 단톡방에 <strong>한 번만</strong> 올리면, 이후 새로 올린 글·파일이 같은 링크에서 자동으로 보입니다.</li>
+      </ol>
+      <p class="sub" style="margin:10px 0 0">⚠ 링크를 아는 사람은 누구나 볼 수 있으니 <strong>개인정보가 포함된 글·파일은 올리지 마세요.</strong> 올린 지 30일이 지나면 자동으로 삭제됩니다.</p>
+    </div>
+  </div>
+</div>
+
+<!-- 로그인 후 -->
+<div id="main" class="hide">
+  <div class="bar">
+    <strong>💬 글·파일 올리기</strong>
+    <span><span id="who" style="font-size:13px;opacity:.85;margin-right:8px"></span><button type="button" class="btn gray sm" id="logoutBtn">로그아웃</button></span>
+  </div>
+  <div class="wrap">
+
+    <div class="card box-y">
+      <h2 style="color:#92400e">🔗 카카오톡 공유용 링크</h2>
+      <p class="sub" style="color:#78350f;margin:0 0 8px">링크를 <strong>여러 개</strong> 만들어 용도별로 나눠 쓸 수 있습니다(최대 10개). 단톡방마다 해당 링크를 한 번만 올려 두세요. 로그인 없이 열리고, 새로 올리면 <strong>같은 링크에서 자동으로 최신</strong>이 보입니다.</p>
+      <div id="linkList"></div>
+      <div class="row" style="margin-top:10px">
+        <input type="text" id="newChannel" maxlength="20" placeholder="새 링크 이름 (예: 주간업무)" style="flex:1 1 200px;width:auto">
+        <button type="button" class="btn sm" id="addChannelBtn">+ 새 링크 만들기</button>
+      </div>
+      <div id="linkMsg" class="sub" style="color:var(--green);margin-top:6px"></div>
+    </div>
+
+    <div class="card" style="background:#f0f9ff;border-color:#bae6fd">
+      <h2 style="color:#0369a1">✏️ 글·파일 올리기</h2>
+      <label class="l">올릴 링크 (어느 공유 링크에 보일지 선택)</label>
+      <select id="chanSel"></select>
+      <label class="l">제목</label>
+      <input type="text" id="titleIn" maxlength="60" placeholder="예: 11월 2주차 주간업무 안내">
+      <label class="l">종류</label>
+      <div class="row" style="font-size:15px">
+        <label style="cursor:pointer"><input type="radio" name="kind" value="text" checked> ✏️ 글 올리기</label>
+        <label style="cursor:pointer"><input type="radio" name="kind" value="file"> 📎 파일 올리기</label>
+      </div>
+      <div id="textWrap">
+        <label class="l">내용 (3,000자 이하)</label>
+        <textarea id="textIn" rows="8" maxlength="3000" placeholder="올릴 글을 입력하세요. 줄바꿈은 그대로 표시됩니다."></textarea>
+      </div>
+      <div id="fileWrap" class="hide">
+        <label class="l">파일 (6MB 이하 · PDF, 한글, 엑셀, 워드, 파워포인트, CSV, 텍스트)</label>
+        <input type="file" id="fileIn" accept=".pdf,.hwp,.hwpx,.xls,.xlsx,.doc,.docx,.ppt,.pptx,.csv,.txt" style="width:100%">
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button type="button" class="btn" id="uploadBtn">올리기</button>
+        <span id="upMsg" class="sub"></span>
+      </div>
+      <p class="sub" style="margin:10px 0 0">⚠ 개인정보가 포함된 글·파일은 올리지 마세요. 올린 지 30일이 지나면 자동으로 삭제됩니다.</p>
+    </div>
+
+    <div class="card">
+      <h2>올린 글·파일</h2>
+      <div id="myList" class="sub">불러오는 중...</div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ========== 설정 ========== */
+const firebaseConfig = {
+  apiKey: "AIzaSyBqf_Nfq_uUiPyMaAS9b6ke6XnrMXhPBl8",
+  authDomain: "data-compile-970cf.firebaseapp.com",
+  projectId: "data-compile-970cf",
+  storageBucket: "data-compile-970cf.firebasestorage.app",
+  messagingSenderId: "954054731108",
+  appId: "1:954054731108:web:36d489db5be3759ebcc671",
+  measurementId: "G-Q4KFD8BL29"
+};
+const MAX_BYTES = 6 * 1024 * 1024;           // 파일 최대 6MB (Firestore에 나눠 저장)
+const CHUNK = 600 * 1024;                    // 문서 1개(1MiB 제한)에 들어가도록 600KB씩
+const MAX_CHANNELS = 10;
+const EXPIRE_MS = 30 * 24 * 60 * 60 * 1000;  // 30일 후 삭제
+const ALLOWED_EXT = ['pdf','hwp','hwpx','xls','xlsx','csv','doc','docx','ppt','pptx','txt'];
+
+/* ========== 초기화 ========== */
+firebase.initializeApp(firebaseConfig);
+try {   // 본 시스템과 같은 App Check 설정
+  firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider('6LeFfLktAAAAANS2TCKuARKz8ByPqh7fKM-kauh1'), true);
+} catch (e) { console.warn('App Check 활성화 실패', e); }
+const auth = firebase.auth();
+const db = firebase.firestore();
+const $ = id => document.getElementById(id);
+let me = null;            // 로그인한 사용자
+let channels = [];        // [{id,name}]
+let myNotices = [];
+
+/* ========== 공통 도구 ========== */
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function toast(t) { const m = $('toast'); m.textContent = t; m.style.display = 'block'; setTimeout(() => m.style.display = 'none', 2600); }
+function fmtDate(ts) {
+  if (!ts || !ts.toDate) return '';
+  const d = ts.toDate(), z = n => (n < 10 ? '0' : '') + n;
+  return d.getFullYear() + '.' + z(d.getMonth() + 1) + '.' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
+}
+function fmtSize(b) { return !b ? '' : (b > 1048576 ? (b / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(b / 1024)) + 'KB'); }
+const col = uid => db.collection('managers').doc(uid).collection('notices');
+const metaRef = uid => db.collection('managers').doc(uid).collection('noticeMeta').doc('channels');
+const baseUrl = () => location.origin + location.pathname + '?notice=' + me.uid;
+const urlOf = c => c ? baseUrl() + '&c=' + c.id : baseUrl();
+
+/* ========== 파일 조각 ↔ 파일 ========== */
+function readBuf(blob) {   // 오래된 휴대폰 브라우저에서도 동작하도록 FileReader 사용
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = () => reject(fr.error || new Error('파일 읽기 실패'));
+    fr.readAsArrayBuffer(blob);
+  });
+}
+function sliceToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => { const r = String(fr.result); resolve(r.slice(r.indexOf(',') + 1)); };
+    fr.onerror = () => reject(fr.error || new Error('파일 읽기 실패'));
+    fr.readAsDataURL(blob);
+  });
+}
+function base64ToBlob(parts, type) {
+  const arrs = parts.map(b64 => { const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return u8; });
+  return new Blob(arrs, { type: type || 'application/octet-stream' });
+}
+const urlCache = {}, blobCache = {};
+async function fileBlob(uid, n) {
+  if (blobCache[n.id]) return blobCache[n.id];
+  const snap = await col(uid).doc(n.id).collection('chunks').orderBy('i').get();
+  const parts = snap.docs.map(d => d.data().data);
+  if (!parts.length || (n.chunks && parts.length !== n.chunks)) throw new Error('파일 조각이 모두 모이지 않았습니다.');
+  blobCache[n.id] = base64ToBlob(parts, /\.pdf$/i.test(n.fileName || '') ? 'application/pdf' : 'application/octet-stream');
+  urlCache[n.id] = URL.createObjectURL(blobCache[n.id]);
+  return blobCache[n.id];
+}
+
+/* ========== 화면 표시(글·PDF·기타 파일) ========== */
+const MOBILE = /Android|iPhone|iPad|iPod|KAKAOTALK/i.test(navigator.userAgent);
+let pdfjsLoading = null;
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve();
+  if (pdfjsLoading) return pdfjsLoading;
+  pdfjsLoading = new Promise((resolve, reject) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+    sc.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; resolve(); };
+    sc.onerror = () => { pdfjsLoading = null; reject(new Error('PDF 표시 도구를 불러오지 못했습니다.')); };
+    document.head.appendChild(sc);
+  });
+  return pdfjsLoading;
+}
+async function drawPages(wrap, blob) {
+  await loadPdfJs();
+  const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(await readBuf(blob)) }).promise;
+  const width = Math.max(280, wrap.clientWidth || 320), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  for (let pg = 1; pg <= pdf.numPages; pg++) {
+    const page = await pdf.getPage(pg), base = page.getViewport({ scale: 1 });
+    const vp = page.getViewport({ scale: (width / base.width) * dpr });
+    const cv = document.createElement('canvas');
+    cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+    cv.style.cssText = 'width:100%;height:auto;display:block;margin-bottom:8px;border:1px solid #cbd5e1;background:#fff';
+    await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+    wrap.appendChild(cv);
+  }
+}
+async function fillSlot(slot, uid, n) {
+  if (n.type === 'text') { slot.innerHTML = '<div class="textbody">' + esc(n.text) + '</div>'; return; }
+  slot.innerHTML = '<div class="sub">불러오는 중...</div>';
+  try {
+    const blob = await fileBlob(uid, n), u = urlCache[n.id];
+    const isPdf = /\.pdf$/i.test(n.fileName || '');
+    if (!isPdf) {
+      const ext = ((n.fileName || '').match(/\.([A-Za-z0-9]+)$/) || [, ''])[1].toLowerCase();
+      const icon = { hwp:'📘',hwpx:'📘',xls:'📗',xlsx:'📗',csv:'📗',doc:'📄',docx:'📄',ppt:'📙',pptx:'📙',txt:'📄' }[ext] || '📎';
+      slot.innerHTML = '<div class="item" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0">' +
+        '<span style="font-size:32px">' + icon + '</span>' +
+        '<div style="flex:1 1 180px;min-width:0;word-break:break-all"><div style="font-weight:700">' + esc(n.fileName || '파일') + '</div><div class="sub" style="font-size:13px">' + esc(fmtSize(n.size)) + '</div></div>' +
+        '<a class="btn" href="' + u + '" download="' + esc(n.fileName || 'file') + '">⬇ 파일 받기</a></div>' +
+        '<div class="sub" style="font-size:12.5px;margin-top:6px">카카오톡 안에서 받아지지 않으면 오른쪽 위 메뉴에서 "다른 브라우저로 열기"를 눌러 주세요.</div>';
+      return;
+    }
+    const links = '<div style="margin-top:6px;font-size:13px"><a href="' + u + '" download="' + esc(n.fileName || 'notice.pdf') + '">PDF 파일 받기</a>' +
+      (MOBILE ? '' : ' · <a href="' + u + '" target="_blank" rel="noopener">새 창에서 크게 보기 ↗</a>') + '</div>';
+    if (MOBILE) {
+      slot.innerHTML = '<div class="pages"></div>' + links;
+      try { await drawPages(slot.querySelector('.pages'), blob); return; } catch (e) { console.warn('쪽별 표시 실패, 기본 보기로 전환', e); }
+    }
+    slot.innerHTML = '<iframe src="' + u + '#toolbar=1&view=FitH" title="' + esc(n.title) + '" style="width:100%;height:75vh;min-height:420px;border:1px solid #cbd5e1;border-radius:8px;background:#fff"></iframe>' + links;
+  } catch (e) {
+    console.error(e);
+    slot.innerHTML = '<div style="color:#b91c1c;font-size:14px">불러오지 못했습니다.</div>';
+  }
+}
+function renderList(el, list, uid, canDelete) {
+  if (!list.length) { el.innerHTML = '<div class="sub">등록된 글·파일이 없습니다.</div>'; return; }
+  let html = '';
+  list.forEach((n, i) => {
+    const head = (n.channelName ? '<span class="tag">' + esc(n.channelName) + '</span>' : '') + '<strong>' + esc(n.title) + '</strong> <span class="sub" style="font-size:13px">' + esc(fmtDate(n.createdAt)) + '</span>';
+    const del = canDelete ? ' <button type="button" class="btn gray sm" data-del="' + esc(n.id) + '">삭제</button>' : '';
+    if (i === 0) html += '<div class="item" style="border-color:#bae6fd"><div style="margin-bottom:8px">🆕 ' + head + del + '</div><div class="slot" data-auto="' + esc(n.id) + '"></div></div>';
+    else html += '<details class="item" data-id="' + esc(n.id) + '"><summary>' + head + '</summary><div style="margin:8px 0">' + del + '</div><div class="slot"></div></details>';
+  });
+  el.innerHTML = html;
+  const first = el.querySelector('[data-auto]');
+  if (first) fillSlot(first, uid, list[0]);
+  el.querySelectorAll('details[data-id]').forEach(d => d.addEventListener('toggle', () => {
+    const slot = d.querySelector('.slot');
+    if (d.open && slot && !slot.innerHTML) { const n = list.find(x => x.id === d.getAttribute('data-id')); if (n) fillSlot(slot, uid, n); }
+  }));
+  if (canDelete) el.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => removeNotice(b.getAttribute('data-del'))));
+}
+
+/* ========== 삭제·만료 ========== */
+async function deleteNotice(uid, n) {
+  const ref = col(uid).doc(n.id);
+  const chunks = await ref.collection('chunks').get();
+  if (!chunks.empty) { const b = db.batch(); chunks.docs.forEach(d => b.delete(d.ref)); await b.commit(); }
+  await ref.delete();
+  if (urlCache[n.id]) { URL.revokeObjectURL(urlCache[n.id]); delete urlCache[n.id]; delete blobCache[n.id]; }
+}
+async function dropExpired(uid, list) {
+  const cutoff = Date.now() - EXPIRE_MS, keep = [], old = [];
+  list.forEach(n => { const t = n.createdAt && n.createdAt.toDate ? n.createdAt.toDate().getTime() : null; (t !== null && t < cutoff ? old : keep).push(n); });
+  if (old.length && me && me.uid === uid) for (const n of old) { try { await deleteNotice(uid, n); } catch (e) { console.warn('만료 삭제 실패', e); } }
+  return keep;
+}
+async function removeNotice(id) {
+  const n = myNotices.find(x => x.id === id); if (!n) return;
+  if (!confirm('"' + n.title + '" 을(를) 삭제할까요? 삭제하면 되돌릴 수 없습니다.')) return;
+  try { await deleteNotice(me.uid, n); await loadMine(); toast('삭제했습니다.'); } catch (e) { console.error(e); alert('삭제에 실패했습니다: ' + (e.message || e)); }
+}
+
+/* ========== 공개 열람 (?notice=uid&c=채널) ========== */
+async function showPublic(uid, channel) {
+  const el = $('pubList');
+  try {
+    let list;
+    if (channel) {
+      const snap = await col(uid).where('channel', '==', channel).limit(50).get();
+      list = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+      list.sort((a, b) => (b.createdAt && b.createdAt.toDate ? b.createdAt.toDate().getTime() : 0) - (a.createdAt && a.createdAt.toDate ? a.createdAt.toDate().getTime() : 0));
+    } else {
+      const snap = await col(uid).orderBy('createdAt', 'desc').limit(30).get();
+      list = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    }
+    list = await dropExpired(uid, list);
+    if (channel && list.length && list[0].channelName) { $('pubTitle').textContent = '📢 ' + list[0].channelName; document.title = list[0].channelName; }
+    renderList(el, list, uid, false);
+  } catch (e) {
+    console.error(e);
+    el.innerHTML = '<div style="color:#b91c1c">불러오지 못했습니다. 링크가 올바른지 확인해 주세요.</div>';
+  }
+}
+
+/* ========== 내 공유 링크 ========== */
+async function loadChannels() {
+  channels = [];
+  try {
+    const m = await metaRef(me.uid).get();
+    if (m.exists) channels = (m.data().list || []).filter(c => c && c.id && c.name);
+    else {   // 예전 자료취합 담당자 화면에서 만든 링크가 있으면 이어받기
+      const old = await db.collection('managers').doc(me.uid).get();
+      if (old.exists && Array.isArray(old.data().noticeChannels) && old.data().noticeChannels.length) {
+        channels = old.data().noticeChannels.filter(c => c && c.id && c.name).slice(0, MAX_CHANNELS);
+        await metaRef(me.uid).set({ list: channels });
+      }
+    }
+  } catch (e) { console.warn('링크 목록 읽기 실패', e); }
+}
+function linkRow(label, url, id) {
+  return '<div class="link"><div style="font-weight:700;margin-bottom:6px">' + esc(label) + '</div><div class="row">' +
+    '<input type="text" readonly value="' + esc(url) + '" onclick="this.select()" style="flex:1 1 240px;width:auto;font-size:13.5px">' +
+    '<button type="button" class="btn sm" data-copy="' + esc(url) + '">링크 복사</button>' +
+    '<button type="button" class="btn green sm" data-share="' + esc(url) + '" data-t="' + esc(label) + '">공유하기</button>' +
+    (id ? '<button type="button" class="btn gray sm" data-rm="' + esc(id) + '">삭제</button>' : '') + '</div></div>';
+}
+function renderLinks() {
+  let html = linkRow('전체 보기 (모든 글·파일이 한곳에)', urlOf(null), null);
+  channels.forEach(c => { html += linkRow(c.name, urlOf(c), c.id); });
+  $('linkList').innerHTML = html;
+  $('linkList').querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => copyText(b.getAttribute('data-copy'))));
+  $('linkList').querySelectorAll('[data-share]').forEach(b => b.addEventListener('click', () => {
+    const u = b.getAttribute('data-share');
+    if (navigator.share) navigator.share({ title: b.getAttribute('data-t') || '공지', url: u }).catch(() => {}); else copyText(u);
+  }));
+  $('linkList').querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => removeChannel(b.getAttribute('data-rm'))));
+  const sel = $('chanSel'), prev = sel.value;
+  sel.innerHTML = '<option value="">전체 보기 링크에만 올리기</option>' + channels.map(c => '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>').join('');
+  sel.value = prev && channels.some(c => c.id === prev) ? prev : (channels[0] ? channels[0].id : '');
+}
+function copyText(t) {
+  const ok = () => { $('linkMsg').textContent = '✅ 링크가 복사되었습니다. 카톡에 붙여넣기 하세요.'; };
+  const fb = () => { const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); ok(); } catch (e) { $('linkMsg').textContent = '복사하지 못했습니다. 입력칸을 눌러 직접 복사해 주세요.'; } document.body.removeChild(ta); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, fb); else fb();
+}
+async function saveChannels(arr) { await metaRef(me.uid).set({ list: arr }); channels = arr; }
+async function addChannel() {
+  const name = ($('newChannel').value || '').trim();
+  if (!name) { alert('링크 이름을 입력해주세요.'); return; }
+  if (channels.length >= MAX_CHANNELS) { alert('링크는 최대 ' + MAX_CHANNELS + '개까지 만들 수 있습니다.'); return; }
+  if (channels.some(c => c.name === name)) { alert('같은 이름의 링크가 이미 있습니다.'); return; }
+  const A = 'abcdefghjkmnpqrstuvwxyz23456789', rnd = new Uint8Array(8); crypto.getRandomValues(rnd);
+  let id = ''; for (let i = 0; i < rnd.length; i++) id += A[rnd[i] % A.length];
+  try {
+    await saveChannels(channels.concat([{ id, name }]));
+    $('newChannel').value = ''; renderLinks(); $('chanSel').value = id;
+    $('linkMsg').textContent = '✅ 새 링크가 만들어졌습니다. [링크 복사]를 눌러 카톡에 붙여넣으세요.';
+  } catch (e) { console.error(e); alert('링크를 만들지 못했습니다: ' + (e.message || e)); }
+}
+async function removeChannel(id) {
+  const c = channels.find(x => x.id === id); if (!c) return;
+  if (!confirm('"' + c.name + '" 링크를 목록에서 삭제할까요?\n\n이미 올린 글·파일은 지워지지 않고 "전체 보기"에 남습니다.\n이미 카톡에 올린 이 링크 주소는 계속 열릴 수 있습니다.')) return;
+  try { await saveChannels(channels.filter(x => x.id !== id)); renderLinks(); } catch (e) { console.error(e); alert('삭제하지 못했습니다: ' + (e.message || e)); }
+}
+
+/* ========== 올리기 ========== */
+function chanFields() {
+  const c = channels.find(x => x.id === $('chanSel').value);
+  return c ? { channel: c.id, channelName: c.name } : {};
+}
+function kind() { return document.querySelector('input[name=kind]:checked').value; }
+async function upload() {
+  const title = ($('titleIn').value || '').trim();
+  if (!title) { alert('제목을 입력해주세요.'); return; }
+  const btn = $('uploadBtn'), msg = $('upMsg');
+  btn.disabled = true;
+  try {
+    const uid = me.uid;
+    if (kind() === 'text') {
+      const text = ($('textIn').value || '').replace(/\s+$/, '');
+      if (!text.trim()) { alert('내용을 입력해주세요.'); return; }
+      msg.textContent = '저장 중...';
+      await col(uid).add(Object.assign({ title, type: 'text', text, createdAt: firebase.firestore.FieldValue.serverTimestamp() }, chanFields()));
+      $('textIn').value = '';
+    } else {
+      const file = $('fileIn').files && $('fileIn').files[0];
+      if (!file) { alert('올릴 파일을 선택해주세요.'); return; }
+      const m = file.name.match(/\.([A-Za-z0-9]+)$/), ext = m ? m[1].toLowerCase() : '';
+      if (ALLOWED_EXT.indexOf(ext) < 0) { alert('올릴 수 있는 파일: PDF, 한글(hwp·hwpx), 엑셀(xls·xlsx·csv), 워드(doc·docx), 파워포인트(ppt·pptx), 텍스트(txt)'); return; }
+      if (file.size > MAX_BYTES) { alert((MAX_BYTES / 1048576) + 'MB 이하의 파일만 올릴 수 있습니다. (용량이 크면 파일을 줄여서 올려주세요)'); return; }
+      if (ext === 'pdf') {
+        const head = new Uint8Array(await readBuf(file.slice(0, 5)));
+        if (String.fromCharCode.apply(null, head) !== '%PDF-') { alert('올바른 PDF 파일이 아닙니다.'); return; }
+      }
+      const count = Math.ceil(file.size / CHUNK), ref = col(uid).doc(), batch = db.batch();
+      for (let i = 0; i < count; i++) {
+        batch.set(ref.collection('chunks').doc((i < 10 ? '0' : '') + i), { i, data: await sliceToBase64(file.slice(i * CHUNK, (i + 1) * CHUNK)) });
+        msg.textContent = '파일 준비 중... (' + (i + 1) + '/' + count + ')';
+      }
+      batch.set(ref, Object.assign({ title, fileName: file.name.replace(/\.[A-Za-z0-9]+$/, '') + '.' + ext, size: file.size, chunks: count, createdAt: firebase.firestore.FieldValue.serverTimestamp() }, chanFields()));
+      msg.textContent = '저장 중...';
+      await batch.commit();
+      $('fileIn').value = '';
+    }
+    $('titleIn').value = '';
+    msg.textContent = '✅ 올렸습니다.';
+    await loadMine();
+  } catch (e) {
+    console.error(e); msg.textContent = '';
+    alert('올리지 못했습니다: ' + (e.message || e));
+  } finally { btn.disabled = false; }
+}
+async function loadMine() {
+  try {
+    const snap = await col(me.uid).orderBy('createdAt', 'desc').limit(50).get();
+    myNotices = await dropExpired(me.uid, snap.docs.map(d => Object.assign({ id: d.id }, d.data())));
+  } catch (e) { console.error(e); myNotices = []; $('myList').innerHTML = '<div style="color:#b91c1c">목록을 불러오지 못했습니다.</div>'; return; }
+  renderList($('myList'), myNotices, me.uid, true);
+}
+
+/* ========== 로그인 ========== */
+const isPub = /[?&]notice=/.test(location.search);
+if (isPub) {
+  const m = location.search.match(/[?&]notice=([^&#]+)/), c = location.search.match(/[?&]c=([^&#]+)/);
+  const uid = decodeURIComponent(m[1]), ch = c ? decodeURIComponent(c[1]) : null;
+  document.title = '기관 공지';
+  if (/^[A-Za-z0-9_-]{10,64}$/.test(uid) && (!ch || /^[a-z0-9]{4,16}$/.test(ch))) showPublic(uid, ch);
+  else $('pubList').innerHTML = '<div style="color:#b91c1c">링크가 올바르지 않습니다.</div>';
+} else {
+  $('googleBtn').addEventListener('click', async () => {
+    const b = $('googleBtn'); b.disabled = true;
+    try { await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+    catch (e) {
+      console.error(e);
+      if (e.code === 'auth/popup-blocked') { try { await auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider()); return; } catch (e2) {} }
+      if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') alert('로그인 중 오류가 발생했습니다: ' + (e.code || e.message));
+    } finally { b.disabled = false; }
+  });
+  $('logoutBtn').addEventListener('click', () => auth.signOut());
+  $('addChannelBtn').addEventListener('click', addChannel);
+  $('uploadBtn').addEventListener('click', upload);
+  document.querySelectorAll('input[name=kind]').forEach(r => r.addEventListener('change', () => {
+    $('textWrap').classList.toggle('hide', kind() !== 'text'); $('fileWrap').classList.toggle('hide', kind() !== 'file');
+  }));
+  auth.onAuthStateChanged(async u => {
+    me = u && !u.isAnonymous ? u : null;
+    $('login').classList.toggle('hide', !!me);
+    $('main').classList.toggle('hide', !me);
+    if (!me) return;
+    $('who').textContent = me.email || '';
+    await loadChannels();
+    renderLinks();
+    await loadMine();
+  });
+}
+</script>
+</body>
+</html>
