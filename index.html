@@ -917,15 +917,26 @@
 
       <!-- 기관 공지 올리기 (PDF 전용) -->
       <div class="q-card" id="noticeManagerCard" style="background:#f0f9ff; border-color:#bae6fd;">
-        <h4 style="color:#0369a1; margin-top:0;">📢 기관 공지 올리기 (PDF)</h4>
-        <p style="font-size:13.2px; color:#075985; margin:4px 0 10px 0;">주간업무 등 공지 파일을 <strong>PDF</strong>로 올리면, 기관이 접속 코드로 들어왔을 때 화면 맨 아래에서 바로 볼 수 있습니다. 가장 최근 공지가 펼쳐져 나오며, <strong>올린 지 30일이 지난 공지는 자동으로 삭제</strong>됩니다. <strong>개인정보가 포함된 문서는 올리지 마세요.</strong></p>
+        <h4 style="color:#0369a1; margin-top:0;">📢 기관 공지 올리기</h4>
+        <p style="font-size:13.2px; color:#075985; margin:4px 0 10px 0;">주간업무 등 공지를 <strong>PDF 파일</strong>로 올리거나 <strong>글로 직접</strong> 쓰면, 기관이 접속 코드로 들어왔을 때 화면 맨 아래에서 바로 볼 수 있습니다. 가장 최근 공지가 펼쳐져 나오며, <strong>올린 지 30일이 지난 공지는 자동으로 삭제</strong>됩니다. <strong>개인정보가 포함된 문서는 올리지 마세요.</strong></p>
         <div class="form-group" style="margin-bottom:8px;">
           <label>공지 제목</label>
           <input type="text" id="noticeTitleInput" maxlength="60" placeholder="예: 11월 2주차 주간업무" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" />
         </div>
         <div class="form-group" style="margin-bottom:8px;">
+          <label>공지 종류</label>
+          <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:15px;">
+            <label style="cursor:pointer;"><input type="radio" name="noticeKind" value="pdf" checked onchange="NoticeBoard.setKind(this.value)" /> 📄 PDF 파일</label>
+            <label style="cursor:pointer;"><input type="radio" name="noticeKind" value="text" onchange="NoticeBoard.setKind(this.value)" /> ✏️ 글 직접 쓰기</label>
+          </div>
+        </div>
+        <div class="form-group" id="noticePdfWrap" style="margin-bottom:8px;">
           <label>PDF 파일 (20MB 이하)</label>
           <input type="file" id="noticeFileInput" accept="application/pdf,.pdf" style="width:100%;" />
+        </div>
+        <div class="form-group hidden" id="noticeTextWrap" style="margin-bottom:8px;">
+          <label>공지 내용 (3,000자 이하)</label>
+          <textarea id="noticeTextInput" maxlength="3000" rows="8" placeholder="공지할 내용을 입력하세요. 줄바꿈은 그대로 표시됩니다." style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:15px; resize:vertical;"></textarea>
         </div>
         <button type="button" class="btn btn-sm" id="noticeUploadBtn" onclick="NoticeBoard.upload()" style="width:auto;">공지 올리기</button>
         <span id="noticeUploadStatus" style="font-size:14px; color:#64748b; margin-left:8px;"></span>
@@ -6795,6 +6806,10 @@ window.NoticeBoard = (function () {
 
   var STORAGE_PREFIX = 'https://firebasestorage.googleapis.com/';
   async function fillFrame(slot, uid, n) {
+    if (n.type === 'text') {   // 글 공지: 파일 없이 내용을 그대로 보여준다
+      slot.innerHTML = '<div style="white-space:pre-wrap; word-break:break-word; line-height:1.7; font-size:16px; color:#0f172a; background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:14px;">' + esc(n.text) + '</div>';
+      return;
+    }
     slot.innerHTML = '<div style="color:#64748b; font-size:14px;">PDF를 불러오는 중...</div>';
     try {
       if (n.url) {   // Storage에 저장된 공지
@@ -6924,8 +6939,45 @@ window.NoticeBoard = (function () {
     render(document.getElementById('noticeSurveyList'), current.list, false, uid);
   }
 
+  var kind = 'pdf';
+  function setKind(k) {
+    kind = k === 'text' ? 'text' : 'pdf';
+    document.getElementById('noticePdfWrap').classList.toggle('hidden', kind === 'text');
+    document.getElementById('noticeTextWrap').classList.toggle('hidden', kind !== 'text');
+  }
+  async function uploadText() {
+    var titleEl = document.getElementById('noticeTitleInput');
+    var textEl = document.getElementById('noticeTextInput');
+    var statusEl = document.getElementById('noticeUploadStatus');
+    var btn = document.getElementById('noticeUploadBtn');
+    var title = (titleEl.value || '').trim();
+    var text = (textEl.value || '').replace(/\s+$/, '');
+    if (!title) { alert('공지 제목을 입력해주세요.'); return; }
+    if (!text.trim()) { alert('공지 내용을 입력해주세요.'); return; }
+    if (text.length > 3000) { alert('3,000자 이하로 입력해주세요.'); return; }
+    btn.disabled = true;
+    statusEl.textContent = '저장 중...';
+    try {
+      var uid = currentUser.id;
+      await col(uid).add({
+        title: title, type: 'text', text: text,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      titleEl.value = ''; textEl.value = '';
+      statusEl.textContent = '✅ 공지가 등록되었습니다.';
+      await load(uid);
+    } catch (e) {
+      console.error('[공지] 글 등록 실패', e);
+      statusEl.textContent = '';
+      alert('등록에 실패했습니다: ' + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   async function upload() {
     if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) { alert('담당자 로그인 후 이용할 수 있습니다.'); return; }
+    if (kind === 'text') return uploadText();
     var titleEl = document.getElementById('noticeTitleInput');
     var fileEl = document.getElementById('noticeFileInput');
     var statusEl = document.getElementById('noticeUploadStatus');
@@ -6994,7 +7046,7 @@ window.NoticeBoard = (function () {
     }
   }
 
-  return { load: load, upload: upload, showPublic: showPublic };
+  return { load: load, upload: upload, showPublic: showPublic, setKind: setKind };
 })();
 
 /* 담당자 화면 진입 시 / 기관 제출 화면 진입 시 공지를 자동으로 불러온다 */
