@@ -13,6 +13,69 @@ const db = admin.firestore();
 // 이제는 브라우저가 이 함수만 호출하고, 실제 비교와 managers 문서 읽기는
 // 전부 서버 쪽(관리자 권한, Firestore 규칙의 영향을 받지 않음)에서 이루어지며,
 // 브라우저에는 비밀번호가 절대 전달되지 않는다.
+// ---------------------------------------------------------------------
+// [신규] 기관별 확인번호(숫자 4자리). 담당자가 기관 명단을 저장하면 기관마다 무작위 번호가
+// 만들어져 managers/{uid}.agencyPins = [{ name, pin }] 에 저장된다. 기관이 제출할 때 자기 기관의
+// 번호를 입력해야 하므로 다른 기관을 잘못 선택해서 제출하는 일을 막는다.
+// 번호가 만들어져 있지 않은 기관(예전 명단, 직접 입력한 기관명)은 번호 없이 기존처럼 제출된다.
+// 무차별 대입을 막기 위해 같은 기관에 10번 틀리면 15분간 잠근다.
+const PIN_MAX_FAILS = 10;
+const PIN_LOCK_MS = 15 * 60 * 1000;
+
+function pinEntryOf(managerData, agencyName) {
+  const arr = Array.isArray(managerData.agencyPins) ? managerData.agencyPins : [];
+  return arr.find((e) => e && String(e.name || "").trim() === agencyName && /^\d{4}$/.test(String(e.pin || ""))) || null;
+}
+
+async function checkAgencyPin(managerUid, managerData, agencyName, pin) {
+  const entry = pinEntryOf(managerData, agencyName);
+  if (!entry) return { ok: true, required: false };
+  const key = crypto.createHash("sha1").update(agencyName).digest("hex");
+  const ref = db.collection("managers").doc(managerUid).collection("pinAttempts").doc(key);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const st = snap.exists ? snap.data() : {};
+    const now = Date.now();
+    if (st.lockedUntil && st.lockedUntil > now) {
+      const min = Math.ceil((st.lockedUntil - now) / 60000);
+      throw new HttpsError("resource-exhausted", "확인번호를 여러 번 틀려 잠시 잠겼습니다. 약 " + min + "분 뒤에 다시 시도해주세요.");
+    }
+    if (String(pin || "").trim() === String(entry.pin)) {
+      if (snap.exists) tx.delete(ref);
+      return { ok: true, required: true };
+    }
+    const fails = (st.fails || 0) + 1;
+    if (fails >= PIN_MAX_FAILS) {
+      tx.set(ref, { fails: 0, lockedUntil: now + PIN_LOCK_MS });
+    } else {
+      tx.set(ref, { fails: fails, lockedUntil: 0 });
+    }
+    return { ok: false, required: true, remaining: Math.max(0, PIN_MAX_FAILS - fails) };
+  });
+}
+
+// 기관이 자기 기관 확인번호를 맞게 입력했는지 미리 확인 (제출 전에 알려주기 위함)
+exports.verifyAgencyPin = onCall({ enforceAppCheck: true }, async (request) => {
+  const data = request.data || {};
+  const agencyCode = String(data.agencyCode || "").trim();
+  const password = String(data.password || "").trim();
+  const agencyName = String(data.agencyName || "").trim();
+  const pin = String(data.pin || "").trim();
+  if (!agencyCode || !password || !agencyName) {
+    throw new HttpsError("invalid-argument", "필수 정보가 누락되었습니다.");
+  }
+  const codeSnap = await db.collection("system").doc("agency_code_index").get();
+  const managerUid = (codeSnap.exists ? codeSnap.data() : {})[agencyCode];
+  if (!managerUid) throw new HttpsError("permission-denied", "존재하지 않는 접속 코드입니다.");
+  const managerSnap = await db.collection("managers").doc(managerUid).get();
+  if (!managerSnap.exists) throw new HttpsError("permission-denied", "존재하지 않는 접속 코드입니다.");
+  const managerData = managerSnap.data();
+  if (!managerData.surveyPw || managerData.surveyPw !== password) {
+    throw new HttpsError("permission-denied", "제출 전용 비밀번호가 올바르지 않습니다.");
+  }
+  return await checkAgencyPin(managerUid, managerData, agencyName, pin);
+});
+
 exports.verifySurveyAccess = onCall({ enforceAppCheck: true }, async (request) => {
   const agencyCode = (request.data && request.data.agencyCode || "").trim();
   const password = (request.data && request.data.password || "").trim();
@@ -43,6 +106,8 @@ exports.verifySurveyAccess = onCall({ enforceAppCheck: true }, async (request) =
     ok: true,
     managerUid: managerUid,
     agencyLists: managerData.agencyLists || [],
+    // 확인번호가 있는 기관 이름만 알려준다 (번호 자체는 절대 포함하지 않음)
+    pinNames: (Array.isArray(managerData.agencyPins) ? managerData.agencyPins : []).map((e) => String((e && e.name) || "").trim()).filter((n) => n),
   };
 });
 
@@ -128,6 +193,12 @@ exports.submitSurveyResponse = onCall({ enforceAppCheck: true }, async (request)
     if (allAgencyNames.length > 0 && !allAgencyNames.includes(agencyName)) {
       throw new HttpsError("permission-denied", "등록된 기관 목록에 없는 기관명입니다.");
     }
+  }
+
+  // 3-1) 기관별 확인번호 (담당자가 번호를 만들어 둔 기관만 해당)
+  const pinResult = await checkAgencyPin(managerUid, managerData, agencyName, String(data.agencyPin || ""));
+  if (!pinResult.ok) {
+    throw new HttpsError("permission-denied", "기관 확인번호가 올바르지 않습니다.");
   }
 
   // 4) 검증 통과 - Admin 권한으로 응답 문서를 대신 기록한다.

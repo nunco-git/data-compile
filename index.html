@@ -521,6 +521,11 @@
                 <label>제출 기관명 직접 입력</label>
                 <input type="text" id="accessAgencyName" placeholder="예: 부여읍 행정복지센터" />
               </div>
+              <div class="form-group hidden" id="agencyPinWrap">
+                <label>기관 확인번호 (숫자 4자리)</label>
+                <input type="password" id="accessAgencyPin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="담당자가 기관별로 안내한 4자리 번호" />
+                <p style="font-size:13.2px; color:#64748b; margin:4px 0 0 0;">우리 기관에 안내된 번호입니다. 다른 기관을 잘못 선택하지 않도록 확인하는 용도입니다.</p>
+              </div>
               <button type="button" class="btn" id="startSurveyAccessBtn" onclick="startSurveyAccessWithAgency()">작성/제출 시작하기</button>
             </div>
           </form>
@@ -3991,12 +3996,94 @@ async function deleteManager(arg637, arg638) {
     return 'list_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
   }
 
+  /* ---- 기관별 확인번호(숫자 4자리, 1000~9999 무작위) ---- */
+  function allAgencyNamesOf(lists) {
+    var seen = {}, out = [];
+    (lists || []).forEach(function (l) {
+      (l.agencies || []).forEach(function (n) {
+        n = String(n || '').trim();
+        if (n && !seen[n]) { seen[n] = true; out.push(n); }
+      });
+    });
+    return out;
+  }
+  function randomPin(used) {
+    var buf = new Uint32Array(1), pin, tries = 0;
+    do {
+      crypto.getRandomValues(buf);
+      pin = String(1000 + (buf[0] % 9000));
+      tries++;
+    } while (used[pin] && tries < 200);
+    return pin;
+  }
+  /* 명단에 있는 기관마다 번호를 만들고(이미 있으면 유지), 명단에서 빠진 기관의 번호는 지운다. 새로 만든 개수를 돌려준다 */
+  function ensureAgencyPins() {
+    if (!currentUser) return 0;
+    var old = Array.isArray(currentUser.agencyPins) ? currentUser.agencyPins : [];
+    var byName = {}, used = {};
+    old.forEach(function (e) { if (e && e.name && /^\d{4}$/.test(String(e.pin || ''))) { byName[String(e.name).trim()] = String(e.pin); } });
+    var names = allAgencyNamesOf(currentUser.agencyLists);
+    var next = [], created = 0;
+    names.forEach(function (n) { if (byName[n]) used[byName[n]] = true; });
+    names.forEach(function (n) {
+      if (!byName[n]) { byName[n] = randomPin(used); used[byName[n]] = true; created++; }
+      next.push({ name: n, pin: byName[n] });
+    });
+    currentUser.agencyPins = next;
+    return created;
+  }
+  window.__lastCreatedPins = 0;
   async function persistAgencyLists() {
     if (!currentUser) return;
+    window.__lastCreatedPins = ensureAgencyPins();
     await db.collection('managers').doc(currentUser.id).update({
-      agencyLists: currentUser.agencyLists || []
+      agencyLists: currentUser.agencyLists || [],
+      agencyPins: currentUser.agencyPins || []
     });
+    renderAgencyPins();
   }
+
+  function csvCell(v) { return '"' + String(v).replace(/"/g, '""') + '"'; }
+  function renderAgencyPins() {
+    var box = document.getElementById('agencyPinPanel'); if (!box) return;
+    var pins = Array.isArray(currentUser && currentUser.agencyPins) ? currentUser.agencyPins : [];
+    var missing = allAgencyNamesOf(currentUser && currentUser.agencyLists).length - pins.length;
+    var rows = pins.map(function (e, i) {
+      return '<tr><td style="padding:4px 8px; border-bottom:1px solid #e2e8f0;">' + escapeHtmlPin(e.name) + '</td>' +
+        '<td style="padding:4px 8px; border-bottom:1px solid #e2e8f0; font-weight:800; letter-spacing:2px; font-size:16px;">' + e.pin + '</td>' +
+        '<td style="padding:4px 8px; border-bottom:1px solid #e2e8f0;"><button type="button" class="btn btn-secondary btn-sm" style="width:auto;" onclick="reissueAgencyPin(' + i + ')">다시 만들기</button></td></tr>';
+    }).join('');
+    box.innerHTML =
+      '<h4 style="color:#166534; margin:12px 0 4px 0;">🔢 기관별 확인번호 (숫자 4자리)</h4>' +
+      '<p style="font-size:14.1px; color:#475569; margin:0 0 8px 0;">명단을 저장하면 기관마다 무작위 번호가 자동으로 만들어집니다. 기관에는 <strong>자기 기관의 번호만</strong> 알려주세요. 제출할 때 이 번호를 입력해야 하므로 다른 기관을 잘못 골라 제출하는 일을 막을 수 있습니다.</p>' +
+      (pins.length ? '<div style="max-height:260px; overflow:auto; border:1px solid #e2e8f0; border-radius:6px; background:#fff;"><table style="width:100%; border-collapse:collapse; font-size:14.5px;"><tr style="background:#f1f5f9;"><th style="text-align:left; padding:4px 8px;">기관명</th><th style="text-align:left; padding:4px 8px;">확인번호</th><th></th></tr>' + rows + '</table></div>' +
+        '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;"><button type="button" class="btn btn-secondary btn-sm" onclick="downloadAgencyPinsCsv()">📥 엑셀(CSV)로 받기</button><button type="button" class="btn btn-secondary btn-sm" onclick="copyAgencyPins()">📋 전체 복사</button></div>'
+        : '<div style="font-size:14.1px; color:#94a3b8;">아직 만들어진 번호가 없습니다. 명단을 저장하면 만들어집니다.</div>') +
+      (missing > 0 ? '<div style="margin-top:8px;"><button type="button" class="btn btn-sm" onclick="makeMissingAgencyPins()">번호 없는 기관 ' + missing + '곳 번호 만들기</button></div>' : '');
+  }
+  function escapeHtmlPin(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  window.reissueAgencyPin = async function (i) {
+    var e = currentUser.agencyPins && currentUser.agencyPins[i]; if (!e) return;
+    if (!confirm('"' + e.name + '"의 확인번호를 새로 만들까요?\n기존 번호는 더 이상 쓸 수 없고, 기관에 새 번호를 다시 알려야 합니다.')) return;
+    var used = {}; currentUser.agencyPins.forEach(function (x) { used[x.pin] = true; });
+    e.pin = randomPin(used);
+    try { await db.collection('managers').doc(currentUser.id).update({ agencyPins: currentUser.agencyPins }); renderAgencyPins(); }
+    catch (err) { alert('저장 중 오류가 발생했습니다: ' + err.message); }
+  };
+  window.makeMissingAgencyPins = async function () {
+    try { var n = ensureAgencyPins(); await db.collection('managers').doc(currentUser.id).update({ agencyPins: currentUser.agencyPins }); renderAgencyPins(); alert(n + '곳의 확인번호를 만들었습니다. 기관에 번호를 안내해주세요.'); }
+    catch (err) { alert('저장 중 오류가 발생했습니다: ' + err.message); }
+  };
+  window.downloadAgencyPinsCsv = function () {
+    var lines = ['기관명,확인번호'].concat((currentUser.agencyPins || []).map(function (e) { return csvCell(e.name) + ',' + csvCell(e.pin); }));
+    var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '기관별_확인번호.csv';
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  };
+  window.copyAgencyPins = function () {
+    var txt = (currentUser.agencyPins || []).map(function (e) { return e.name + '\t' + e.pin; }).join('\n');
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { alert('복사했습니다. 엑셀이나 메모장에 붙여넣으세요.'); }, function () { prompt('아래 내용을 복사하세요.', txt); });
+  };
 
   function getSelectedList() {
     ensureAgencyListsArray();
@@ -4049,6 +4136,7 @@ async function deleteManager(arg637, arg638) {
       '<p style="font-size:14.1px; color:#94a3b8; margin:4px 0 0 0;">기관에서 제출할 때 입력하는 "기관명(제출 시 표시되는 이름)"과 정확히 같은 문자열이어야 필터링이 적용됩니다.</p>' +
       '</div>' +
       '</div>' +
+      '<div id="agencyPinPanel" style="grid-column:1 / -1;"></div>' +
       '</div>';
 
     if (slot) {
@@ -4082,6 +4170,7 @@ async function deleteManager(arg637, arg638) {
     }
 
     renderRoundTargetListStatus();
+    try { renderAgencyPins(); } catch (e) { }
   }
 
   function renderRoundTargetListStatus() {
@@ -4184,7 +4273,7 @@ async function deleteManager(arg637, arg638) {
       renderAgencyListSelects();
       var freshSel = document.getElementById('agencyListSelect');
       if (freshSel) freshSel.value = list.id;
-      alert('명단이 저장되었습니다.');
+      alert('명단이 저장되었습니다.' + (window.__lastCreatedPins ? '\n\n새로 ' + window.__lastCreatedPins + '곳의 기관 확인번호(숫자 4자리)가 만들어졌습니다.\n아래 "기관별 확인번호"에서 확인해 기관별로 안내해주세요.' : ''));
     } catch (e) {
       console.error(e);
       alert('명단 저장 중 오류가 발생했습니다: ' + e.message);
@@ -5275,6 +5364,7 @@ async function deleteManager(arg637, arg638) {
         password: verified.password,
         roundId: activeSurveyInfo.roundId,
         agencyName: activeSurveyInfo.agencyName,
+        agencyPin: (verified.pinAgency === activeSurveyInfo.agencyName ? (verified.pin || '') : ''),
         payload: docData
       });
 
@@ -6552,7 +6642,8 @@ window.renderCustomSurvey = function () {
         managerUid: data.managerUid,
         agencyCode: agencyCode,
         password: pw,
-        agencyLists: lists
+        agencyLists: lists,
+        pinNames: data.pinNames || []
       };
 
       var choices = buildAgencyChoices(openRounds, lists);
@@ -6617,6 +6708,25 @@ window.renderCustomSurvey = function () {
     btn.disabled = true;
     btn.textContent = '확인 중...';
     try {
+      /* 기관별 확인번호: 담당자가 번호를 만들어 둔 기관이면 4자리를 서버에서 확인한다 */
+      if ((verified.pinNames || []).indexOf(agencyName) >= 0) {
+        var pinVal = ((document.getElementById('accessAgencyPin') || {}).value || '').trim();
+        if (!/^\d{4}$/.test(pinVal)) {
+          alert('"' + agencyName + '"의 기관 확인번호(숫자 4자리)를 입력해주세요.\n번호는 담당자가 기관별로 안내합니다.');
+          return;
+        }
+        var pinRes = await firebase.functions().httpsCallable('verifyAgencyPin')({
+          agencyCode: verified.agencyCode, password: verified.password, agencyName: agencyName, pin: pinVal
+        });
+        if (!pinRes.data || !pinRes.data.ok) {
+          alert('기관 확인번호가 올바르지 않습니다.\n선택한 기관이 맞는지, 번호를 다시 확인해주세요.' +
+            (pinRes.data && typeof pinRes.data.remaining === 'number' ? '\n(남은 시도 ' + pinRes.data.remaining + '회)' : ''));
+          return;
+        }
+        verified.pin = pinVal; verified.pinAgency = agencyName;
+      } else {
+        verified.pin = ''; verified.pinAgency = '';
+      }
       var lists = verified.agencyLists || [];
       var openRounds = (await fetchSubmittableRounds(verified.managerUid))
         .filter(function (r) { return roundAllowsAgency(r, lists, agencyName); });
@@ -6641,6 +6751,23 @@ window.renderCustomSurvey = function () {
       btn.textContent = '작성/제출 시작하기';
     }
   };
+
+  // 기관 확인번호 입력칸: 선택한 기관에 번호가 있을 때만 보인다
+  function updateAgencyPinWrap() {
+    var wrap = document.getElementById('agencyPinWrap'); if (!wrap) return;
+    var v = window.__verifiedAccess || {};
+    var sel = document.getElementById('accessAgencyNameSelect');
+    var manual = document.getElementById('accessAgencyName');
+    var selVisible = sel && !document.getElementById('agencyNameSelectWrap').classList.contains('hidden');
+    var nm = (selVisible && sel.value && sel.value !== MANUAL_OPTION_VALUE) ? sel.value : normName(manual ? manual.value : '');
+    wrap.classList.toggle('hidden', (v.pinNames || []).indexOf(normName(nm)) < 0);
+  }
+  (function () {
+    var sel = document.getElementById('accessAgencyNameSelect');
+    var manual = document.getElementById('accessAgencyName');
+    if (sel) sel.addEventListener('change', updateAgencyPinWrap);
+    if (manual) manual.addEventListener('input', updateAgencyPinWrap);
+  })();
 
   // ---------------- 담당자: 명단 선택창 ↔ 입력칸 동기화 ----------------
   var editorListId = null; // 아래 입력칸에 현재 불러와져 있는 명단 id
