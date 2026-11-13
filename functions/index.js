@@ -14,47 +14,55 @@ const db = admin.firestore();
 // 전부 서버 쪽(관리자 권한, Firestore 규칙의 영향을 받지 않음)에서 이루어지며,
 // 브라우저에는 비밀번호가 절대 전달되지 않는다.
 // ---------------------------------------------------------------------
-// [신규] 기관별 확인번호(숫자 4자리). 담당자가 기관 명단을 저장하면 기관마다 무작위 번호가
-// 만들어져 managers/{uid}.agencyPins = [{ name, pin }] 에 저장된다. 기관이 제출할 때 자기 기관의
-// 번호를 입력해야 하므로 다른 기관을 잘못 선택해서 제출하는 일을 막는다.
-// 번호가 만들어져 있지 않은 기관(예전 명단, 직접 입력한 기관명)은 번호 없이 기존처럼 제출된다.
+// [신규] 기관 비밀번호(숫자 4자리). 기관이 "최초로 자료를 제출할 때" 스스로 정하고,
+// 그 뒤로는 같은 기관명으로 접속·제출할 때마다 이 번호를 입력해야 한다.
+// 다른 기관을 잘못 선택해서 제출하는 일을 막기 위한 장치이다.
+// 번호는 managers/{uid}.agencyPinMap[키] = { name, pin, at } 에만 저장되고,
+// 기관 화면에는 절대 전달되지 않는다 (담당자 본인만 자기 문서를 읽을 수 있다).
+// 키는 기관명을 UTF-8 16진수로 바꾼 값이다. 담당자가 번호를 초기화하면 기관이 다시 정할 수 있다.
 // 무차별 대입을 막기 위해 같은 기관에 10번 틀리면 15분간 잠근다.
 const PIN_MAX_FAILS = 10;
 const PIN_LOCK_MS = 15 * 60 * 1000;
 
+const pinKeyOf = (agencyName) => "k" + Buffer.from(String(agencyName), "utf8").toString("hex");
 function pinEntryOf(managerData, agencyName) {
-  const arr = Array.isArray(managerData.agencyPins) ? managerData.agencyPins : [];
-  return arr.find((e) => e && String(e.name || "").trim() === agencyName && /^\d{4}$/.test(String(e.pin || ""))) || null;
+  const map = managerData.agencyPinMap && typeof managerData.agencyPinMap === "object" ? managerData.agencyPinMap : {};
+  const e = map[pinKeyOf(agencyName)];
+  return e && /^\d{4}$/.test(String(e.pin || "")) ? e : null;
 }
 
-async function checkAgencyPin(managerUid, managerData, agencyName, pin) {
-  const entry = pinEntryOf(managerData, agencyName);
-  if (!entry) return { ok: true, required: false };
-  const key = crypto.createHash("sha1").update(agencyName).digest("hex");
-  const ref = db.collection("managers").doc(managerUid).collection("pinAttempts").doc(key);
+// 기관 번호 확인. 아직 번호가 없는 기관이면 allowCreate일 때 입력한 번호로 새로 정한다.
+async function checkAgencyPin(managerUid, agencyName, pin, allowCreate) {
+  pin = String(pin || "").trim();
+  const mRef = db.collection("managers").doc(managerUid);
+  const aRef = mRef.collection("pinAttempts").doc(crypto.createHash("sha1").update(agencyName).digest("hex"));
   return db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    const st = snap.exists ? snap.data() : {};
+    const [mSnap, aSnap] = await Promise.all([tx.get(mRef), tx.get(aRef)]);
+    const entry = pinEntryOf(mSnap.exists ? mSnap.data() : {}, agencyName);
+    if (!entry) {
+      if (!allowCreate) return { ok: true, isNew: true };
+      if (!/^\d{4}$/.test(pin)) return { ok: false, isNew: true, reason: "NEED_NEW_PIN" };
+      tx.update(mRef, { ["agencyPinMap." + pinKeyOf(agencyName)]: { name: agencyName, pin: pin, at: Date.now() } });
+      return { ok: true, isNew: true, created: true };
+    }
+    const st = aSnap.exists ? aSnap.data() : {};
     const now = Date.now();
     if (st.lockedUntil && st.lockedUntil > now) {
       const min = Math.ceil((st.lockedUntil - now) / 60000);
-      throw new HttpsError("resource-exhausted", "확인번호를 여러 번 틀려 잠시 잠겼습니다. 약 " + min + "분 뒤에 다시 시도해주세요.");
+      throw new HttpsError("resource-exhausted", "기관 비밀번호를 여러 번 틀려 잠시 잠겼습니다. 약 " + min + "분 뒤에 다시 시도해주세요.");
     }
-    if (String(pin || "").trim() === String(entry.pin)) {
-      if (snap.exists) tx.delete(ref);
-      return { ok: true, required: true };
+    if (pin === String(entry.pin)) {
+      if (aSnap.exists) tx.delete(aRef);
+      return { ok: true, isNew: false };
     }
     const fails = (st.fails || 0) + 1;
-    if (fails >= PIN_MAX_FAILS) {
-      tx.set(ref, { fails: 0, lockedUntil: now + PIN_LOCK_MS });
-    } else {
-      tx.set(ref, { fails: fails, lockedUntil: 0 });
-    }
-    return { ok: false, required: true, remaining: Math.max(0, PIN_MAX_FAILS - fails) };
+    if (fails >= PIN_MAX_FAILS) tx.set(aRef, { fails: 0, lockedUntil: now + PIN_LOCK_MS });
+    else tx.set(aRef, { fails: fails, lockedUntil: 0 });
+    return { ok: false, isNew: false, reason: "WRONG_PIN", remaining: Math.max(0, PIN_MAX_FAILS - fails) };
   });
 }
 
-// 기관이 자기 기관 확인번호를 맞게 입력했는지 미리 확인 (제출 전에 알려주기 위함)
+// 제출 전에 기관 비밀번호를 미리 확인 (처음 정하는 기관이면 isNew:true 만 알려주고 아무것도 저장하지 않는다)
 exports.verifyAgencyPin = onCall({ enforceAppCheck: true }, async (request) => {
   const data = request.data || {};
   const agencyCode = String(data.agencyCode || "").trim();
@@ -73,7 +81,7 @@ exports.verifyAgencyPin = onCall({ enforceAppCheck: true }, async (request) => {
   if (!managerData.surveyPw || managerData.surveyPw !== password) {
     throw new HttpsError("permission-denied", "제출 전용 비밀번호가 올바르지 않습니다.");
   }
-  return await checkAgencyPin(managerUid, managerData, agencyName, pin);
+  return await checkAgencyPin(managerUid, agencyName, pin, false);
 });
 
 exports.verifySurveyAccess = onCall({ enforceAppCheck: true }, async (request) => {
@@ -106,8 +114,9 @@ exports.verifySurveyAccess = onCall({ enforceAppCheck: true }, async (request) =
     ok: true,
     managerUid: managerUid,
     agencyLists: managerData.agencyLists || [],
-    // 확인번호가 있는 기관 이름만 알려준다 (번호 자체는 절대 포함하지 않음)
-    pinNames: (Array.isArray(managerData.agencyPins) ? managerData.agencyPins : []).map((e) => String((e && e.name) || "").trim()).filter((n) => n),
+    // 기관 비밀번호가 이미 정해진 기관의 '이름'만 알려준다 (번호 자체는 절대 포함하지 않음)
+    pinNames: Object.values(managerData.agencyPinMap && typeof managerData.agencyPinMap === "object" ? managerData.agencyPinMap : {})
+      .map((e) => String((e && e.name) || "").trim()).filter((n) => n),
   };
 });
 
@@ -195,10 +204,15 @@ exports.submitSurveyResponse = onCall({ enforceAppCheck: true }, async (request)
     }
   }
 
-  // 3-1) 기관별 확인번호 (담당자가 번호를 만들어 둔 기관만 해당)
-  const pinResult = await checkAgencyPin(managerUid, managerData, agencyName, String(data.agencyPin || ""));
+  // 3-1) 기관 비밀번호(숫자 4자리): 이미 정해진 기관이면 일치해야 하고, 처음 제출하는 기관이면 이번에 정한 번호를 저장한다.
+  const pinResult = await checkAgencyPin(managerUid, agencyName, String(data.agencyPin || ""), true);
   if (!pinResult.ok) {
-    throw new HttpsError("permission-denied", "기관 확인번호가 올바르지 않습니다.");
+    throw new HttpsError(
+      "permission-denied",
+      pinResult.reason === "NEED_NEW_PIN"
+        ? "처음 제출하는 기관은 사용할 기관 비밀번호(숫자 4자리)를 정해 입력해야 합니다."
+        : "기관 비밀번호가 올바르지 않습니다."
+    );
   }
 
   // 4) 검증 통과 - Admin 권한으로 응답 문서를 대신 기록한다.
