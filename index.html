@@ -430,32 +430,6 @@
               Google 계정으로 로그인
             </button>
 
-            <!-- 링크 입력 취합 바로가기 -->
-            <a href="https://nunco-git.github.io/hwpxexcelonmerge/" onclick="openLinkOverlay(event)"
-               style="display:block; margin-top:16px; text-decoration:none; background:linear-gradient(160deg,#eff6ff 0%,#dbeafe 100%); border:1.5px solid #93c5fd; border-radius:12px; padding:14px 16px; text-align:center; transition:box-shadow 0.2s ease, transform 0.15s ease;"
-               onmouseover="this.style.boxShadow='0 6px 16px rgba(37,99,235,0.18)'; this.style.transform='translateY(-1px)';"
-               onmouseout="this.style.boxShadow='none'; this.style.transform='none';">
-              <span style="display:block; font-size:17.4px; font-weight:800; color:#1d4ed8;">🔗 링크 입력 취합 바로가기 →</span>
-              <span style="display:block; margin-top:5px; font-size:14.3px; font-weight:600; color:#1e40af; line-height:1.5;">엑셀이나 한글파일을 실시간으로 부서원과 수정작업 가능</span>
-            </a>
-
-            <!-- 변수 입력 취합 바로가기 -->
-            <a href="https://nunco-git.github.io/variablehwpx/" onclick="openVarOverlay(event)"
-               style="display:block; margin-top:12px; text-decoration:none; background:linear-gradient(160deg,#fff7ed 0%,#ffedd5 100%); border:1.5px solid #fdba74; border-radius:12px; padding:14px 16px; text-align:center; transition:box-shadow 0.2s ease, transform 0.15s ease;"
-               onmouseover="this.style.boxShadow='0 6px 16px rgba(194,65,12,0.18)'; this.style.transform='translateY(-1px)';"
-               onmouseout="this.style.boxShadow='none'; this.style.transform='none';">
-              <span style="display:block; font-size:17.4px; font-weight:800; color:#9a3412;">📝 변수 입력 취합 바로가기 →</span>
-              <span style="display:block; margin-top:5px; font-size:14.3px; font-weight:600; color:#b45309; line-height:1.5;">한글 문서의 부서명·전화·팩스를 변수로 만들어 여러 명이 입력하고 한 번에 반영</span>
-            </a>
-
-            <!-- 글·파일 올리기 바로가기 (자료취합 담당자 계정과 별개의 board.html, Google 로그인만 하면 누구나) -->
-            <a href="board.html" onclick="openBoardOverlay(event)"
-               style="display:block; margin-top:12px; text-decoration:none; background:linear-gradient(160deg,#f0fdf4 0%,#dcfce7 100%); border:1.5px solid #86efac; border-radius:12px; padding:14px 16px; text-align:center; transition:box-shadow 0.2s ease, transform 0.15s ease;"
-               onmouseover="this.style.boxShadow='0 6px 16px rgba(22,163,74,0.18)'; this.style.transform='translateY(-1px)';"
-               onmouseout="this.style.boxShadow='none'; this.style.transform='none';">
-              <span style="display:block; font-size:17.4px; font-weight:800; color:#166534;">💬 카톡 등 대화창에 글 올리기 · 파일 올리기 →</span>
-              <span style="display:block; margin-top:5px; font-size:14.3px; font-weight:600; color:#15803d; line-height:1.5;">긴 글이나 파일(PDF·한글·엑셀 등)을 올리고 링크를 카톡에 공유 · Google 로그인만 하면 누구나 사용, 행정기관 메일 인증 없음</span>
-            </a>
           </div>
 
           <!-- 담당자 계정 생성 (Google + 성명/접속코드) -->
@@ -656,18 +630,13 @@
         <button type="submit" class="btn" id="surveySubmitBtn" style="margin-top:8px;">제출하기</button>
       </form>
 
-      <!-- 기관 공지 (열람 전용) -->
-      <div class="q-card" id="noticeSurveyCard" style="margin-top:24px; background:#f0f9ff; border-color:#bae6fd;">
-        <h4 style="color:#0369a1; margin-top:0;">📢 기관 공지 <span style="font-size:12.5px; font-weight:normal; color:#64748b;">(올린 지 30일이 지난 공지는 자동 삭제됩니다)</span></h4>
-        <div id="noticeSurveyList"></div>
-      </div>
     </div>
 
     <!-- 3. 업무 담당자 전용 화면 -->
     <div id="viewManager" class="hidden">
       <div class="user-info-bar">
         <span>👤 담당자: <strong id="managerNameDisplay"></strong> <span id="managerEmailDisplay" style="color:#64748b; font-weight:normal;"></span></span>
-        <button class="btn btn-sm" style="width:auto; margin-right:6px; background:#16a34a;" onclick="openBoardOverlay(event)">💬 글·파일 올리기</button><button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
+        <button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
       </div>
 
       <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:stretch; margin-bottom:20px;">
@@ -7180,34 +7149,6 @@ window.NoticeBoard = (function () {
   return { load: load, upload: upload, showPublic: showPublic, setKind: setKind };
 })();
 
-/* 담당자 화면 진입 시 / 기관 제출 화면 진입 시 공지를 자동으로 불러온다 */
-(function () {
-  if (typeof enterAppForUser === 'function') {
-    var origEnter = enterAppForUser;
-    enterAppForUser = async function (user) {
-      var ok = await origEnter.apply(this, arguments);
-      try {
-        if (ok && typeof currentUser !== 'undefined' && currentUser && currentUser.id) {
-          await NoticeBoard.load(currentUser.id);
-          if (window.__goNotice) {
-            window.__goNotice = false;
-            openNoticeOverlay();
-          }
-        }
-      } catch (e) { console.error(e); }
-      return ok;
-    };
-  }
-  if (typeof window.enterSurveyForRound === 'function') {
-    var origRound = window.enterSurveyForRound;
-    window.enterSurveyForRound = function (managerUid) {
-      var r = origRound.apply(this, arguments);
-      try { if (managerUid) NoticeBoard.load(managerUid); } catch (e) { console.error(e); }
-      return r;
-    };
-  }
-})();
-
 /* 첫 화면 "기관 공지 올리기 바로가기" : Google 로그인 → 담당자(서무) 화면 맨 아래 공지 칸으로 이동 */
 window.goNoticeUpload = function (ev) {
   if (ev) ev.preventDefault();
@@ -7343,6 +7284,9 @@ window.NoticeLinks = (function () {
 (function () {
   var m = location.search.match(/[?&]notice=([^&#]+)/);
   if (m && /^[A-Za-z0-9_-]{10,64}$/.test(decodeURIComponent(m[1]))) {
+    /* 글·파일 올리기는 자료취합과 별도 앱(board.html)으로 분리됨: 예전 링크는 그쪽으로 이동 */
+    location.replace('board.html' + location.search);
+    return;
     document.title = '기관 공지';
     var cm = location.search.match(/[?&]c=([^&#]+)/);
     var chan = cm && /^[a-z0-9]{4,16}$/.test(decodeURIComponent(cm[1])) ? decodeURIComponent(cm[1]) : null;
