@@ -857,7 +857,10 @@
               <div id="templateSheetTabs" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
               <button type="button" id="addTemplateSheetBtn" class="btn btn-secondary btn-sm" onclick="addTemplateSheet()">+ 시트 추가</button>
               <button type="button" id="removeTemplateSheetBtn" class="btn btn-danger btn-sm" onclick="removeTemplateSheet()">🗑️ 이 시트 삭제</button>
+              <button type="button" id="importTemplateXlsxBtn" class="btn btn-sm" style="background:#16a34a;" onclick="document.getElementById('templateImportInput').click()">📥 엑셀 파일에서 서식 가져오기</button>
+              <input type="file" id="templateImportInput" accept=".xlsx,.xlsm,.xls,.csv" class="hidden" onchange="importTemplateFromExcel(event)" />
             </div>
+            <div style="font-size:13.5px; color:#475569; margin:-2px 0 8px 0;">💡 엑셀 파일을 <strong>그대로 가져오거나</strong>, 엑셀에서 범위를 복사(Ctrl+C)해 아래 표의 첫 칸을 클릭하고 <strong>붙여넣기(Ctrl+V)</strong> 하세요. 칸이 모자라면 자동으로 늘어납니다. (글자와 열 너비만 가져오며, 병합·테두리·색은 가져오지 않습니다.)</div>
 
             <div id="templateSpreadsheetWrap" style="max-height:360px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px;">
               <div id="templateSpreadsheet"></div>
@@ -7624,6 +7627,89 @@ window.NoticeLinks = (function () {
     if (!confirm('이 공유 양식을 삭제할까요?')) return;
     try { await db.collection('sharedForms').doc(fid).delete(); await db.collection('sharedFormReports').doc(rid).delete(); sfLoadReports(); } catch (e) { alert(e.message); }
   };
+})();
+
+/* ================= 자유 서식: 엑셀 가져오기 / 붙여넣기 시 칸 자동 확장 ================= */
+(function () {
+  var MAX_ROWS = 300, MAX_COLS = 40;
+  function clampW(w) { return Math.max(50, Math.min(400, Math.round(w))); }
+  window.importTemplateFromExcel = function (event) {
+    var input = event.target, file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    if (typeof templateLocked !== 'undefined' && templateLocked) { alert('확정된 서식이거나 응답이 제출된 회차는 수정할 수 없습니다.'); return; }
+    if (file.size > 5 * 1024 * 1024) { alert('5MB 이하 파일만 가져올 수 있습니다.'); return; }
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellStyles: true });
+        var sheets = [], trimmed = false;
+        wb.SheetNames.forEach(function (name) {
+          var ws = wb.Sheets[name]; if (!ws) return;
+          var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, blankrows: true });
+          var lastRow = -1, lastCol = -1;
+          aoa.forEach(function (row, r) { row.forEach(function (v, c) { if (String(v).trim() !== '') { if (r > lastRow) lastRow = r; if (c > lastCol) lastCol = c; } }); });
+          if (lastRow < 0) return;
+          if (lastRow + 1 > MAX_ROWS) { lastRow = MAX_ROWS - 1; trimmed = true; }
+          if (lastCol + 1 > MAX_COLS) { lastCol = MAX_COLS - 1; trimmed = true; }
+          var data = [];
+          for (var r = 0; r <= lastRow; r++) {
+            var row = [];
+            for (var c = 0; c <= lastCol; c++) { var v = aoa[r] && aoa[r][c] != null ? String(aoa[r][c]) : ''; row.push(v.replace(/\r\n?/g, '\n')); }
+            data.push(row);
+          }
+          var cols = ws['!cols'] || [], widths = [];
+          for (var c2 = 0; c2 <= lastCol; c2++) {
+            var ci = cols[c2], w = 120;
+            if (ci) { if (ci.wpx) w = ci.wpx; else if (ci.wch) w = ci.wch * 7 + 5; else if (ci.width) w = ci.width * 7 + 5; }
+            widths.push(clampW(w));
+          }
+          sheets.push({ name: String(name).slice(0, 31), data: data, colWidths: widths });
+        });
+        if (!sheets.length) { alert('가져올 내용이 있는 시트를 찾지 못했습니다.'); return; }
+        var hasContent = (currentUser.templateSheets || []).some(function (sh) { return (sh.data || []).some(function (row) { return row.some(function (v) { return String(v || '').trim() !== ''; }); }); });
+        if (hasContent && !confirm('지금 만들어 둔 서식 내용이 모두 사라지고, 엑셀 파일의 ' + sheets.length + '개 시트로 바뀝니다. 계속할까요?')) return;
+        currentUser.templateSheets = sheets;
+        currentTemplateSheetIndex = 0;
+        renderTemplateEditor();
+        alert(sheets.length + '개 시트를 가져왔습니다.' + (trimmed ? '\n(행은 ' + MAX_ROWS + '개, 열은 ' + MAX_COLS + '개까지만 가져왔습니다.)' : '') + '\n내용을 확인하고 필요하면 고친 뒤 "임시 저장"을 눌러주세요.\n※ 글자와 열 너비만 가져오며, 병합·테두리·색은 가져오지 않습니다.');
+      } catch (err) { alert('엑셀 파일을 읽지 못했습니다: ' + (err && err.message ? err.message : err)); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  /* 엑셀에서 복사한 내용을 붙여넣을 때, 표 크기를 넘으면 행·열을 먼저 늘려 준다 */
+  function parseTsvSize(txt) {
+    var rows = 0, cols = 0, cur = 0, inQ = false, any = false;
+    for (var i = 0; i < txt.length; i++) {
+      var ch = txt[i];
+      if (inQ) { if (ch === '"') { if (txt[i + 1] === '"') i++; else inQ = false; } continue; }
+      if (ch === '"' && (i === 0 || txt[i - 1] === '\t' || txt[i - 1] === '\n')) { inQ = true; any = true; continue; }
+      if (ch === '\t') { cur++; any = true; }
+      else if (ch === '\n') { rows++; cols = Math.max(cols, cur + 1); cur = 0; any = false; }
+      else any = true;
+    }
+    if (any || cur > 0) { rows++; cols = Math.max(cols, cur + 1); }
+    return { rows: rows, cols: cols };
+  }
+  window.addEventListener('paste', function (e) {
+    try {
+      if (typeof templateGrid === 'undefined' || !templateGrid || (typeof templateLocked !== 'undefined' && templateLocked)) return;
+      var holder = document.getElementById('templateSpreadsheet');
+      if (!holder || !holder.offsetParent) return;
+      var sel = templateGrid.selectedCell; if (!sel) return;
+      var ae = document.activeElement;
+      if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && !holder.contains(ae)) return;
+      var txt = (e.clipboardData && e.clipboardData.getData('text')) || ''; if (!txt) return;
+      var size = parseTsvSize(txt.replace(/\r\n?/g, '\n').replace(/\n$/, ''));
+      var x0 = Math.min(sel[0], sel[2]), y0 = Math.min(sel[1], sel[3]);
+      var needCols = x0 + size.cols, needRows = y0 + size.rows;
+      var curCols = templateGrid.options.columns.length, curRows = templateGrid.rows.length;
+      if (needCols > MAX_COLS || needRows > MAX_ROWS) { alert('붙여넣는 내용이 너무 큽니다. (최대 ' + MAX_ROWS + '행 × ' + MAX_COLS + '열)'); e.preventDefault(); e.stopImmediatePropagation(); return; }
+      if (needCols > curCols) templateGrid.insertColumn(needCols - curCols, curCols - 1, false);
+      if (needRows > curRows) templateGrid.insertRow(needRows - curRows, curRows - 1, false);
+    } catch (err) { console.error('[서식 붙여넣기] 칸 늘리기 실패(붙여넣기는 계속 진행)', err); }
+  }, true);
 })();
 </script>
 </body>
