@@ -375,6 +375,33 @@
     <iframe id="boardIframe" src="about:blank" title="글·파일 올리기" allow="clipboard-read; clipboard-write; web-share; fullscreen"></iframe>
   </div>
 
+  <div id="sharedFormsModal" class="hidden" style="position:fixed; inset:0; z-index:9300; background:rgba(15,23,42,.55); overflow:auto;">
+    <div style="max-width:760px; margin:24px auto; background:#fff; border-radius:12px; padding:18px 20px; box-shadow:0 10px 30px rgba(0,0,0,.3);">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <h3 style="margin:0;">📚 공유 양식</h3>
+        <button class="btn btn-sm btn-secondary" onclick="closeSharedForms()">닫기</button>
+      </div>
+      <p style="font-size:14.1px; color:#475569; margin:6px 0 10px 0;">다른 담당자가 만들어 공유한 <strong>취합 양식(질문·표 항목·서식 시트)</strong>을 불러와 내 새 회차로 쓰거나, 내가 만든 양식을 공유할 수 있습니다. 기관 명단·접속코드·비밀번호·마감일·제출된 응답은 공유되지 않습니다. 불러온 뒤 취합 대상은 본인이 관리하는 기관만 지정하세요.</p>
+      <div style="display:flex; gap:6px; margin-bottom:10px;">
+        <button class="btn btn-sm" id="sfTabFind" onclick="sfShowTab('find')">양식 찾기</button>
+        <button class="btn btn-sm btn-secondary" id="sfTabShare" onclick="sfShowTab('share')">내 양식 올리기</button>
+        <button class="btn btn-sm btn-secondary hidden" id="sfTabReports" onclick="sfShowTab('reports')">🚩 신고 내역</button>
+      </div>
+      <div id="sfPaneFind">
+        <input type="text" id="sfSearch" placeholder="양식 이름·설명으로 검색" oninput="sfRenderList()" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:8px;" />
+        <div id="sfList" style="max-height:52vh; overflow:auto;"></div>
+      </div>
+      <div id="sfPaneShare" class="hidden">
+        <div class="form-group"><label>공유할 회차</label><select id="sfRoundSelect" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></select></div>
+        <div class="form-group"><label>양식 이름 (60자 이내)</label><input type="text" id="sfTitle" maxlength="60" placeholder="예: 시설 안전점검 결과 취합" /></div>
+        <div class="form-group"><label>설명 (300자 이내)</label><textarea id="sfDesc" maxlength="300" rows="3" placeholder="어떤 용도의 양식인지, 누구에게 받는 자료인지 적어주세요."></textarea></div>
+        <label style="display:flex; gap:6px; align-items:flex-start; font-size:14.1px; margin-bottom:10px;"><input type="checkbox" id="sfConsent" style="margin-top:3px;" /> 이 양식에 개인정보·내부 문서가 포함되어 있지 않으며, 로그인한 모든 담당자가 볼 수 있음을 확인했습니다.</label>
+        <button class="btn" onclick="sfPublish()">공유하기</button>
+      </div>
+      <div id="sfPaneReports" class="hidden"><div id="sfReportList"></div></div>
+    </div>
+  </div>
+
   <div id="demoOverlay" class="hidden">
     <div id="demoOverlayBar">
       <button onclick="closeDemoOverlay()">← 초기화면으로 돌아가기</button>
@@ -695,6 +722,7 @@
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-sm" onclick="startNewRound()">➕ 새 회차 추가</button>
+            <button class="btn btn-sm" style="background:#7c3aed;" onclick="openSharedForms()">📚 공유 양식 (불러오기·올리기)</button>
             <button class="btn btn-sm btn-danger" id="closeRoundBtn" onclick="closeCurrentEditingRound()">🔒 이 회차 종료</button>
           </div>
         </div>
@@ -1132,6 +1160,7 @@ async function handleGoogleLogin() {
 }
 async function enterAppForUser(arg27) {
   const v28 = await db.collection("system").doc("superadmins").collection("list").doc(arg27.email).get();
+  window.__isSuperAdmin = !!v28.exists;
   if (v28.exists) {
     document.getElementById("superAdminEmailDisplay").innerText = "(" + arg27.email + ")";
     document.getElementById("viewLogin").classList.add("hidden");
@@ -7447,6 +7476,154 @@ window.NoticeLinks = (function () {
   } else if (m) {
     document.documentElement.className = document.documentElement.className.replace(' np', '');
   }
+})();
+
+/* ================= 공유 양식 (취합 양식 공유·불러오기) ================= */
+(function () {
+  var SF_LIST = [];
+  function esc(x) { return String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function fmtDate(ms) { if (!ms) return ''; if (ms && typeof ms.toMillis === 'function') ms = ms.toMillis(); var d = new Date(ms); if (isNaN(d.getTime())) return ''; return d.getFullYear() + '.' + (d.getMonth() + 1) + '.' + d.getDate(); }
+  window.closeSharedForms = function () { document.getElementById('sharedFormsModal').classList.add('hidden'); };
+  window.openSharedForms = async function () {
+    if (!currentUser) return;
+    document.getElementById('sharedFormsModal').classList.remove('hidden');
+    document.getElementById('sfTabReports').classList.toggle('hidden', !window.__isSuperAdmin);
+    sfShowTab('find');
+    var sel = document.getElementById('sfRoundSelect');
+    sel.innerHTML = (roundsList || []).map(function (r) { return '<option value="' + r.id + '">' + esc(r.name) + (r.status === 'open' ? '' : ' (종료)') + '</option>'; }).join('');
+    if (currentRoundId) sel.value = currentRoundId;
+    await sfLoad();
+  };
+  window.sfShowTab = function (t) {
+    ['find', 'share', 'reports'].forEach(function (k) {
+      document.getElementById('sfPane' + k.charAt(0).toUpperCase() + k.slice(1)).classList.toggle('hidden', k !== t);
+      var b = document.getElementById('sfTab' + k.charAt(0).toUpperCase() + k.slice(1));
+      if (b) b.classList.toggle('btn-secondary', k !== t);
+    });
+    if (t === 'reports') sfLoadReports();
+  };
+  async function sfLoad() {
+    var box = document.getElementById('sfList');
+    box.innerHTML = '<div style="color:#94a3b8; padding:10px;">불러오는 중...</div>';
+    try {
+      var snap = await db.collection('sharedForms').orderBy('createdAt', 'desc').limit(60).get();
+      SF_LIST = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      sfRenderList();
+    } catch (e) { box.innerHTML = '<div style="color:#dc2626; padding:10px;">목록을 불러오지 못했습니다: ' + esc(e.message) + '<br>(Firestore 규칙에 sharedForms 항목이 추가되었는지 확인하세요.)</div>'; }
+  }
+  window.sfRenderList = function () {
+    var q = (document.getElementById('sfSearch').value || '').trim().toLowerCase();
+    var rows = SF_LIST.filter(function (f) { return !q || ((f.title || '') + ' ' + (f.description || '')).toLowerCase().indexOf(q) >= 0; });
+    var box = document.getElementById('sfList');
+    if (!rows.length) { box.innerHTML = '<div style="color:#94a3b8; padding:10px;">' + (SF_LIST.length ? '검색 결과가 없습니다.' : '아직 공유된 양식이 없습니다. "내 양식 올리기"에서 첫 양식을 공유해보세요.') + '</div>'; return; }
+    box.innerHTML = rows.map(function (f) {
+      var mine = currentUser && f.ownerUid === currentUser.id;
+      var qn = (f.questions || []).length, cn = (f.columns || []).length, sn = (f.templateSheets || []).length;
+      return '<div style="border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; margin-bottom:8px;">' +
+        '<div style="font-weight:700;">' + esc(f.title) + (mine ? ' <span style="font-size:12px; color:#7c3aed;">(내가 올림)</span>' : '') + '</div>' +
+        (f.description ? '<div style="font-size:14px; color:#475569; margin:3px 0;">' + esc(f.description) + '</div>' : '') +
+        '<div style="font-size:13px; color:#94a3b8;">' + fmtDate(f.createdAt) + ' · 질문 ' + qn + '개 · 표 항목 ' + cn + '개 · 서식 시트 ' + sn + '개' + '</div>' +
+        '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">' +
+        '<button class="btn btn-sm" onclick="sfUse(\'' + f.id + '\')">불러와 새 회차 만들기</button>' +
+        (mine || window.__isSuperAdmin ? '<button class="btn btn-sm btn-danger" onclick="sfDelete(\'' + f.id + '\')">삭제</button>' : '<button class="btn btn-sm btn-secondary" onclick="sfReport(\'' + f.id + '\')">🚩 신고</button>') +
+        '</div></div>';
+    }).join('');
+  };
+  window.sfPublish = async function () {
+    var rid = document.getElementById('sfRoundSelect').value;
+    var title = document.getElementById('sfTitle').value.trim();
+    var desc = document.getElementById('sfDesc').value.trim();
+    if (!rid) { alert('공유할 회차를 선택해주세요.'); return; }
+    if (!title) { alert('양식 이름을 입력해주세요.'); return; }
+    if (!document.getElementById('sfConsent').checked) { alert('확인 항목에 체크해주세요.'); return; }
+    try {
+      var snap = await db.collection('managers').doc(currentUser.id).collection('rounds').doc(rid).get();
+      if (!snap.exists) { alert('회차를 찾을 수 없습니다.'); return; }
+      var r = snap.data();
+      var payload = JSON.parse(JSON.stringify({
+        questions: r.questions || [], columns: r.columns || [],
+        templateSheets: r.templateSheets || [], templateTitle: r.templateTitle || '',
+        useSurvey: r.useSurvey !== false, useExcel: !!r.useExcel, useTemplate: !!r.useTemplate
+      }));
+      var json = JSON.stringify(payload);
+      if (json.indexOf('firebasestorage.googleapis.com') >= 0) { alert('업로드한 파일 서식은 공유할 수 없습니다. 질문·표 항목·서식 시트로 구성된 회차만 공유할 수 있습니다.'); return; }
+      if (json.length > 800000) { alert('양식이 너무 커서 공유할 수 없습니다. (약 ' + Math.round(json.length / 1024) + 'KB, 한도 약 780KB)\n서식 시트의 불필요한 칸을 줄여보세요.'); return; }
+      if (!(payload.questions.length || payload.columns.length || payload.templateSheets.length)) { alert('질문, 표 항목, 서식 시트가 없는 회차입니다.'); return; }
+      await db.collection('sharedForms').add(Object.assign({
+        title: title, description: desc, ownerUid: currentUser.id,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, payload));
+      alert('공유했습니다. 다른 담당자가 "공유 양식"에서 불러올 수 있습니다.');
+      document.getElementById('sfTitle').value = ''; document.getElementById('sfDesc').value = ''; document.getElementById('sfConsent').checked = false;
+      sfShowTab('find'); await sfLoad();
+    } catch (e) { alert('공유 중 오류가 발생했습니다: ' + e.message); }
+  };
+  window.sfUse = async function (id) {
+    var f = SF_LIST.filter(function (x) { return x.id === id; })[0]; if (!f) return;
+    var name = prompt('새 회차의 이름을 입력하세요.', f.title || '');
+    if (!name) return;
+    try {
+      var copy = JSON.parse(JSON.stringify({ questions: f.questions || [], columns: f.columns || [], templateSheets: f.templateSheets || [] }));
+      var mRef = db.collection('managers').doc(currentUser.id);
+      var code = generateRoundCode(), ref = mRef.collection('rounds').doc();
+      var data = {
+        name: name, roundCode: code,
+        questions: copy.questions,
+        columns: copy.columns.length ? copy.columns : cloneDefaultColumns(),
+        useSurvey: f.useSurvey !== false, useExcel: !!f.useExcel, useTemplate: !!f.useTemplate,
+        templateSheets: copy.templateSheets.length ? wrapTemplateSheets(copy.templateSheets) : wrapTemplateSheets([newTemplateSheet('시트1')]),
+        templateTitle: f.templateTitle || '',
+        templateConfirmed: false, questionsConfirmed: false, columnsConfirmed: false,
+        deadline: '', confirmedAt: null, status: 'open', createdAt: Date.now(), closedAt: null
+      };
+      await ref.set(data);
+      await registerRoundCode(code, ref.id);
+      await mRef.update({ activeRoundId: ref.id });
+      currentUser.activeRoundId = ref.id; currentRoundId = ref.id;
+      currentUser.questions = data.questions; currentUser.columns = data.columns;
+      currentUser.useSurvey = data.useSurvey; currentUser.useExcel = data.useExcel; currentUser.useTemplate = data.useTemplate;
+      currentUser.templateSheets = data.templateSheets; currentTemplateSheetIndex = 0; currentUser.templateTitle = data.templateTitle;
+      currentUser.templateConfirmed = false; currentUser.questionsConfirmed = false; currentUser.columnsConfirmed = false;
+      currentUser.deadline = ''; currentUser.confirmedAt = null;
+      closeSharedForms();
+      await loadRoundsList(); renderModeSelection(); renderManagerQuestions(); renderColumnConfigEditor();
+      alert('"' + name + '" 회차를 공유 양식으로 만들었습니다.\n내용을 검토·수정한 뒤 확정하시고, 취합 대상은 본인이 관리하는 기관 명단으로 지정해주세요.');
+    } catch (e) { alert('불러오는 중 오류가 발생했습니다: ' + e.message); }
+  };
+  window.sfDelete = async function (id) {
+    if (!confirm('이 공유 양식을 삭제할까요? 이미 불러가서 사용 중인 회차에는 영향이 없습니다.')) return;
+    try { await db.collection('sharedForms').doc(id).delete(); await sfLoad(); } catch (e) { alert('삭제 중 오류가 발생했습니다: ' + e.message); }
+  };
+  window.sfReport = async function (id) {
+    var f = SF_LIST.filter(function (x) { return x.id === id; })[0]; if (!f) return;
+    var reason = prompt('신고 사유를 간단히 적어주세요. (예: 부적절한 내용, 개인정보 포함, 광고)');
+    if (!reason) return;
+    try {
+      await db.collection('sharedFormReports').doc(id + '_' + currentUser.id).set({
+        formId: id, title: String(f.title || '').slice(0, 60), reason: reason.slice(0, 200), reporter: currentUser.id,
+        at: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      alert('신고했습니다. 슈퍼관리자가 확인 후 조치합니다.');
+    } catch (e) { alert('신고 중 오류가 발생했습니다: ' + e.message); }
+  };
+  async function sfLoadReports() {
+    var box = document.getElementById('sfReportList');
+    box.innerHTML = '<div style="color:#94a3b8;">불러오는 중...</div>';
+    try {
+      var snap = await db.collection('sharedFormReports').orderBy('at', 'desc').limit(100).get();
+      if (snap.empty) { box.innerHTML = '<div style="color:#94a3b8;">신고 내역이 없습니다.</div>'; return; }
+      box.innerHTML = snap.docs.map(function (d) {
+        var r = d.data();
+        return '<div style="border:1px solid #fecaca; background:#fef2f2; border-radius:8px; padding:8px 10px; margin-bottom:6px;"><b>' + esc(r.title) + '</b><div style="font-size:14px;">' + esc(r.reason) + '</div>' +
+          '<div style="display:flex; gap:6px; margin-top:6px;"><button class="btn btn-sm btn-danger" onclick="sfReportDeleteForm(\'' + esc(r.formId) + '\',\'' + d.id + '\')">양식 삭제</button><button class="btn btn-sm btn-secondary" onclick="sfReportDismiss(\'' + d.id + '\')">신고 무시</button></div></div>';
+      }).join('');
+    } catch (e) { box.innerHTML = '<div style="color:#dc2626;">' + esc(e.message) + '</div>'; }
+  }
+  window.sfReportDismiss = async function (rid) { try { await db.collection('sharedFormReports').doc(rid).delete(); sfLoadReports(); } catch (e) { alert(e.message); } };
+  window.sfReportDeleteForm = async function (fid, rid) {
+    if (!confirm('이 공유 양식을 삭제할까요?')) return;
+    try { await db.collection('sharedForms').doc(fid).delete(); await db.collection('sharedFormReports').doc(rid).delete(); sfLoadReports(); } catch (e) { alert(e.message); }
+  };
 })();
 </script>
 </body>
